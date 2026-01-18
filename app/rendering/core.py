@@ -4,6 +4,7 @@ Orquesta la creación de la figura Matplotlib y delega en plotters específicos.
 """
 
 import datetime
+import os
 import structlog
 import matplotlib
 import matplotlib.pyplot as plt
@@ -91,7 +92,9 @@ class ChartRenderer:
         fig.suptitle(title, fontsize=14)
 
         market_pair_safe = market_pair.replace('/', '_').lower()
-        chart_file = '{}/{}_{}_{}.png'.format('./charts', exchange, market_pair_safe, candle_period)
+        charts_dir = './charts'
+        os.makedirs(charts_dir, exist_ok=True)
+        chart_file = '{}/{}_{}_{}.png'.format(charts_dir, exchange, market_pair_safe, candle_period)
 
         plt.savefig(chart_file)
         plt.close(fig)
