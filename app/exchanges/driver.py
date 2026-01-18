@@ -77,8 +77,8 @@ class CCXTDriver(BaseExchange):
     def get_historical_data(
         self, 
         market_pair: str, 
-        time_unit: str,
         exchange: str,
+        time_unit: str,
         start_date: Optional[int] = None,
         max_periods: int = 240
     ) -> List[List]:
