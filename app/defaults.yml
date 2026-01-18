@@ -12,6 +12,23 @@ settings:
   market_data_chunk_size: 20
   market_pairs: null
   timezone: UTC
+  
+  # ─────────────────────────────────────────
+  # Dynamic Pairs - Filtrado automático de mercados
+  # ─────────────────────────────────────────
+  # Si enabled=true y market_pairs=null, usa filtros dinámicos
+  # Flujo: DataManager.get_top_pairs() → Lista filtrada
+  dynamic_pairs:
+    enabled: false              # Activar filtrado dinámico
+    source: volume              # volume | manual (futuro: coingecko)
+    top_n: 50                   # Cantidad de pares a analizar
+    quote_currency: USDT        # Moneda de cotización
+    min_volume_24h: 1000000     # Volumen mínimo (en USDT)
+    exclude:                    # Pares a excluir
+      - USDC/USDT
+      - BUSD/USDT
+      - TUSD/USDT
+      - DAI/USDT
 
 exchanges: null
 
