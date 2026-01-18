@@ -2,6 +2,12 @@
 Punto de Entrada Principal (Main Entry Point)
 Este módulo inicializa la configuración, los logs y despliega los hilos (workers)
 que realizarán el análisis técnico de forma paralela.
+
+Flujo:
+    1. Cargar configuración (YAML)
+    2. Inicializar DataManager y PairResolver
+    3. Resolver pares (manual o dinámico)
+    4. Crear workers para cada chunk de pares
 """
 
 import concurrent.futures
@@ -17,35 +23,47 @@ from behaviour.core import Behaviour
 from conf import Configuration
 from exchanges import ExchangeInterface
 from notifications.core import Notifier
+from data import DataManager, PairResolver
 
 
 def main():
     """
     Función principal que arranca el bot.
-    1. Carga la configuración (YAML).
-    2. Configura el logger.
-    3. Inicializa la interfaz de exchange.
-    4. Divide los mercados en 'chunks' y asigna un Worker a cada uno.
+    
+    Flujo:
+        1. Carga configuración → 2. Inicializa exchanges
+        3. Resuelve pares (manual/dinámico) → 4. Lanza workers
     """
-    # Load settings and create the config object
+    # 1. Cargar configuración
     config = Configuration()
     settings = config.settings
 
-    # Set up logger
+    # 2. Configurar logger
     logs.configure_logging(settings['log_level'], settings['log_mode'])
     logger = structlog.get_logger()
 
-    # Configure and run configured behaviour.
+    # 3. Inicializar interfaz de exchange
     exchange_interface = ExchangeInterface(config.exchanges)
 
-    if settings['market_pairs']:
-        market_pairs = settings['market_pairs']
-        logger.info("Found configured markets: %s", market_pairs)
-        market_data = exchange_interface.get_exchange_markets(
-            markets=market_pairs)
-    else:
-        logger.info("No configured markets, using all available on exchange.")
-        market_data = exchange_interface.get_exchange_markets()
+    # 4. Inicializar DataManager y PairResolver
+    # Flujo: PairResolver → DataManager → CCXTDriver → Exchange API
+    data_manager = DataManager(exchange_interface)
+    pair_resolver = PairResolver(settings, data_manager)
+
+    # 5. Resolver pares para cada exchange
+    market_data = {}
+    for exchange_name in exchange_interface.get_exchanges():
+        pairs = pair_resolver.resolve(exchange_name)
+        
+        if pairs:
+            logger.info("Found configured markets: %s", pairs)
+            exchange_markets = exchange_interface.get_exchange_markets(
+                markets=pairs
+            )
+            market_data.update(exchange_markets)
+        else:
+            logger.info("No configured markets, using all available on exchange.")
+            market_data.update(exchange_interface.get_exchange_markets())
 
     thread_list = []
 

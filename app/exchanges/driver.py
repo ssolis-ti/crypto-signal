@@ -73,6 +73,14 @@ class CCXTDriver(BaseExchange):
             except Exception as e:
                 self.logger.error(f"Error cargando exchange {exchange_name}: {e}")
 
+    def get_exchanges(self) -> List[str]:
+        """
+        Retorna lista de nombres de exchanges cargados.
+        
+        Flujo: app.py → get_exchanges() → ['binance', 'coinbase', ...]
+        """
+        return list(self.exchanges.keys())
+
     @retry(retry=retry_if_exception_type(ccxt.NetworkError), stop=stop_after_attempt(3))
     def get_historical_data(
         self, 
