@@ -51,7 +51,7 @@ notifiers:
         
         {% if btc_trend == 'bullish' %}🟢 BTC Alcista (+{{btc_change_24h|default(0)|round(1)}}%){% elif btc_trend == 'bearish' %}🔴 BTC Bajista ({{btc_change_24h|default(0)|round(1)}}%){% else %}⚪ BTC Neutral{% endif %}
         
-        {% if quality == 'A+' %}⚡ A+ Señal muy fuerte{% elif quality == 'A' %}✅ A Señal sólida{% elif quality == 'B' %}⚠️ B Confirmar{% else %}❌ C Precaución{% endif %}
+        {% if quality == 'A+' %}⚡ A+ Señal muy fuerte ({{score|default(50)|round(0)|int}}){% elif quality == 'A' %}✅ A Señal sólida ({{score|default(50)|round(0)|int}}){% elif quality == 'B' %}⚠️ B Confirmar ({{score|default(50)|round(0)|int}}){% else %}❌ C Precaución ({{score|default(50)|round(0)|int}}){% endif %}
         
         {% if context_note %}💡 {{context_note}}{% endif %}
         
@@ -76,6 +76,7 @@ notifiers:
         period_count={{analysis.config.period_count|default('N/A')}}
         quality_grade={{quality|default('B')}}
         confidence_score={{confidence|default(0)}}
+        score={{score|default(50)}}
         btc_trend={{btc_trend|default('neutral')}}
         btc_24h_pct={{btc_change_24h|default(0)}}
         alt_vs_btc_strength={{relative_strength|default(0)}}

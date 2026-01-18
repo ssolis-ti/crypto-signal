@@ -28,6 +28,7 @@ class EnhancedSignal:
     # Clasificación
     quality: str = 'B'                   # A+/A/B/C
     confidence: int = 50                 # 0-100
+    score: float = 50.0                  # Score continuo 0-100 (Fase 1)
     recommendation: str = 'hold'         # strong_buy/buy/hold/avoid/sell/strong_sell
     
     # Contexto
@@ -51,6 +52,7 @@ class EnhancedSignal:
             'values': self.values,
             'quality': self.quality,
             'confidence': self.confidence,
+            'score': self.score,
             'recommendation': self.recommendation,
             'context_note': self.context_note,
             'btc_trend': self.btc_trend,
@@ -141,8 +143,8 @@ class SignalEnhancer:
             enhanced.relative_strength = alt_strength.relative_strength
             enhanced.divergence = alt_strength.divergence
             
-            # Calcular calidad
-            quality, confidence, note = self._calculate_quality(
+            # Calcular calidad (scoring continuo - Fase 1)
+            quality, confidence, note, score = self._calculate_quality(
                 signal_type=enhanced.signal_type,
                 btc_trend=context.btc_trend,
                 alt_strength=alt_strength,
@@ -152,6 +154,7 @@ class SignalEnhancer:
             
             enhanced.quality = quality
             enhanced.confidence = confidence
+            enhanced.score = score
             enhanced.context_note = note
             enhanced.recommendation = self._get_recommendation(quality, enhanced.signal_type)
             
@@ -187,17 +190,121 @@ class SignalEnhancer:
         rsi_value: float = None
     ) -> tuple:
         """
-        Calcula calidad de la señal.
+        Calcula calidad usando scoring continuo (Fase 1).
         
         Returns:
-            (quality, confidence, note)
+            (quality, confidence, note, score)
         """
-        if signal_type == 'hot':
-            return self._quality_for_hot(btc_trend, alt_strength, sentiment, rsi_value)
-        elif signal_type == 'cold':
-            return self._quality_for_cold(btc_trend, alt_strength, sentiment)
+        score = self._calculate_score(signal_type, btc_trend, alt_strength, sentiment, rsi_value)
+        quality = self._score_to_quality(score)
+        confidence = int(score)
+        note = self._generate_score_note(btc_trend, alt_strength, score, signal_type)
+        return quality, confidence, note, score
+    
+    def _calculate_score(
+        self,
+        signal_type: str,
+        btc_trend: str,
+        alt: AltStrengthData,
+        sentiment: str,
+        rsi: float = None
+    ) -> float:
+        """
+        Calcula score continuo 0-100 (Fase 1).
+        
+        Factores:
+            - BTC trend: ±20 pts
+            - ALT relative strength: ±30 pts
+            - Market sentiment: ±10 pts
+            - RSI zone: ±15 pts
+        """
+        score = 50.0  # Base neutral
+        
+        # Factor BTC trend
+        btc_factors = {'bullish': 20, 'neutral': 0, 'bearish': -20}
+        btc_adjustment = btc_factors.get(btc_trend, 0)
+        
+        # Factor ALT strength (relativo a 1.0)
+        alt_adjustment = (alt.relative_strength - 1.0) * 30
+        alt_adjustment = max(-30, min(30, alt_adjustment))  # Clamp
+        
+        # Factor sentiment
+        sent_factors = {'risk_on': 10, 'neutral': 0, 'risk_off': -10}
+        sent_adjustment = sent_factors.get(sentiment, 0)
+        
+        # Ajustar según tipo de señal
+        if signal_type == 'hot':  # Compra
+            score += btc_adjustment
+            score += alt_adjustment
+            score += sent_adjustment
+            
+            # Bonus RSI
+            if rsi is not None:
+                if rsi < 30:
+                    score += 15  # Sobreventa extrema
+                elif rsi < 40:
+                    score += 10  # Sobreventa
+                elif rsi > 70:
+                    score -= 15  # Sobrecompra
+                elif rsi > 60:
+                    score -= 5   # Cerca de sobrecompra
+        
+        elif signal_type == 'cold':  # Venta
+            score -= btc_adjustment  # Invertir: BTC bearish es bueno para ventas
+            score -= alt_adjustment  # ALT débil es bueno para ventas
+            score -= sent_adjustment
+            
+            # Bonus RSI para ventas
+            if rsi is not None:
+                if rsi > 70:
+                    score += 15  # Sobrecompra extrema
+                elif rsi > 60:
+                    score += 10
+                elif rsi < 30:
+                    score -= 10  # Sobreventa
+        
+        return max(0, min(100, score))
+    
+    def _score_to_quality(self, score: float) -> str:
+        """Mapea score continuo a calidad discreta."""
+        if score >= 75:
+            return 'A+'
+        elif score >= 60:
+            return 'A'
+        elif score >= 40:
+            return 'B'
         else:
-            return 'B', 50, 'Señal neutral'
+            return 'C'
+    
+    def _generate_score_note(
+        self, 
+        btc_trend: str, 
+        alt: AltStrengthData, 
+        score: float,
+        signal_type: str
+    ) -> str:
+        """Genera nota explicativa basada en score."""
+        parts = []
+        
+        # BTC
+        btc_labels = {'bullish': 'BTC alcista', 'bearish': 'BTC bajista', 'neutral': 'BTC lateral'}
+        parts.append(btc_labels.get(btc_trend, 'BTC neutral'))
+        
+        # ALT
+        if alt.outperforming:
+            parts.append(f'ALT fuerte ({alt.relative_strength:.1f}x)')
+        elif alt.relative_strength < 0.8:
+            parts.append('ALT débil')
+        
+        # Score
+        if score >= 75:
+            parts.append('Score excelente')
+        elif score >= 60:
+            parts.append('Score sólido')
+        elif score < 40:
+            parts.append('Score bajo - precaución')
+        
+        return ', '.join(parts)
     
     def _quality_for_hot(
         self, 

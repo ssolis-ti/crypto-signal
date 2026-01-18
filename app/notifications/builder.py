@@ -344,6 +344,7 @@ class MessageBuilder:
                                     
                                     if enhanced_data:
                                         confidence = enhanced_data.get('confidence', 0)
+                                        score = enhanced_data.get('score', 50.0)  # Fase 1
                                         btc_trend = enhanced_data.get('btc_trend', 'neutral')
                                         btc_change_24h = enhanced_data.get('btc_change_24h', 0)
                                         relative_strength = enhanced_data.get('relative_strength', 1.0)
@@ -353,6 +354,7 @@ class MessageBuilder:
                                         btc_change_24h = 0
                                         relative_strength = 0
                                         market_sentiment = 'neutral'
+                                        score = 50.0
 
                                     new_message = dict(
                                         values=values, exchange=exchange, market=market_pair, base_currency=base_currency,
@@ -360,8 +362,8 @@ class MessageBuilder:
                                         analysis=analysis, status=status, last_status=last_status,
                                         prices=prices, lrsi=lrsi, creation_date=creation_date, hot_cold_label=hot_cold_label,
                                         indicator_label=indicator_label, price_value=price_value, decimal_format=decimal_format,
-                                        # Campos de Correlación (Fase 4)
-                                        quality=quality, context_note=context_note, confidence=confidence,
+                                        # Campos de Correlación (Fase 4) + Score (Fase 1)
+                                        quality=quality, context_note=context_note, confidence=confidence, score=score,
                                         btc_trend=btc_trend, btc_change_24h=btc_change_24h, 
                                         relative_strength=relative_strength, market_sentiment=market_sentiment
                                     )
