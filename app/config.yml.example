@@ -1,7 +1,7 @@
 # ===========================================
-# CRYPTO-SIGNAL: Archivo de Configuración
+# CRYPTO-SIGNAL: Configuración Optimizada
 # ===========================================
-# Copia este archivo como config.yml y edita tus credenciales
+# Copia este archivo como config.yml
 # Ubicación: app/config.yml
 
 settings:
@@ -10,7 +10,7 @@ settings:
     - BTC/USDT
     - ETH/USDT
   enable_charts: true         # Genera gráficos técnicos
-  timezone: UTC
+  timezone: America/Santiago  # Tu zona horaria
 
 exchanges:
   binance:
@@ -26,16 +26,76 @@ notifiers:
       chat_id: "TU_CHAT_ID_AQUI"  # Obtener de @userinfobot
     optional:
       parse_mode: html
-      template: "<b>[{{analysis.config.candle_period}}]</b> {{market}} is {{status}}!"
+      template: |
+        {% if status == 'hot' %}🟢 <b>SEÑAL DE COMPRA</b>{% else %}🔴 <b>SEÑAL DE VENTA</b>{% endif %}
+        
+        📊 <b>{{market}}</b> @ {{exchange}}
+        ⏱️ Timeframe: {{analysis.config.candle_period}}
+        📉 {{indicator|upper}}: {{values}}
+        💵 Precio actual: ${{price_value.close}}
+        🕐 {{creation_date}}
 
+# =====================
+# INDICADORES ACTIVOS
+# =====================
 indicators:
+  # RSI - Índice de Fuerza Relativa
   rsi:
     - enabled: true
       alert_enabled: true
       alert_frequency: once
       signal: [rsi]
-      hot: 30                 # Alerta cuando RSI < 30 (sobreventa)
-      cold: 70                # Alerta cuando RSI > 70 (sobrecompra)
-      mute_cold: false        # true = solo alertas de compra
-      candle_period: 1h
+      hot: 30                 # RSI < 30 = Sobreventa (compra)
+      cold: 70                # RSI > 70 = Sobrecompra (venta)
+      hot_label: "🟢 RSI en sobreventa"
+      cold_label: "🔴 RSI en sobrecompra"
+      mute_cold: false
+      candle_period: 4h
       period_count: 14
+
+  # MACD - Moving Average Convergence Divergence
+  macd:
+    - enabled: true
+      alert_enabled: true
+      alert_frequency: once
+      signal: [macd, macdsignal]
+      hot: 0                  # MACD cruza hacia arriba
+      cold: 0                 # MACD cruza hacia abajo
+      hot_label: "🟢 MACD cruce alcista"
+      cold_label: "🔴 MACD cruce bajista"
+      mute_cold: false
+      candle_period: 4h
+
+  # =====================
+  # INDICADORES DESHABILITADOS
+  # =====================
+  momentum:
+    - enabled: false
+  mfi:
+    - enabled: false
+  obv:
+    - enabled: false
+  stoch_rsi:
+    - enabled: false
+  ichimoku:
+    - enabled: false
+  iiv:
+    - enabled: false
+
+# =====================
+# INFORMANTES (datos adicionales)
+# =====================
+informants:
+  ohlcv:
+    - enabled: true
+      signal: [open, high, low, close]
+      candle_period: 4h
+  lrsi:
+    - enabled: true
+      signal: [lrsi]
+      candle_period: 4h
+      period_count: 14
+  bollinger_bands:
+    - enabled: true
+      candle_period: 4h
+      period_count: 21
