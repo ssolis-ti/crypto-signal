@@ -1,8 +1,27 @@
+# Configuración personal (contiene credenciales)
+config.yml
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+
+# Archivos temporales
 .env
 settings.env
-config.yml
-.vscode
-.idea/
-lib/ta-lib/
-app/charts
-app/user_data
+
+# Generados por el bot
+app/charts/
+app/user_data/
+
+# TA-Lib (ahora se descarga en Docker)
+lib/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
