@@ -1,0 +1,41 @@
+# ===========================================
+# CRYPTO-SIGNAL: Archivo de Configuración
+# ===========================================
+# Copia este archivo como config.yml y edita tus credenciales
+# Ubicación: app/config.yml
+
+settings:
+  update_interval: 300        # Segundos entre análisis (5 min)
+  market_pairs:
+    - BTC/USDT
+    - ETH/USDT
+  enable_charts: true         # Genera gráficos técnicos
+  timezone: UTC
+
+exchanges:
+  binance:
+    required:
+      enabled: true
+    # all_pairs: [USDT]       # Descomenta para escanear TODO
+    # exclude: [USDC, BUSD]   # Ignorar stablecoins
+
+notifiers:
+  telegram:
+    required:
+      token: "TU_TOKEN_AQUI"      # Obtener de @BotFather
+      chat_id: "TU_CHAT_ID_AQUI"  # Obtener de @userinfobot
+    optional:
+      parse_mode: html
+      template: "<b>[{{analysis.config.candle_period}}]</b> {{market}} is {{status}}!"
+
+indicators:
+  rsi:
+    - enabled: true
+      alert_enabled: true
+      alert_frequency: once
+      signal: [rsi]
+      hot: 30                 # Alerta cuando RSI < 30 (sobreventa)
+      cold: 70                # Alerta cuando RSI > 70 (sobrecompra)
+      mute_cold: false        # true = solo alertas de compra
+      candle_period: 1h
+      period_count: 14
