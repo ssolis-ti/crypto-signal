@@ -30,6 +30,26 @@ settings:
       - TUSD/USDT
       - DAI/USDT
 
+  # ─────────────────────────────────────────
+  # Correlation - Análisis de Contexto de Mercado
+  # ─────────────────────────────────────────
+  # Clasifica señales según correlación con BTC y contexto global
+  # Calidad: A+ (mejor) → A → B → C (evitar)
+  correlation:
+    enabled: false              # Activar análisis de correlación
+    reference_pair: BTC/USDT    # Par de referencia (líder del mercado)
+    
+    # Umbrales para clasificación
+    thresholds:
+      btc_bullish: 2.0          # % cambio 24h para considerar bullish
+      btc_bearish: -2.0         # % cambio 24h para considerar bearish
+      outperform_ratio: 1.2     # Ratio ALT/BTC para considerar outperforming
+    
+    # Filtro de calidad (opcional)
+    quality_filter:
+      enabled: false            # Si true, solo notifica señales de alta calidad
+      min_quality: A            # Calidad mínima para notificar (A+, A, B, C)
+
 exchanges: null
 
 notifiers:
