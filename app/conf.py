@@ -12,8 +12,7 @@ class Configuration():
     """
 
     def __init__(self):
-        """Initializes the Configuration class
-        """
+        """Initializes the Configuration class"""
 
         with open('defaults.yml', 'r') as config_file:
             default_config = yaml.load(config_file, Loader=yaml.FullLoader)
@@ -24,45 +23,32 @@ class Configuration():
         else:
             user_config = dict()
 
-        if 'settings' in user_config:
-            self.settings = {
-                **default_config['settings'], **user_config['settings']}
-        else:
-            self.settings = default_config['settings']
+        # Merge Recursivo (Deep Merge)
+        self.config = self._deep_merge(default_config, user_config)
 
-        if 'notifiers' in user_config:
-            self.notifiers = {
-                **default_config['notifiers'], **user_config['notifiers']}
-        else:
-            self.notifiers = default_config['notifiers']
+        self.settings = self.config.get('settings', {})
+        self.notifiers = self.config.get('notifiers', {})
+        self.indicators = self.config.get('indicators', {})
+        self.informants = self.config.get('informants', {})
+        self.crossovers = self.config.get('crossovers', {})
+        self.exchanges = self.config.get('exchanges', {})
+        self.conditionals = self.config.get('conditionals', None)
 
-        if 'indicators' in user_config:
-            self.indicators = {
-                **default_config['indicators'], **user_config['indicators']}
-        else:
-            self.indicators = default_config['indicators']
-
-        if 'informants' in user_config:
-            self.informants = {
-                **default_config['informants'], **user_config['informants']}
-        else:
-            self.informants = default_config['informants']
-
-        if 'crossovers' in user_config:
-            self.crossovers = {
-                **default_config['crossovers'], **user_config['crossovers']}
-        else:
-            self.crossovers = default_config['crossovers']
-
-        if 'exchanges' in user_config:
-            self.exchanges = user_config['exchanges']
-        else:
-            self.exchanges = dict()
-        
-        if 'conditionals' in user_config:
-            self.conditionals = user_config['conditionals']
-        else:
-            self.conditionals = None
+    def _deep_merge(self, default, override):
+        """
+        Fusiona recursivamente dos diccionarios.
+        Los valores de 'override' sobrescriben a 'default'.
+        """
+        if isinstance(default, dict) and isinstance(override, dict):
+            # Copiamos default para no mutarlo
+            merged = default.copy()
+            for key, value in override.items():
+                if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+                    merged[key] = self._deep_merge(merged[key], value)
+                else:
+                    merged[key] = value
+            return merged
+        return override
 
         for exchange in ccxt.exchanges:
             if exchange not in self.exchanges:
