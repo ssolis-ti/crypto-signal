@@ -55,6 +55,7 @@ def main():
     market_data = {}
     for exchange_name in exchange_interface.get_exchanges():
         pairs = pair_resolver.resolve(exchange_name)
+        logger.info(f"DEBUG: Resolver returned {len(pairs) if pairs else 0} pairs for {exchange_name}")
         
         if pairs:
             logger.info("Found configured markets: %s", pairs)
