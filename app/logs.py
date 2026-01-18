@@ -5,7 +5,6 @@ import logging
 import sys
 
 import structlog
-from pythonjsonlogger import jsonlogger
 
 
 def configure_logging(loglevel, log_mode):
@@ -22,7 +21,8 @@ def configure_logging(loglevel, log_mode):
         loglevel = logging.INFO
 
     if log_mode == 'json':
-        log_formatter = jsonlogger.JsonFormatter()
+        # Fallback to standard logging for JSON mode as python-json-logger was removed
+        log_formatter = logging.Formatter('%(message)s')
     elif log_mode == 'text':
         log_formatter = logging.Formatter('%(message)s')
     elif log_mode == 'standard':
