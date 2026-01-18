@@ -1,23 +1,40 @@
 # ===========================================
-# CRYPTO-SIGNAL: Configuración Optimizada
+# CRYPTO-SIGNAL: Configuración Profesional
 # ===========================================
-# Copia este archivo como config.yml
-# Ubicación: app/config.yml
+# Copia este archivo como config.yml en la raíz del proyecto
+# Documentación: docs/config.md
 
 settings:
-  update_interval: 300        # Segundos entre análisis (5 min)
-  market_pairs:
-    - BTC/USDT
-    - ETH/USDT
-  enable_charts: true         # Genera gráficos técnicos
-  timezone: America/Santiago  # Tu zona horaria
+  update_interval: 300          # Segundos entre análisis (5 min)
+  market_pairs: false           # false = usar dynamic_pairs
+  enable_charts: true           # Genera gráficos técnicos PNG
+  timezone: America/Santiago    # Tu zona horaria
+  
+  # MODO DINÁMICO (Top N pares por volumen)
+  dynamic_pairs:
+    enabled: true
+    top_n: 50
+    min_volume_24h: 1000000     # Mínimo $1M volumen 24h
+    exclude:
+      - USDC/USDT
+      - BUSD/USDT
+      - TUSD/USDT
+  
+  # ANÁLISIS DE CORRELACIÓN (Fase 4)
+  correlation:
+    enabled: true
+    reference_pair: BTC/USDT
+    thresholds:
+      btc_bullish: 2.0          # BTC > +2% = alcista
+      btc_bearish: -2.0         # BTC < -2% = bajista
+      outperform_ratio: 1.2     # ALT > 1.2x BTC = supera
+    quality_filter:
+      enabled: false            # true = solo enviar A+ y A
 
 exchanges:
   binance:
     required:
       enabled: true
-    # all_pairs: [USDT]       # Descomenta para escanear TODO
-    # exclude: [USDC, BUSD]   # Ignorar stablecoins
 
 notifiers:
   telegram:
@@ -27,48 +44,63 @@ notifiers:
     optional:
       parse_mode: html
       template: |
-        {% if status == 'hot' %}🟢 <b>SEÑAL DE COMPRA</b>{% else %}🔴 <b>SEÑAL DE VENTA</b>{% endif %}
+        {% if status == 'hot' %}🟢 <b>COMPRA</b>{% else %}🔴 <b>VENTA</b>{% endif %} {% if quality == 'A+' %}⭐⭐⭐{% elif quality == 'A' %}⭐⭐{% elif quality == 'B' %}⭐{% endif %}
         
-        📊 <b>{{market}}</b> @ {{exchange}}
-        ⏱️ Timeframe: {{analysis.config.candle_period}}
-        📉 {{indicator|upper}}: {{values}}
-        💵 Precio actual: ${{price_value.close}}
-        🕐 {{creation_date}}
+        📊 <b>{{market}}</b> | {{analysis.config.candle_period}}
+        🎯 {{hot_cold_label|default('Señal detectada')}}
+        
+        {% if btc_trend == 'bullish' %}🟢 BTC Alcista (+{{btc_change_24h|default(0)|round(1)}}%){% elif btc_trend == 'bearish' %}🔴 BTC Bajista ({{btc_change_24h|default(0)|round(1)}}%){% else %}⚪ BTC Neutral{% endif %}
+        
+        {% if quality == 'A+' %}⚡ A+ Señal muy fuerte ({{score|default(50)|round(0)|int}}){% elif quality == 'A' %}✅ A Señal sólida ({{score|default(50)|round(0)|int}}){% elif quality == 'B' %}⚠️ B Confirmar ({{score|default(50)|round(0)|int}}){% else %}❌ C Precaución ({{score|default(50)|round(0)|int}}){% endif %}
+        
+        {% if context_note %}💡 {{context_note}}{% endif %}
+        
+        ━━━━━━━━━━━━━━━━━━━━
+        <code>
+        [TECHNICAL_DATA]
+        timestamp={{creation_date}}
+        pair={{market}}
+        exchange={{exchange}}
+        timeframe={{analysis.config.candle_period}}
+        signal_type={% if status == 'hot' %}BUY{% else %}SELL{% endif %}
+        quality_grade={{quality|default('B')}}
+        score={{score|default(50)}}
+        btc_trend={{btc_trend|default('neutral')}}
+        btc_24h_pct={{btc_change_24h|default(0)}}
+        context_note={{context_note|default('')}}
+        ohlcv={{prices}}
+        [/TECHNICAL_DATA]
+        </code>
 
 # =====================
-# INDICADORES ACTIVOS
+# INDICADORES
 # =====================
 indicators:
-  # RSI - Índice de Fuerza Relativa
+  macd_cross:
+    - enabled: true
+      alert_enabled: true
+      alert_frequency: once
+      signal: [macd, signal]
+      hot_label: "🟢 MACD cruce ALCISTA"
+      cold_label: "🔴 MACD cruce BAJISTA"
+      indicator_label: "MACD Cross 4h"
+      mute_cold: false
+      candle_period: 4h
+
   rsi:
     - enabled: true
       alert_enabled: true
       alert_frequency: once
       signal: [rsi]
-      hot: 30                 # RSI < 30 = Sobreventa (compra)
-      cold: 70                # RSI > 70 = Sobrecompra (venta)
+      hot: 35
+      cold: 65
       hot_label: "🟢 RSI en sobreventa"
       cold_label: "🔴 RSI en sobrecompra"
       mute_cold: false
       candle_period: 4h
       period_count: 14
 
-  # MACD - Moving Average Convergence Divergence
-  macd:
-    - enabled: true
-      alert_enabled: true
-      alert_frequency: once
-      signal: [macd, macdsignal]
-      hot: 0                  # MACD cruza hacia arriba
-      cold: 0                 # MACD cruza hacia abajo
-      hot_label: "🟢 MACD cruce alcista"
-      cold_label: "🔴 MACD cruce bajista"
-      mute_cold: false
-      candle_period: 4h
-
-  # =====================
-  # INDICADORES DESHABILITADOS
-  # =====================
+  # Deshabilitados
   momentum:
     - enabled: false
   mfi:
@@ -79,23 +111,45 @@ indicators:
     - enabled: false
   ichimoku:
     - enabled: false
-  iiv:
-    - enabled: false
 
 # =====================
-# INFORMANTES (datos adicionales)
+# INFORMANTES
 # =====================
 informants:
+  ema:
+    - enabled: true
+      signal: [ema]
+      candle_period: 4h
+      period_count: 99
+
+  sma:
+    - enabled: true
+      signal: [sma]
+      candle_period: 4h
+      period_count: 200
+
+  bollinger_bands:
+    - enabled: true
+      signal: [upperband, middleband, lowerband]
+      candle_period: 4h
+      period_count: 21
+
   ohlcv:
     - enabled: true
       signal: [open, high, low, close]
       candle_period: 4h
+      period_count: 15
+
   lrsi:
     - enabled: true
       signal: [lrsi]
       candle_period: 4h
-      period_count: 14
-  bollinger_bands:
+
+  vwap:
     - enabled: true
+      signal: [vwap]
       candle_period: 4h
-      period_count: 21
+
+crossovers:
+  std_crossover:
+    - enabled: false
