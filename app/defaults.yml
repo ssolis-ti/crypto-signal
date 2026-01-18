@@ -33,34 +33,9 @@ settings:
 exchanges: null
 
 notifiers:
-  twilio:
-    required:
-      key: null
-      secret: null
-      sender_number: null
-      receiver_number: null
-    optional:
-      template: "{{exchange}}-{{market}}-{{indicator}}-{{indicator_number}} is {{status}}!{{ '\n' -}}"
-  discord:
-    required:
-      webhook: null
-      username: null
-    optional:
-      avatar: null
-      template: "{{exchange}}-{{market}}-{{indicator}}-{{indicator_number}} is {{status}}!{{ '\n' -}}"
-  slack:
-    required:
-      webhook: null
-    optional:
-      template: "{{exchange}}-{{market}}-{{indicator}}-{{indicator_number}} is {{status}}!{{ '\n' -}}"
-  email:
-    required:
-      smtp_server: null
-      username: null
-      password: null
-      destination_emails: null
-    optional:
-      template: "{{exchange}}-{{market}}-{{indicator}}-{{indicator_number}} is {{status}}!{{ '\n' -}}"
+  # ─────────────────────────────────────────
+  # Telegram - Notificador Principal
+  # ─────────────────────────────────────────
   telegram:
     required:
       token: null
@@ -74,12 +49,20 @@ notifiers:
         ⏱ {{analysis.config.candle_period}}
         📈 {{indicator|upper}}
         🏷 {{values}}
+  
+  # ─────────────────────────────────────────
+  # Webhook - Para integraciones futuras
+  # ─────────────────────────────────────────
   webhook:
     required:
       url: null
     optional:
       username: null
       password: null
+  
+  # ─────────────────────────────────────────
+  # Stdout - Debug/Desarrollo
+  # ─────────────────────────────────────────
   stdout:
     required:
       enable: null

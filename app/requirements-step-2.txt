@@ -1,37 +1,28 @@
 # Dependencias Principales - Crypto Signal (Python 3.12+)
-# Actualizado: 2026-01-17
+# Actualizado: 2026-01-18
+# LIMPIEZA: Solo Telegram como notificador principal
 
 # Comunicación
-twilio>=8.0.0
 python-telegram-bot>=21.0        # CRÍTICO: v21+ para Python 3.12+
-discord-webhook>=1.0.0
-slackweb>=1.0.5
+requests>=2.28.0                 # Para webhook
 
 # Exchanges
 ccxt>=4.0.0
 
 # Logging
 structlog>=23.0.0
-python-json-logger>=2.0.0
 
 # Análisis de Datos
 pandas>=2.0.0
-stockstats>=0.5.0
 TA-lib>=0.4.28
 scipy>=1.10.0
-
-# Nota: tulipy eliminado - incompatible con Python 3.12+
-# Las Bollinger Bands ahora usan TA-Lib
+numpy>=1.24.0
 
 # Utilidades
 tenacity>=8.0.0
 jinja2>=3.1.0
-requests>=2.28.0
 PyYAML>=6.0
 pytz>=2023.0
 
 # Visualización
 matplotlib>=3.7.0
-
-# CLI
-tabulate>=0.9.0
