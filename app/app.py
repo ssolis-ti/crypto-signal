@@ -92,6 +92,12 @@ def main():
             time.sleep(settings['start_worker_interval'])
             num += 1
 
+    if not market_data or not thread_list:
+        logger.error("No market pairs found to analyze! Check your configuration (market_pairs or dynamic_pairs).")
+        logger.error("Bot will sleep for 5 minutes and retry (restart container to force retry now).")
+        time.sleep(300)
+        return
+
     logger.info('All workers are running!')
 
     for worker in thread_list:
