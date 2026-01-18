@@ -1,0 +1,261 @@
+# ===========================================
+# CRYPTO-SIGNAL: Configuración Profesional 4H
+# ===========================================
+# Basado en mejores prácticas de análisis técnico
+# Enfoque: Menos señales, mayor calidad
+#
+# IMPORTANTE: Copiar a la RAÍZ del proyecto como config.yml
+# ===========================================
+
+settings:
+  update_interval: 300          # 5 minutos (refresco de datos)
+  market_pairs:
+    - BTC/USDT
+    - ETH/USDT
+  enable_charts: true           # Gráficos técnicos
+  timezone: America/Santiago
+
+exchanges:
+  binance:
+    required:
+      enabled: true
+
+# ===========================================
+# NOTIFICACIONES - Template Explicativo
+# ===========================================
+notifiers:
+  telegram:
+    required:
+      token: "TU_TOKEN_AQUI"
+      chat_id: "TU_CHAT_ID_AQUI"
+    optional:
+      parse_mode: html
+      template: |
+        {% if status == 'hot' %}
+        🟢 <b>SEÑAL DE COMPRA</b>
+        {% else %}
+        🔴 <b>SEÑAL DE VENTA</b>
+        {% endif %}
+        
+        📊 <b>{{market}}</b> | {{analysis.config.candle_period}}
+        
+        <b>🎯 Disparador:</b> {{indicator_label}}
+        <b>🏷️ Valores:</b> {{values}}
+        
+        <i>⚠️ Confirma con:</i>
+        <i>• Precio vs EMA 99 (tendencia)</i>
+        <i>• RSI actual (momentum)</i>
+        
+        🕐 {{creation_date}}
+
+# ===========================================
+# INDICADORES PRINCIPALES (4H)
+# ===========================================
+indicators:
+
+  # ─────────────────────────────────────────
+  # MACD CROSS - Detecta CRUCES reales (no solo valores)
+  # ─────────────────────────────────────────
+  # CRÍTICO: Usa macd_cross en vez de macd
+  # Esto detecta el EVENTO del cruce, no el ESTADO
+  macd_cross:
+    - enabled: true
+      alert_enabled: true
+      alert_frequency: once       # Solo al cambiar estado
+      signal:
+        - macd
+        - signal
+      hot_label: "🟢 MACD cruce ALCISTA confirmado"
+      cold_label: "🔴 MACD cruce BAJISTA detectado"
+      indicator_label: "MACD Cross 4h"
+      mute_cold: false            # Alertar también ventas
+      candle_period: 4h
+
+  # ─────────────────────────────────────────
+  # RSI - Ajustado para 4H
+  # ─────────────────────────────────────────
+  # hot: 35 (sobreventa moderada, no extrema)
+  # cold: 65 (sobrecompra antes de agotamiento)
+  rsi:
+    - enabled: true
+      alert_enabled: true
+      alert_frequency: once
+      signal: [rsi]
+      hot: 35                     # Pullback saludable en tendencia alcista
+      cold: 65                    # Agotamiento o posible corrección
+      hot_label: "🟢 RSI en zona de pullback (compra potencial)"
+      cold_label: "🔴 RSI en zona de agotamiento"
+      mute_cold: false
+      candle_period: 4h
+      period_count: 14
+
+  # ─────────────────────────────────────────
+  # StochRSI CROSS - DESHABILITADO por defecto
+  # ─────────────────────────────────────────
+  # NOTA: En 4H es muy reactivo y puede contradecir MACD.
+  # Genera señales mixtas. Activar solo para experimentación.
+  stochrsi_cross:
+    - enabled: false              # Deshabilitado: muy reactivo para 4H
+      alert_enabled: true
+      alert_frequency: once
+      smooth_k: 10
+      smooth_d: 3
+      signal:
+        - stoch_rsi
+        - smooth_k
+        - smooth_d
+      hot_label: "🟢 StochRSI cruce alcista"
+      cold_label: "🔴 StochRSI cruce bajista"
+      indicator_label: "StochRSI Cross 4h"
+      mute_cold: false
+      candle_period: 4h
+
+  # ─────────────────────────────────────────
+  # INDICADORES DESHABILITADOS
+  # ─────────────────────────────────────────
+  # Estos generan ruido, no aportan a la calidad
+  momentum:
+    - enabled: false
+  mfi:
+    - enabled: false
+  obv:
+    - enabled: false
+  stoch_rsi:
+    - enabled: false              # Usamos stochrsi_cross en su lugar
+  macd:
+    - enabled: false              # Usamos macd_cross en su lugar
+  ichimoku:
+    - enabled: false
+  iiv:
+    - enabled: false
+
+# ===========================================
+# INFORMANTES (Contexto, NO señales directas)
+# ===========================================
+informants:
+
+  # ─────────────────────────────────────────
+  # EMA - FILTRO DE TENDENCIA (Crítico)
+  # ─────────────────────────────────────────
+  # Regla: Si precio < EMA, ignorar señales de compra
+  # Nota: El bot muestra el valor, TÚ decides si aplica
+  # ─────────────────────────────────────────
+  # EMA 99 - FILTRO DE TENDENCIA PRINCIPAL
+  # ─────────────────────────────────────────
+  # REGLA DURA: Si precio < EMA 99, ignorar compras
+  # Esta es la referencia operativa más importante
+  ema:
+    - enabled: true
+      signal: [ema]
+      candle_period: 4h
+      period_count: 99            # Filtro operativo principal
+
+  # ─────────────────────────────────────────
+  # SMA 200 - Tendencia de largo plazo
+  # ─────────────────────────────────────────
+  # ─────────────────────────────────────────
+  # SMA 200 - Solo contexto macro (NO filtro)
+  # ─────────────────────────────────────────
+  # No usar para decisiones, solo referencia visual
+  sma:
+    - enabled: true
+      signal: [sma]
+      candle_period: 4h
+      period_count: 200           # Solo contexto macro, NO regla
+
+  # ─────────────────────────────────────────
+  # Bollinger Bands - Contexto de volatilidad
+  # ─────────────────────────────────────────
+  # NO genera señales, solo muestra bandas
+  # Usar como confirmación: precio en banda inferior + RSI bajo + MACD cruce = alta probabilidad
+  bollinger_bands:
+    - enabled: true
+      signal:
+        - upperband
+        - middleband
+        - lowerband
+      candle_period: 4h
+      period_count: 21
+
+  # ─────────────────────────────────────────
+  # OHLCV - Precios para template
+  # ─────────────────────────────────────────
+  ohlcv:
+    - enabled: true
+      signal:
+        - open
+        - high
+        - low
+        - close
+      candle_period: 4h
+      period_count: 15
+
+  # ─────────────────────────────────────────
+  # LRSI - Laguerre RSI (más reactivo)
+  # ─────────────────────────────────────────
+  # ─────────────────────────────────────────
+  # LRSI - Solo informante (NO escalar peso)
+  # ─────────────────────────────────────────
+  # Similar al RSI pero más reactivo.
+  # Mantener solo como contexto, no incorporar a decisiones.
+  lrsi:
+    - enabled: true
+      signal: [lrsi]
+      candle_period: 4h
+
+  # ─────────────────────────────────────────
+  # VWAP - Precio promedio ponderado por volumen
+  # ─────────────────────────────────────────
+  vwap:
+    - enabled: true
+      signal: [vwap]
+      candle_period: 4h
+      period_count: 15
+
+# ===========================================
+# CROSSOVERS (Cruces entre indicadores)
+# ===========================================
+crossovers:
+
+  # ─────────────────────────────────────────
+  # EMA/SMA Cross - Confirmación de tendencia
+  # ─────────────────────────────────────────
+  # Cuando EMA 99 cruza SMA 200 hacia arriba = tendencia alcista confirmada
+  std_crossover:
+    - enabled: false              # Deshabilitado por defecto (activar si deseas)
+      alert_enabled: true
+      alert_frequency: once
+      key_indicator: ema
+      key_indicator_index: 0
+      key_indicator_type: informants
+      key_signal: ema
+      crossed_indicator: sma
+      crossed_indicator_index: 0
+      crossed_indicator_type: informants
+      crossed_signal: sma
+
+# ===========================================
+# NOTAS DE USO
+# ===========================================
+#
+# 1. INTERPRETACIÓN DE SEÑALES:
+#    - MACD Cross es el DISPARADOR principal
+#    - RSI < 35 + MACD cruce alcista = SEÑAL FUERTE
+#    - RSI > 65 + MACD cruce bajista = SEÑAL DE SALIDA
+#
+# 2. FILTRO DE TENDENCIA (manual):
+#    - Si precio > EMA 99: Priorizar COMPRAS
+#    - Si precio < EMA 99: EVITAR compras (o solo scalps)
+#
+# 3. BOLLINGER (contexto):
+#    - Precio tocando banda inferior + MACD cruce = rebote probable
+#    - Precio tocando banda superior + RSI > 65 = agotamiento
+#
+# 4. FRECUENCIA:
+#    - alert_frequency: once -> Solo notifica cambios de estado
+#    - Esto evita spam y mejora la percepción de calidad
+#
+# 5. PARA ACTIVAR ALERTAS EN CADA ANÁLISIS:
+#    - Cambiar alert_frequency: once -> always
+#
+# ===========================================
