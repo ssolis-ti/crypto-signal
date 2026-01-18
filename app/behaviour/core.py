@@ -72,6 +72,8 @@ class Behaviour():
         
         correlation_config = config.settings.get('correlation', {})
         correlation_enabled = correlation_config.get('enabled', False)
+        print(f"DEBUG: correlation_config = {correlation_config}")
+        print(f"DEBUG: correlation_enabled = {correlation_enabled}, data_manager = {data_manager is not None}")
         
         if correlation_enabled and data_manager:
             self.logger.info("Correlation analysis ENABLED")
