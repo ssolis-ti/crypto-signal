@@ -293,8 +293,14 @@ class MessageBuilder:
                                     decimal_format = '.8f' # Default backup
                                     
                                     if self.market_data and exchange in self.market_data and market_pair in self.market_data[exchange]:
-                                        precision = self.market_data[exchange][market_pair]['precision']
-                                        decimal_format = '.{}f'.format(precision['price'])
+                                        precision = self.market_data[exchange][market_pair].get('precision', {})
+                                        price_precision = precision.get('price', 8)
+                                        # Asegurar que price_precision sea un entero válido
+                                        if isinstance(price_precision, float):
+                                            price_precision = int(price_precision)
+                                        elif not isinstance(price_precision, int):
+                                            price_precision = 8
+                                        decimal_format = '.{}f'.format(price_precision)
 
                                     candle_period = analysis['config']['candle_period']
                                     candle_values = ohlcv_values[exchange][market_pair]
