@@ -186,3 +186,72 @@ class CCXTDriver(BaseExchange):
             top_markets.extend(values)
 
         return top_markets
+
+    @retry(retry=retry_if_exception_type(ccxt.NetworkError), stop=stop_after_attempt(3))
+    def get_exchange_markets(self, exchanges=None, markets=None):
+        """Get market data for all symbol pairs listed on all configured exchanges.
+
+        Args:
+            markets (list, optional): A list of markets to get from the exchanges.
+            exchanges (list, optional): A list of exchanges to collect market data from.
+
+        Returns:
+            dict: A dictionary containing market data for all symbol pairs.
+        """
+        if exchanges is None:
+            exchanges = list(self.exchanges.keys())
+        if markets is None:
+            markets = []
+
+        exchange_markets = dict()
+        for exchange in exchanges:
+            exchange_markets[exchange] = self.exchanges[exchange].load_markets()
+            curr_markets = {
+                k: v for k, v in exchange_markets[exchange].items() if v.get('active', True)
+            }
+
+            if markets:
+                # Only retrieve markets the users specified
+                exchange_markets[exchange] = {
+                    key: curr_markets[key] for key in curr_markets if key in markets
+                }
+
+                for market in markets:
+                    if market not in exchange_markets[exchange]:
+                        self.logger.info(f'{exchange} has no market {market}, ignoring.')
+            else:
+                if self.base_markets.get(exchange):
+                    if self.top_pairs and self.top_pairs > 0:
+                        self.logger.info(
+                            f'Getting top {self.top_pairs} pairs from {self.base_markets[exchange]} in {exchange}'
+                        )
+                        all_markets = {
+                            key: curr_markets[key] for key in curr_markets
+                            if curr_markets[key].get('quote') in self.base_markets[exchange]
+                        }
+
+                        top_markets = self.get_top_markets(exchange, self.base_markets[exchange])
+
+                        exchange_markets[exchange] = {
+                            k: v for k, v in all_markets.items() if k in top_markets
+                        }
+                    else:
+                        self.logger.info(
+                            f'Getting all {self.base_markets[exchange]} market pairs for {exchange}'
+                        )
+                        exchange_markets[exchange] = {
+                            key: curr_markets[key] for key in curr_markets
+                            if curr_markets[key].get('quote') in self.base_markets[exchange]
+                        }
+
+                        if isinstance(self.exclude, list) and len(self.exclude) > 0:
+                            for base_market in self.base_markets[exchange]:
+                                for pair_to_exclude in self.exclude:
+                                    exchange_markets[exchange].pop(pair_to_exclude, None)
+                                    exchange_markets[exchange].pop(
+                                        f'{pair_to_exclude}/{base_market}', None
+                                    )
+
+            time.sleep(self.exchanges[exchange].rateLimit / 1000)
+
+        return exchange_markets

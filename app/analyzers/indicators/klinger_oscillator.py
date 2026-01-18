@@ -49,7 +49,7 @@ class Klinger_oscillator(IndicatorUtils):
         dm = high - low
         -----
         CM[today] =     / CM[yesterday] + DM[today] IF  trend[today]==trend[yesterday]
-                        \ DM[yesterday] + DM[today] IF  trend[today]!=trend[yesterday]
+                        | DM[yesterday] + DM[today] IF  trend[today]!=trend[yesterday]
 
         if Trend = Trend_1
             cm = cm_1 + dm 
