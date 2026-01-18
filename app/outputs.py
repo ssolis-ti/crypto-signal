@@ -86,6 +86,9 @@ class Output():
                             normal_colour
                         )
                     else:
+                        if 'signal' not in analysis['config']:
+                            continue
+                        
                         formatted_values = list()
                         for signal in analysis['config']['signal']:
                             value = analysis['result'].iloc[-1][signal]
