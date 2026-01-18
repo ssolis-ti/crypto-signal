@@ -23,6 +23,17 @@ class Configuration():
         else:
             user_config = dict()
 
+        # USABILITY FIX: Detectar si el usuario puso dynamic_pairs o correlation en la raíz
+        # por error de indentación y moverlos a settings
+        for key in ['dynamic_pairs', 'correlation']:
+            if key in user_config:
+                if 'settings' not in user_config:
+                    user_config['settings'] = {}
+                # Solo si no están ya definidos dentro de settings explícitamente
+                if key not in user_config['settings']:
+                    print(f"WARNING: '{key}' found in root of config.yml. Moving to 'settings' automatically.")
+                    user_config['settings'][key] = user_config[key]
+
         # Merge Recursivo (Deep Merge)
         self.config = self._deep_merge(default_config, user_config)
 
