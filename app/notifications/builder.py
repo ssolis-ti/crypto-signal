@@ -335,13 +335,35 @@ class MessageBuilder:
                                     # Limpiar memoria
                                     if 'result' in analysis:
                                         del analysis['result']
+                                    
+                                    # Extraer datos de correlación y contexto si existen
+                                    quality = analysis.get('quality', 'B')
+                                    context_note = analysis.get('context_note', '')
+                                    confidence = 0
+                                    enhanced_data = analysis.get('enhanced', {})
+                                    
+                                    if enhanced_data:
+                                        confidence = enhanced_data.get('confidence', 0)
+                                        btc_trend = enhanced_data.get('btc_trend', 'neutral')
+                                        btc_change_24h = enhanced_data.get('btc_change_24h', 0)
+                                        relative_strength = enhanced_data.get('relative_strength', 1.0)
+                                        market_sentiment = enhanced_data.get('market_sentiment', 'neutral')
+                                    else:
+                                        btc_trend = 'neutral'
+                                        btc_change_24h = 0
+                                        relative_strength = 0
+                                        market_sentiment = 'neutral'
 
                                     new_message = dict(
                                         values=values, exchange=exchange, market=market_pair, base_currency=base_currency,
                                         quote_currency=quote_currency, indicator=indicator, indicator_number=index,
                                         analysis=analysis, status=status, last_status=last_status,
                                         prices=prices, lrsi=lrsi, creation_date=creation_date, hot_cold_label=hot_cold_label,
-                                        indicator_label=indicator_label, price_value=price_value, decimal_format=decimal_format
+                                        indicator_label=indicator_label, price_value=price_value, decimal_format=decimal_format,
+                                        # Campos de Correlación (Fase 4)
+                                        quality=quality, context_note=context_note, confidence=confidence,
+                                        btc_trend=btc_trend, btc_change_24h=btc_change_24h, 
+                                        relative_strength=relative_strength, market_sentiment=market_sentiment
                                     )
 
                                     new_messages[exchange][market_pair][candle_period].append(new_message)
