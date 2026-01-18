@@ -155,18 +155,23 @@ class DataManager:
         
         # Obtener tickers
         tickers = self.get_tickers(exchange)
+        self.logger.info(f"DEBUG: get_tickers returned {len(tickers)} tickers for {exchange}")
         
         # Filtrar y ordenar
         pairs_with_volume = []
         for symbol, ticker in tickers.items():
             if not symbol.endswith(f'/{quote}'):
+                # self.logger.debug(f"DEBUG: Skipping {symbol} (quote mismatch)")
                 continue
             
             volume = ticker.get('quoteVolume', 0) or 0
             if volume < min_volume:
+                # self.logger.debug(f"DEBUG: Skipping {symbol} (vol {volume} < {min_volume})")
                 continue
             
             pairs_with_volume.append((symbol, volume))
+            
+        self.logger.info(f"DEBUG: Found {len(pairs_with_volume)} pairs matching quote {quote} and min_vol {min_volume}")
         
         # Ordenar por volumen descendente
         pairs_with_volume.sort(key=lambda x: x[1], reverse=True)
