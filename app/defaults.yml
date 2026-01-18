@@ -50,7 +50,13 @@ notifiers:
       chat_id: null
     optional:
       parse_mode: html
-      template: "{{exchange}}-{{market}}-{{indicator}}-{{indicator_number}} is {{status}}!{{ '\n' -}}"
+      template: |
+        {% if status == 'hot' %}🟢 <b>COMPRA</b>{% else %}🔴 <b>VENTA</b>{% endif %}
+        
+        📊 <b>{{market}}</b>
+        ⏱ {{analysis.config.candle_period}}
+        📈 {{indicator|upper}}
+        🏷 {{values}}
   webhook:
     required:
       url: null
