@@ -76,7 +76,9 @@ def main():
 
             notifier = Notifier(
                 config.notifiers, config.indicators, config.conditionals, market_data_chunk)
-            behaviour = Behaviour(config, exchange_interface, notifier)
+            
+            # Pasar data_manager para habilitar MarketContext y SignalEnhancer
+            behaviour = Behaviour(config, exchange_interface, notifier, data_manager)
 
             workerName = "Worker-{}".format(num)
             worker = AnalysisWorker(
