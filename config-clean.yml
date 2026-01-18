@@ -84,6 +84,10 @@ notifiers:
         context_note={{context_note|default('')}}
         ohlcv={{prices}}
         lrsi_value={{lrsi|default('N/A')}}
+        rsi_slope={{rsi_slope|default(0)}}
+        macd_acceleration={{macd_acceleration|default(0)}}
+        vwap_distance={{vwap_distance|default(0)}}
+        momentum_divergence={{momentum_divergence|default('none')}}
         [/TECHNICAL_DATA]
         </code>
 

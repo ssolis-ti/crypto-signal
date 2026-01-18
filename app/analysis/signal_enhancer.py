@@ -12,8 +12,16 @@ IMPORTANTE: Todos los métodos retornan valores por defecto si hay errores.
 import structlog
 from typing import Dict, Optional
 from dataclasses import dataclass
+import pandas as pd
 
 from analysis.market_context import MarketContext, MarketContextData, AltStrengthData
+
+# Fase 2: Indicadores Derivados
+try:
+    from analyzers.indicators.derived import DerivedIndicators
+    DERIVED_AVAILABLE = True
+except ImportError:
+    DERIVED_AVAILABLE = False
 
 
 @dataclass
@@ -39,6 +47,12 @@ class EnhancedSignal:
     divergence: str = 'neutral'
     market_sentiment: str = 'neutral'
     
+    # Indicadores Derivados (Fase 2)
+    rsi_slope: float = 0.0
+    macd_acceleration: float = 0.0
+    vwap_distance: float = 0.0
+    momentum_divergence: str = 'none'
+    
     def __post_init__(self):
         if self.values is None:
             self.values = {}
@@ -59,7 +73,12 @@ class EnhancedSignal:
             'btc_change_24h': self.btc_change_24h,
             'relative_strength': self.relative_strength,
             'divergence': self.divergence,
-            'market_sentiment': self.market_sentiment
+            'market_sentiment': self.market_sentiment,
+            # Fase 2: Derivados
+            'rsi_slope': self.rsi_slope,
+            'macd_acceleration': self.macd_acceleration,
+            'vwap_distance': self.vwap_distance,
+            'momentum_divergence': self.momentum_divergence
         }
     
     def should_notify(self, min_quality: str = 'C') -> bool:
@@ -98,7 +117,8 @@ class SignalEnhancer:
         self, 
         signal: Dict, 
         exchange: str,
-        rsi_value: float = None
+        rsi_value: float = None,
+        indicator_data: Dict = None
     ) -> EnhancedSignal:
         """
         Evalúa y clasifica una señal.
@@ -112,6 +132,13 @@ class SignalEnhancer:
             }
             exchange: Nombre del exchange
             rsi_value: Valor RSI actual (opcional, mejora clasificación)
+            indicator_data: Datos adicionales para indicadores derivados (Fase 2)
+                {
+                    'rsi_series': pd.Series,
+                    'macd_histogram': pd.Series,
+                    'close': float,
+                    'vwap': float
+                }
         
         Returns:
             EnhancedSignal con calidad y contexto
@@ -158,8 +185,17 @@ class SignalEnhancer:
             enhanced.context_note = note
             enhanced.recommendation = self._get_recommendation(quality, enhanced.signal_type)
             
+            # Fase 2: Calcular y aplicar indicadores derivados
+            if DERIVED_AVAILABLE and indicator_data:
+                derived_adjustment = self._apply_derived_indicators(enhanced, indicator_data)
+                if derived_adjustment != 0:
+                    enhanced.score = max(0, min(100, enhanced.score + derived_adjustment))
+                    # Recalcular quality si el score cambió significativamente
+                    enhanced.quality = self._score_to_quality(enhanced.score)
+                    enhanced.confidence = int(enhanced.score)
+            
             self.logger.info(
-                f"Señal {enhanced.symbol}: {enhanced.quality} "
+                f"Señal {enhanced.symbol}: {enhanced.quality} (Score {enhanced.score:.0f}) "
                 f"(BTC {enhanced.btc_trend}, RS {enhanced.relative_strength:.2f})"
             )
             
@@ -180,6 +216,76 @@ class SignalEnhancer:
     # ─────────────────────────────────────────
     # MÉTODOS PRIVADOS
     # ─────────────────────────────────────────
+    
+    def _apply_derived_indicators(
+        self, 
+        enhanced: EnhancedSignal, 
+        indicator_data: Dict
+    ) -> float:
+        """
+        Calcula indicadores derivados y retorna ajuste de score (Fase 2).
+        
+        Args:
+            enhanced: Señal a enriquecer
+            indicator_data: Dict con series de datos
+            
+        Returns:
+            Ajuste de score (-15 a +15)
+        """
+        adjustment = 0.0
+        
+        try:
+            # RSI Slope
+            if 'rsi_series' in indicator_data and indicator_data['rsi_series'] is not None:
+                rsi_series = indicator_data['rsi_series']
+                if isinstance(rsi_series, pd.Series) and len(rsi_series) > 3:
+                    enhanced.rsi_slope = DerivedIndicators.rsi_slope(rsi_series)
+                    # Bonus si RSI slope confirma dirección de señal
+                    if enhanced.signal_type == 'hot' and enhanced.rsi_slope > 0.1:
+                        adjustment += 5  # RSI subiendo confirma compra
+                    elif enhanced.signal_type == 'cold' and enhanced.rsi_slope < -0.1:
+                        adjustment += 5  # RSI bajando confirma venta
+            
+            # MACD Acceleration
+            if 'macd_histogram' in indicator_data and indicator_data['macd_histogram'] is not None:
+                macd_hist = indicator_data['macd_histogram']
+                if isinstance(macd_hist, pd.Series) and len(macd_hist) > 3:
+                    enhanced.macd_acceleration = DerivedIndicators.macd_acceleration(macd_hist)
+                    # Bonus por aceleración favorable
+                    if enhanced.signal_type == 'hot' and enhanced.macd_acceleration > 0:
+                        adjustment += 3
+                    elif enhanced.signal_type == 'cold' and enhanced.macd_acceleration < 0:
+                        adjustment += 3
+            
+            # VWAP Distance
+            close = indicator_data.get('close', 0)
+            vwap = indicator_data.get('vwap', 0)
+            if close > 0 and vwap > 0:
+                enhanced.vwap_distance = DerivedIndicators.vwap_distance(close, vwap)
+                # Bonus si precio está en zona favorable
+                if enhanced.signal_type == 'hot' and enhanced.vwap_distance < -1:
+                    adjustment += 3  # Precio bajo VWAP = bueno para compra
+                elif enhanced.signal_type == 'cold' and enhanced.vwap_distance > 1:
+                    adjustment += 3  # Precio alto VWAP = bueno para venta
+            
+            # Momentum Divergence
+            if 'price_series' in indicator_data and 'rsi_series' in indicator_data:
+                prices = indicator_data.get('price_series')
+                rsi = indicator_data.get('rsi_series')
+                if prices is not None and rsi is not None:
+                    if len(prices) > 14 and len(rsi) > 14:
+                        enhanced.momentum_divergence = DerivedIndicators.momentum_divergence(prices, rsi)
+                        # Divergencia alcista ayuda a compras
+                        if enhanced.signal_type == 'hot' and enhanced.momentum_divergence == 'bullish_divergence':
+                            adjustment += 7
+                        # Divergencia bajista ayuda a ventas
+                        elif enhanced.signal_type == 'cold' and enhanced.momentum_divergence == 'bearish_divergence':
+                            adjustment += 7
+        
+        except Exception as e:
+            self.logger.debug(f"Error calculando indicadores derivados: {e}")
+        
+        return adjustment
     
     def _calculate_quality(
         self,

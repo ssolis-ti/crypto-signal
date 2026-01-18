@@ -349,12 +349,21 @@ class MessageBuilder:
                                         btc_change_24h = enhanced_data.get('btc_change_24h', 0)
                                         relative_strength = enhanced_data.get('relative_strength', 1.0)
                                         market_sentiment = enhanced_data.get('market_sentiment', 'neutral')
+                                        # Fase 2: Indicadores Derivados
+                                        rsi_slope = enhanced_data.get('rsi_slope', 0.0)
+                                        macd_acceleration = enhanced_data.get('macd_acceleration', 0.0)
+                                        vwap_distance = enhanced_data.get('vwap_distance', 0.0)
+                                        momentum_divergence = enhanced_data.get('momentum_divergence', 'none')
                                     else:
                                         btc_trend = 'neutral'
                                         btc_change_24h = 0
                                         relative_strength = 0
                                         market_sentiment = 'neutral'
                                         score = 50.0
+                                        rsi_slope = 0.0
+                                        macd_acceleration = 0.0
+                                        vwap_distance = 0.0
+                                        momentum_divergence = 'none'
 
                                     new_message = dict(
                                         values=values, exchange=exchange, market=market_pair, base_currency=base_currency,
@@ -365,7 +374,10 @@ class MessageBuilder:
                                         # Campos de Correlación (Fase 4) + Score (Fase 1)
                                         quality=quality, context_note=context_note, confidence=confidence, score=score,
                                         btc_trend=btc_trend, btc_change_24h=btc_change_24h, 
-                                        relative_strength=relative_strength, market_sentiment=market_sentiment
+                                        relative_strength=relative_strength, market_sentiment=market_sentiment,
+                                        # Fase 2: Indicadores Derivados
+                                        rsi_slope=rsi_slope, macd_acceleration=macd_acceleration,
+                                        vwap_distance=vwap_distance, momentum_divergence=momentum_divergence
                                     )
 
                                     new_messages[exchange][market_pair][candle_period].append(new_message)
