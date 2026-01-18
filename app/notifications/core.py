@@ -111,7 +111,15 @@ class Notifier():
                         market_safe = market.replace('/', '_').lower()
                         potential_chart = './charts/{}_{}_{}.png'.format(exchange, market_safe, period)
                         
-                        self.notify_telegram(msgs, potential_chart if self.enable_charts else None)
+                        # Verificar si el archivo existe antes de enviar
+                        import os
+                        if self.enable_charts and os.path.exists(potential_chart):
+                            chart_file = potential_chart
+                            print(f"DEBUG: Chart file found: {potential_chart}")
+                        else:
+                            print(f"DEBUG: Chart file NOT found: {potential_chart}, enable_charts={self.enable_charts}")
+                        
+                        self.notify_telegram(msgs, chart_file)
 
         # Enviar Webhook
         if hasattr(self, 'webhook_configured') and self.webhook_configured:
