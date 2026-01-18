@@ -1,35 +1,26 @@
 """
 Módulo Core de Notificaciones
-Orquesta los diferentes clientes de mensajería (Telegram, Discord, etc.)
+Orquesta los diferentes clientes de mensajería (Telegram, Webhook, Stdout)
 y utiliza el MessageBuilder para preparar los contenidos.
 """
-
-import copy
-import sys
-import traceback
-from time import sleep
 
 import structlog
 from jinja2 import Template
 
-from analyzers.utils import IndicatorUtils
 from rendering.core import ChartRenderer
 from notifications.builder import MessageBuilder
 from notifications.validator import ConfigValidator
 
-# Clientes de notificación
-from notifiers.discord_client import DiscordNotifier
-from notifiers.email_client import EmailNotifier
-from notifiers.slack_client import SlackNotifier
+# Clientes de notificación activos
 from notifiers.stdout_client import StdoutNotifier
 from notifiers.telegram_client import TelegramNotifier
-from notifiers.twilio_client import TwilioNotifier
 from notifiers.webhook_client import WebhookNotifier
 
 
-class Notifier(IndicatorUtils):
+class Notifier():
     """
     Controlador central de notificaciones (Refactorizado).
+    Limpieza: Solo soporta Telegram, Webhook y Stdout.
     """
 
     def __init__(self, notifier_config, indicator_config, conditional_config, market_data):
@@ -48,10 +39,6 @@ class Notifier(IndicatorUtils):
         self.timezone = None
         
         # Inicialización de clientes
-        self.twilio_clients = {}
-        self.discord_clients = {}
-        self.slack_clients = {}
-        self.email_clients = {}
         self.telegram_clients = {}
         self.webhook_clients = {}
         self.stdout_clients = {}
@@ -63,34 +50,6 @@ class Notifier(IndicatorUtils):
         enabled_notifiers = []
         
         for notifier in self.notifier_config.keys():
-            if notifier.startswith('twilio'):
-                if ConfigValidator.validate_required_config(notifier, self.notifier_config):
-                    self.twilio_clients[notifier] = TwilioNotifier(
-                        twilio_key=self.notifier_config[notifier]['required']['key'],
-                        twilio_secret=self.notifier_config[notifier]['required']['secret'],
-                        twilio_sender_number=self.notifier_config[notifier]['required']['sender_number'],
-                        twilio_receiver_number=self.notifier_config[notifier]['required']['receiver_number']
-                    )
-                    enabled_notifiers.append(notifier)
-                    self.twilio_configured = True
-
-            if notifier.startswith('discord'):
-                if ConfigValidator.validate_required_config(notifier, self.notifier_config):
-                    self.discord_clients[notifier] = DiscordNotifier(
-                        webhook=self.notifier_config[notifier]['required']['webhook'],
-                        username=self.notifier_config[notifier]['required']['username'],
-                        avatar=self.notifier_config[notifier]['optional']['avatar']
-                    )
-                    enabled_notifiers.append(notifier)
-                    self.discord_configured = True
-
-            if notifier.startswith('slack'):
-                if ConfigValidator.validate_required_config(notifier, self.notifier_config):
-                    self.slack_client = SlackNotifier(
-                        slack_webhook=self.notifier_config[notifier]['required']['webhook']
-                    )
-                    enabled_notifiers.append(notifier)
-                    self.slack_configured = True
 
             if notifier.startswith('telegram'):
                 if ConfigValidator.validate_required_config(notifier, self.notifier_config):
@@ -101,17 +60,6 @@ class Notifier(IndicatorUtils):
                     )
                     enabled_notifiers.append(notifier)
                     self.telegram_configured = True
-
-            if notifier.startswith('email'):
-                if ConfigValidator.validate_required_config(notifier, self.notifier_config):
-                    self.email_clients[notifier] = EmailNotifier(
-                        smtp_address=self.notifier_config[notifier]['required']['smtp'],
-                        username=self.notifier_config[notifier]['required']['username'],
-                        password=self.notifier_config[notifier]['required']['password'],
-                        to=self.notifier_config[notifier]['required']['to_addresses']
-                    )
-                    enabled_notifiers.append(notifier)
-                    self.email_configured = True
 
             if notifier.startswith('webhook'):
                 if ConfigValidator.validate_required_config(notifier, self.notifier_config):
@@ -145,24 +93,7 @@ class Notifier(IndicatorUtils):
         """
         Punto de entrada principal para notificaciones.
         """
-        # 1. Notificaciones Simples (Slack, Twilio)
-        if hasattr(self, 'slack_configured') and self.slack_configured:
-            msg = self.builder.indicator_message_templater(
-                new_analysis, 
-                self.notifier_config['slack']['optional']['template']
-            )
-            if msg.strip():
-                self.slack_client.notify(msg)
-
-        if hasattr(self, 'twilio_configured') and self.twilio_configured:
-            msg = self.builder.indicator_message_templater(
-                new_analysis,
-                self.notifier_config['twilio']['optional']['template']
-            )
-            if msg.strip():
-                self.twilio_clients['twilio'].notify(msg)
-
-        # 2. Notificaciones Estructuradas (Telegram, Discord, Webhook)
+        # Notificaciones Estructuradas (Telegram, Webhook)
         messages_by_pair = self.builder.build_indicator_messages(new_analysis, self.conditional_config)
         
         # Crear Gráficos
@@ -180,7 +111,6 @@ class Notifier(IndicatorUtils):
                         market_safe = market.replace('/', '_').lower()
                         potential_chart = './charts/{}_{}_{}.png'.format(exchange, market_safe, period)
                         
-                        # Intentar usar gráfico si existe
                         self.notify_telegram(msgs, potential_chart if self.enable_charts else None)
 
         # Enviar Webhook
@@ -214,15 +144,12 @@ class Notifier(IndicatorUtils):
                         self.logger.info('Error creating chart for %s %s', market_pair, candle_period)
                         self.logger.exception(e)
 
-        
     def notify_telegram(self, messages, chart_file):
         for notifier in self.telegram_clients:
-            # Renderizar mensajes finales
             tpl = Template(self.notifier_config[notifier]['optional']['template'])
             formatted = [tpl.render(m) for m in messages]
             
             if chart_file:
-                # Aquí deberíamos verificar si el archivo existe
                 try:
                     self.telegram_clients[notifier].send_chart_messages(chart_file, formatted)
                 except Exception as e:
@@ -231,3 +158,12 @@ class Notifier(IndicatorUtils):
             else:
                  self.telegram_clients[notifier].send_messages(formatted)
 
+    def notify_webhook(self, messages, chart_file):
+        for notifier in self.webhook_clients:
+            for message in messages:
+                self.webhook_clients[notifier].notify(message)
+
+    def notify_stdout(self, messages):
+        for notifier in self.stdout_clients:
+            for message in messages:
+                self.stdout_clients[notifier].notify(message)
