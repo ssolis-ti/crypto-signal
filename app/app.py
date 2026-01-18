@@ -13,6 +13,7 @@ Flujo:
 import concurrent.futures
 import sys
 import time
+import traceback
 from threading import Thread
 
 import structlog
@@ -134,11 +135,17 @@ class AnalysisWorker(Thread):
         Ciclo de vida del hilo: Ejecutar análisis -> Dormir -> Repetir.
         """
         while True:
-            self.logger.info('Starting %s', self.threadName)
-            self.behaviour.run(self.market_data, self.settings['output_mode'])
-            self.logger.info("%s sleeping for %s seconds",
-                             self.threadName, self.settings['update_interval'])
-            time.sleep(self.settings['update_interval'])
+            try:
+                self.logger.info('Starting %s', self.threadName)
+                self.behaviour.run(self.market_data, self.settings['output_mode'])
+                self.logger.info("%s sleeping for %s seconds",
+                                 self.threadName, self.settings['update_interval'])
+                time.sleep(self.settings['update_interval'])
+            except Exception as e:
+                self.logger.error(f"CRITICAL ERROR in {self.threadName}: {e}")
+                self.logger.error(traceback.format_exc())
+                # Dormir un poco para evitar loop infinito de logs si el error es persistente
+                time.sleep(60)
 
 
 if __name__ == "__main__":
