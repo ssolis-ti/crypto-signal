@@ -295,10 +295,21 @@ class MessageBuilder:
                                     if self.market_data and exchange in self.market_data and market_pair in self.market_data[exchange]:
                                         precision = self.market_data[exchange][market_pair].get('precision', {})
                                         price_precision = precision.get('price', 8)
-                                        # Asegurar que price_precision sea un entero válido
-                                        if isinstance(price_precision, float):
-                                            price_precision = int(price_precision)
-                                        elif not isinstance(price_precision, int):
+                                        # Manejar diferentes formatos de precisión de CCXT
+                                        # Puede ser: int (2), float (0.01), o None
+                                        try:
+                                            if price_precision is None:
+                                                price_precision = 8
+                                            elif isinstance(price_precision, float) and price_precision < 1:
+                                                # Caso: 0.01 significa 2 decimales, 0.001 significa 3
+                                                import math
+                                                price_precision = abs(int(math.log10(price_precision)))
+                                            else:
+                                                price_precision = int(price_precision)
+                                            # Validar rango razonable
+                                            if price_precision < 0 or price_precision > 18:
+                                                price_precision = 8
+                                        except (ValueError, TypeError):
                                             price_precision = 8
                                         decimal_format = '.{}f'.format(price_precision)
 
