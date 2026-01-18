@@ -13,6 +13,7 @@ ccxt>=4.0.0
 structlog>=23.0.0
 
 # Análisis de Datos
+stockstats>=0.5.0
 pandas>=2.0.0
 TA-lib>=0.4.28
 scipy>=1.10.0
