@@ -29,6 +29,19 @@ Bot de análisis técnico para criptomonedas con notificaciones a Telegram.
 
 ---
 
+## 📋 Requisitos
+
+### Para Docker (Recomendado)
+- Docker Desktop instalado
+- Git
+
+### Para Instalación Local
+- Python 3.12 o superior
+- TA-Lib instalado en el sistema
+- Git
+
+---
+
 ## 🐳 Instalación con Docker (Recomendado)
 
 ```bash
@@ -36,23 +49,34 @@ Bot de análisis técnico para criptomonedas con notificaciones a Telegram.
 git clone https://github.com/ssolis-ti/crypto-signal.git
 cd crypto-signal
 
-# 2. Crear configuración
-cp app/config.yml.example app/config.yml
+# 2. Copiar el archivo de ejemplo a la RAÍZ del proyecto
+cp app/config.yml.example config.yml
 
-# 3. Editar app/config.yml con tu token de Telegram
-#    - token: De @BotFather
-#    - chat_id: De @userinfobot
+# 3. Editar config.yml (en la raíz, NO en app/)
+#    Configura tu token y chat_id de Telegram
+#    Usa app/config.yml.example como referencia
 
 # 4. Ejecutar
 docker compose up --build
 ```
 
+> ⚠️ **IMPORTANTE**: El archivo `config.yml` debe estar en la **raíz del proyecto** (junto a `docker-compose.yml`), NO dentro de la carpeta `app/`.
+
 ---
 
 ## 💻 Instalación Local (Sin Docker)
 
+### Requisitos previos
+1. Python 3.12+ instalado
+2. TA-Lib instalado:
+   - **Windows**: Descargar wheel desde [aquí](https://github.com/cgohlke/talib-build/releases)
+   - **Linux**: `sudo apt-get install libta-lib-dev`
+   - **macOS**: `brew install ta-lib`
+
+### Pasos
+
 ```bash
-# 1. Clonar y entrar al directorio
+# 1. Clonar y entrar al directorio app/
 git clone https://github.com/ssolis-ti/crypto-signal.git
 cd crypto-signal/app
 
@@ -60,16 +84,18 @@ cd crypto-signal/app
 pip install -r requirements-step-1.txt
 pip install -r requirements-step-2.txt
 
-# 3. Crear y editar configuración
+# 3. Copiar el archivo de ejemplo
 cp config.yml.example config.yml
 
-# 4. Ejecutar
+# 4. Editar config.yml con tu token de Telegram
+#    Revisa config.yml.example para ver todas las opciones
+
+# 5. Ejecutar
 python app.py
 ```
 
-> **Nota**: Requiere TA-Lib instalado en el sistema. En Windows usar wheels pre-compilados.
+> 📝 **Nota**: En instalación local, el `config.yml` SÍ va dentro de `app/`.
 
----
 
 ## ⚙️ Configuración Básica
 
