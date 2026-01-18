@@ -154,6 +154,27 @@ class CCXTDriver(BaseExchange):
         return self.exchanges[exchange].load_markets()
 
     @retry(retry=retry_if_exception_type(ccxt.NetworkError), stop=stop_after_attempt(3))
+    def get_all_tickers(self, exchange: str) -> Dict:
+        """
+        Obtiene todos los tickers del exchange.
+        
+        Flujo: DataManager → get_all_tickers → Exchange API
+        
+        Returns:
+            Dict {symbol: {last, bid, ask, baseVolume, quoteVolume, percentage, ...}}
+        
+        Nota: Una sola llamada API trae TODOS los tickers.
+        """
+        if not self.exchanges[exchange].has.get('fetchTickers'):
+            self.logger.warning(f"{exchange} no soporta fetchTickers")
+            return {}
+        
+        tickers = self.exchanges[exchange].fetch_tickers()
+        time.sleep(self.exchanges[exchange].rateLimit / 1000)
+        
+        return tickers
+
+    @retry(retry=retry_if_exception_type(ccxt.NetworkError), stop=stop_after_attempt(3))
     def get_top_markets(self, exchange: str, base_markets: List[str]) -> List[str]:
         """Obtiene los pares con mayor volumen."""
         top_markets = []
