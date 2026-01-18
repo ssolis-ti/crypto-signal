@@ -23,21 +23,33 @@ class Configuration():
         else:
             user_config = dict()
 
-        # USABILITY FIX: Detectar si el usuario puso dynamic_pairs o correlation en la raíz
-        # por error de indentación y moverlos a settings
+        # USABILITY FIX V2: Detectar si dynamic_pairs o correlation están en la raíz
+        # O accidentalmente dentro de 'exchanges' por error de indentación
         for key in ['dynamic_pairs', 'correlation']:
+            # 1. Chequear en raiz
             if key in user_config:
-                if 'settings' not in user_config:
-                    user_config['settings'] = {}
-                # Solo si no están ya definidos dentro de settings explícitamente
+                if 'settings' not in user_config: user_config['settings'] = {}
                 if key not in user_config['settings']:
-                    print(f"WARNING: '{key}' found in root of config.yml. Moving to 'settings' automatically.")
+                    print(f"WARNING: '{key}' found in root. Moving to 'settings'.")
                     user_config['settings'][key] = user_config[key]
+            
+            # 2. Chequear dentro de exchanges (error común de indentación)
+            elif 'exchanges' in user_config and isinstance(user_config['exchanges'], dict):
+                if key in user_config['exchanges']:
+                    if 'settings' not in user_config: user_config['settings'] = {}
+                    if key not in user_config['settings']:
+                        print(f"WARNING: '{key}' found inside 'exchanges'. Moving to 'settings'.")
+                        user_config['settings'][key] = user_config['exchanges'][key]
+                        # Limpiar para que no falle validación de exchanges
+                        del user_config['exchanges'][key]
 
         # Merge Recursivo (Deep Merge)
         self.config = self._deep_merge(default_config, user_config)
-
+        
         self.settings = self.config.get('settings', {})
+        print(f"DEBUG: Loaded settings keys: {list(self.settings.keys())}")
+        if 'dynamic_pairs' in self.settings:
+            print(f"DEBUG: dynamic_pairs config: {self.settings['dynamic_pairs']}")
         self.notifiers = self.config.get('notifiers', {})
         self.indicators = self.config.get('indicators', {})
         self.informants = self.config.get('informants', {})
