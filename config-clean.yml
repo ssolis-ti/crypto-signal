@@ -1,0 +1,197 @@
+# ===========================================
+# CRYPTO-SIGNAL: Configuración Profesional 4H - CLEAN
+# ===========================================
+
+settings:
+  update_interval: 300
+  market_pairs: false
+  enable_charts: true
+  timezone: America/Santiago
+  
+  # Configuración de pares dinámicos
+  dynamic_pairs:
+    enabled: true
+    top_n: 50
+    min_volume_24h: 1000000
+    exclude:
+      - USDC/USDT
+      - BUSD/USDT
+      - TUSD/USDT
+      - DAI/USDT
+      - USDP/USDT
+  
+  # ANÁLISIS DE CORRELACIÓN (Fase 4)
+  correlation:
+    enabled: true
+    reference_pair: BTC/USDT
+    thresholds:
+      btc_bullish: 2.0
+      btc_bearish: -2.0
+      outperform_ratio: 1.2
+    quality_filter:
+      enabled: false
+
+exchanges:
+  binance:
+    required:
+      enabled: true
+
+notifiers:
+  telegram:
+    required:
+      token: ""
+      chat_id: ""
+    optional:
+      parse_mode: html
+      template: |
+        {% if status == 'hot' %}🟢 <b>COMPRA</b>{% else %}🔴 <b>VENTA</b>{% endif %} {% if quality == 'A+' %}⭐⭐⭐{% elif quality == 'A' %}⭐⭐{% elif quality == 'B' %}⭐{% endif %}
+        
+        📊 <b>{{market}}</b> | {{analysis.config.candle_period}}
+        🎯 {{hot_cold_label|default('Señal detectada')}}
+        
+        {% if btc_trend == 'bullish' %}🟢 BTC Alcista (+{{btc_change_24h|default(0)|round(1)}}%){% elif btc_trend == 'bearish' %}🔴 BTC Bajista ({{btc_change_24h|default(0)|round(1)}}%){% else %}⚪ BTC Neutral{% endif %}
+        
+        {% if quality == 'A+' %}⚡ A+ Señal muy fuerte{% elif quality == 'A' %}✅ A Señal sólida{% elif quality == 'B' %}⚠️ B Confirmar{% else %}❌ C Precaución{% endif %}
+        
+        {% if context_note %}💡 {{context_note}}{% endif %}
+        
+        ━━━━━━━━━━━━━━━━━━━━
+        <code>
+        [TECHNICAL_DATA]
+        timestamp={{creation_date}}
+        pair={{market}}
+        base={{base_currency}}
+        quote={{quote_currency}}
+        exchange={{exchange}}
+        timeframe={{analysis.config.candle_period}}
+        signal_type={% if status == 'hot' %}BUY{% else %}SELL{% endif %}
+        signal_status={{status}}
+        last_status={{last_status|default('none')}}
+        indicator_name={{indicator}}
+        indicator_index={{indicator_number}}
+        indicator_label={{indicator_label|default(indicator)}}
+        raw_values={{values}}
+        hot_threshold={{analysis.config.hot|default('N/A')}}
+        cold_threshold={{analysis.config.cold|default('N/A')}}
+        period_count={{analysis.config.period_count|default('N/A')}}
+        quality_grade={{quality|default('B')}}
+        confidence_score={{confidence|default(0)}}
+        btc_trend={{btc_trend|default('neutral')}}
+        btc_24h_pct={{btc_change_24h|default(0)}}
+        alt_vs_btc_strength={{relative_strength|default(0)}}
+        market_sentiment={{market_sentiment|default('neutral')}}
+        context_note={{context_note|default('')}}
+        ohlcv={{prices}}
+        lrsi_value={{lrsi|default('N/A')}}
+        [/TECHNICAL_DATA]
+        </code>
+
+# ===========================================
+# INDICADORES (4H)
+# ===========================================
+indicators:
+  macd_cross:
+    - enabled: true
+      alert_enabled: true
+      alert_frequency: once
+      signal: [macd, signal]
+      hot_label: "🟢 MACD cruce ALCISTA"
+      cold_label: "🔴 MACD cruce BAJISTA"
+      indicator_label: "MACD Cross 4h"
+      mute_cold: false
+      candle_period: 4h
+
+  rsi:
+    - enabled: true
+      alert_enabled: true
+      alert_frequency: once
+      signal: [rsi]
+      hot: 35
+      cold: 65
+      hot_label: "🟢 RSI pullback"
+      cold_label: "🔴 RSI agotamiento"
+      mute_cold: false
+      candle_period: 4h
+      period_count: 14
+
+  stochrsi_cross:
+    - enabled: false
+      alert_enabled: true
+      alert_frequency: once
+      smooth_k: 10
+      smooth_d: 3
+      signal: [stoch_rsi, smooth_k, smooth_d]
+      hot_label: "🟢 StochRSI cruce alcista"
+      cold_label: "🔴 StochRSI cruce bajista"
+      indicator_label: "StochRSI Cross 4h"
+      mute_cold: false
+      candle_period: 4h
+
+  # Deshabilitados
+  momentum:
+    - enabled: false
+  mfi:
+    - enabled: false
+  obv:
+    - enabled: false
+  stoch_rsi:
+    - enabled: false
+  macd:
+    - enabled: false
+  ichimoku:
+    - enabled: false
+  iiv:
+    - enabled: false
+
+# ===========================================
+# INFORMANTES
+# ===========================================
+informants:
+  ema:
+    - enabled: true
+      signal: [ema]
+      candle_period: 4h
+      period_count: 99
+
+  sma:
+    - enabled: true
+      signal: [sma]
+      candle_period: 4h
+      period_count: 200
+
+  bollinger_bands:
+    - enabled: true
+      signal: [upperband, middleband, lowerband]
+      candle_period: 4h
+      period_count: 21
+
+  ohlcv:
+    - enabled: true
+      signal: [open, high, low, close]
+      candle_period: 4h
+      period_count: 15
+
+  lrsi:
+    - enabled: true
+      signal: [lrsi]
+      candle_period: 4h
+
+  vwap:
+    - enabled: true
+      signal: [vwap]
+      candle_period: 4h
+      period_count: 15
+
+crossovers:
+  std_crossover:
+    - enabled: false
+      alert_enabled: true
+      alert_frequency: once
+      key_indicator: ema
+      key_indicator_index: 0
+      key_indicator_type: informants
+      key_signal: ema
+      crossed_indicator: sma
+      crossed_indicator_index: 0
+      crossed_indicator_type: informants
+      crossed_signal: sma
