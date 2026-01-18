@@ -12,5 +12,6 @@ Flujo:
 
 from analysis.market_context import MarketContext
 from analysis.signal_enhancer import SignalEnhancer
+from analysis.strategy_analyzer import StrategyAnalyzer
 
-__all__ = ['MarketContext', 'SignalEnhancer']
+__all__ = ['MarketContext', 'SignalEnhancer', 'StrategyAnalyzer']
