@@ -1,82 +1,113 @@
-"""Notify a user via telegram
+"""
+Cliente Telegram Modernizado (v21+ Async)
+Compatible con Python 3.12+
 """
 
-import json
-
+import asyncio
 import structlog
-import telegram
-from telegram.utils.request import Request
-from tenacity import (retry, retry_if_exception_type, stop_after_attempt,
-                      wait_fixed)
+from telegram import Bot
+from telegram.error import TimedOut, NetworkError
+from tenacity import (
+    retry, 
+    retry_if_exception_type, 
+    stop_after_attempt,
+    wait_exponential
+)
 
 from notifiers.utils import NotifierUtils
 
-__con_pool_size__ = 10
+# Configuración
 __connect_timeout__ = 40
+__read_timeout__ = 40
 __stop_after_attempt__ = 3
-__wait_fixed__ = 5
 __max_message_size__ = 4096
 
 
 class TelegramNotifier(NotifierUtils):
-    """Used to notify user of events via telegram.
+    """
+    Cliente Telegram moderno usando API v21+ (async).
     """
 
-    def __init__(self, token, chat_id, parse_mode):
-        """Initialize TelegramNotifier class
+    def __init__(self, token: str, chat_id: str, parse_mode: str = "HTML"):
+        """
+        Inicializa el notificador de Telegram.
 
         Args:
-            token (str): The telegram API token.
-            chat_id (str): The chat ID you want the bot to send messages to.
+            token: Token del bot de Telegram.
+            chat_id: ID del chat destino.
+            parse_mode: Modo de parseo (HTML, Markdown, MarkdownV2).
         """
         self.logger = structlog.get_logger()
-        self.bot = telegram.Bot(token=token, request=Request(
-            con_pool_size=__con_pool_size__, connect_timeout=__connect_timeout__))
+        self.bot = Bot(token=token)
         self.chat_id = chat_id
         self.parse_mode = parse_mode
 
-    @retry(
-        retry=retry_if_exception_type(telegram.error.TimedOut),
-        stop=stop_after_attempt(__stop_after_attempt__),
-        wait=wait_fixed(__wait_fixed__)
-    )
     def notify(self, message: str):
-        """Send the notification.
+        """
+        Envía un mensaje de texto (wrapper síncrono para compatibilidad).
+        """
+        asyncio.run(self._async_notify(message))
 
-        Args:
-            message (str): The message to send.
+    @retry(
+        retry=retry_if_exception_type((TimedOut, NetworkError)),
+        stop=stop_after_attempt(__stop_after_attempt__),
+        wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
+    async def _async_notify(self, message: str):
+        """
+        Envía un mensaje de texto de forma asíncrona.
         """
         message_chunks = self.chunk_message(
-            message=message, max_message_size=__max_message_size__)
+            message=message, max_message_size=__max_message_size__
+        )
         for message_chunk in message_chunks:
             try:
-                self.bot.send_message(
-                    chat_id=self.chat_id, text=message_chunk, parse_mode=self.parse_mode)
+                await self.bot.send_message(
+                    chat_id=self.chat_id,
+                    text=message_chunk,
+                    parse_mode=self.parse_mode,
+                    read_timeout=__read_timeout__,
+                    connect_timeout=__connect_timeout__
+                )
             except Exception as e:
-                self.logger.info('Unable to send message using Telegram !')
-                self.logger.debug(e)
+                self.logger.error('Error enviando mensaje Telegram', error=str(e))
+                raise
+
+    def send_chart_messages(self, photo_url: str, messages: list = None):
+        """
+        Envía un gráfico con mensajes (wrapper síncrono).
+        """
+        messages = messages or []
+        asyncio.run(self._async_send_chart(photo_url, messages))
 
     @retry(
-        retry=retry_if_exception_type(telegram.error.TimedOut),
+        retry=retry_if_exception_type((TimedOut, NetworkError)),
         stop=stop_after_attempt(__stop_after_attempt__),
-        wait=wait_fixed(__wait_fixed__)
+        wait=wait_exponential(multiplier=1, min=2, max=10)
     )
-    def send_chart_messages(self, photo_url: str, messages=[]):
-        """Send image chart
-
-        Args:
-            photo_url (str): The photo url to send.
+    async def _async_send_chart(self, photo_url: str, messages: list):
+        """
+        Envía una imagen y mensajes de forma asíncrona.
         """
         try:
             with open(photo_url, 'rb') as f:
-                self.bot.send_photo(chat_id=self.chat_id,
-                                    photo=f.read(), timeout=__connect_timeout__)
+                await self.bot.send_photo(
+                    chat_id=self.chat_id,
+                    photo=f,
+                    read_timeout=__read_timeout__,
+                    connect_timeout=__connect_timeout__
+                )
         except Exception as e:
-            self.logger.info('Unable to send chart messages using Telegram !')
-            self.logger.debug(e)
-        self.send_messages(messages)
+            self.logger.error('Error enviando gráfico Telegram', error=str(e))
 
-    def send_messages(self, messages=[]):
-        if messages:
-            for message in messages:
-                self.notify(message)
+        # Enviar mensajes asociados
+        for message in messages:
+            await self._async_notify(message)
+
+    def send_messages(self, messages: list = None):
+        """
+        Envía múltiples mensajes.
+        """
+        messages = messages or []
+        for message in messages:
+            self.notify(message)

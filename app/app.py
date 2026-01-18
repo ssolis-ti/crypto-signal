@@ -1,5 +1,7 @@
-#!/usr/local/bin/python
-"""Main app module
+""" 
+Punto de Entrada Principal (Main Entry Point)
+Este módulo inicializa la configuración, los logs y despliega los hilos (workers)
+que realizarán el análisis técnico de forma paralela.
 """
 
 import concurrent.futures
@@ -11,14 +13,19 @@ import structlog
 
 import conf
 import logs
-from behaviour import Behaviour
+from behaviour.core import Behaviour
 from conf import Configuration
-from exchange import ExchangeInterface
-from notification import Notifier
+from exchanges import ExchangeInterface
+from notifications.core import Notifier
 
 
 def main():
-    """Initializes the application
+    """
+    Función principal que arranca el bot.
+    1. Carga la configuración (YAML).
+    2. Configura el logger.
+    3. Inicializa la interfaz de exchange.
+    4. Divide los mercados en 'chunks' y asigna un Worker a cada uno.
     """
     # Load settings and create the config object
     config = Configuration()
@@ -83,6 +90,14 @@ def chunks(l, n):
 
 
 class AnalysisWorker(Thread):
+    """
+    Hilo de ejecución individual (Worker).
+    Cada worker procesa un subconjunto de pares de mercado en su propio loop.
+    
+    > [!IMPORTANT]
+    > Escalabilidad: Si se configuran demasiados mercados, aumentar el tamaño de 
+    > los 'chunks' o el número de hilos puede saturar la CPU o las APIs.
+    """
 
     def __init__(self, threadName, behaviour, notifier, market_data, settings, logger):
         Thread.__init__(self)
@@ -95,6 +110,9 @@ class AnalysisWorker(Thread):
         self.logger = logger
 
     def run(self):
+        """
+        Ciclo de vida del hilo: Ejecutar análisis -> Dormir -> Repetir.
+        """
         while True:
             self.logger.info('Starting %s', self.threadName)
             self.behaviour.run(self.market_data, self.settings['output_mode'])

@@ -1,14 +1,27 @@
-# Copy this file to config.yml to get started and then add your own configuration.
-# Full documentation here: https://github.com/CryptoSignal/crypto-signal/blob/master/docs/config.md
-
 settings:
   update_interval: 300
   market_pairs:
-    - ETH/BTC
-    - LTC/BTC
-    - XMR/BTC
+    - BTC/USDT
+  output_mode: console
+  enable_charts: false
 
 exchanges:
-  bittrex:
+  binance:
     required:
       enabled: true
+
+notifiers:
+  telegram:
+    required:
+      token: "7751808009:AAGJz7AICNMuuBpParM9q6u4qhwgagTyp6E"
+      chat_id: "7456125907"
+
+indicators:
+  rsi:
+    - enabled: true
+      alert_enabled: true
+      signal: [rsi]
+      hot: 30
+      cold: 70
+      candle_period: 1h
+      period_count: 14

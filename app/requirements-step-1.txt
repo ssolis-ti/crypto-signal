@@ -1,2 +1,3 @@
-numpy>=1.14.0
-Cython>=0.28.2
+# Dependencias Base (Pre-compilación TA-Lib)
+numpy>=1.22.0
+Cython>=0.29.0

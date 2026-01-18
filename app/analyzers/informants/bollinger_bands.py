@@ -1,11 +1,10 @@
 """ Bollinger Bands Indicator
+Migrado a TA-Lib para compatibilidad con Python 3.12+
 """
-
-import math
 
 import numpy
 import pandas
-import tulipy
+import talib
 
 from analyzers.utils import IndicatorUtils
 
@@ -36,17 +35,21 @@ class Bollinger(IndicatorUtils):
             index=dataframe.index
         )
 
-        bb_df_size = bb_values.shape[0]
-        close_data = numpy.array(dataframe['close'])
+        close_data = numpy.array(dataframe['close'], dtype=numpy.float64)
 
         if close_data.size > period_count:
-            bb_data = tulipy.bbands(close_data, period_count, 2)
-
-            for index in range(period_count, bb_df_size):
-                data_index = index - period_count
-                bb_values['lowerband'][index] = bb_data[0][data_index]
-                bb_values['middleband'][index] = bb_data[1][data_index]
-                bb_values['upperband'][index] = bb_data[2][data_index]
+            # TA-Lib devuelve (upperband, middleband, lowerband)
+            upper, middle, lower = talib.BBANDS(
+                close_data, 
+                timeperiod=period_count, 
+                nbdevup=2, 
+                nbdevdn=2, 
+                matype=0  # SMA
+            )
+            
+            bb_values['upperband'] = upper
+            bb_values['middleband'] = middle
+            bb_values['lowerband'] = lower
 
         bb_values.dropna(how='all', inplace=True)
 

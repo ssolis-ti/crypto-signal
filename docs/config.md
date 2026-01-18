@@ -48,8 +48,18 @@ description: This option controls how frequently to rescan the exchange informat
 
 **market_pairs**\
 default: None\
-necessity: optional\
-description: Allows you to specify a list of market pairs you are interested in.
+| necessity: optional\
+| description: Allows you to specify a list of market pairs you are interested in.
+
+**enable_charts**\
+default: false\
+| necessity: optional\
+| description: Valid values are `true` or `false`. Whether to generate and send technical analysis charts.
+
+**timezone**\
+default: UTC\
+| necessity: optional\
+| description: The timezone to use for date/time display in charts and logs (e.g., `America/Santiago`, `Europe/Madrid`).
 
 An example of settings in the config.yml file might look like
 
@@ -63,6 +73,8 @@ settings:
     - ETH/BTC
     - LTC/BTC
     - XMR/BTC
+  enable_charts: true
+  timezone: UTC
 ```
 
 # 3) Exchanges
@@ -70,8 +82,18 @@ Settings that alter behaviour of interaction with an exchange.
 
 **enabled**\
 default: False\
-necessity: required\
-description: Valid options are `true` or `false`. This setting enables or disables exchanges.
+| necessity: required\
+| description: Valid options are `true` or `false`. This setting enables or disables exchanges.
+
+**all_pairs**\
+default: None\
+| necessity: optional\
+| description: Allows you to track all available pairs for a specific base currency (e.g., `USDT`, `BTC`).
+
+**exclude**\
+default: None\
+| necessity: optional\
+| description: List of pairs to ignore when using `all_pairs`. Useful for skipping stablecoins or low-liquidity assets.
 
 An example of exchange settings
 
@@ -352,6 +374,8 @@ The notifier templates are built with a templating language called [Jinja2](http
 - analysis.config.candle_period - The raw config item of what time period of candles to gather.
 - analysis.config.period_count - The raw config item of how many candles to gather.
 - analysis.config.signal - The raw config item of the configured signal lines.
+- prices - A string containing the current price for all configured candle periods.
+- price_value - An object allowing access to specific price data (e.g., `{{price_value['1h'].close}}`). Requires the `ohlcv` informant to be enabled for that period.
 
 As an example of how to use it, lets say you want to write a custom message for discord... it would end up looking something like...
 
@@ -361,12 +385,28 @@ template: "[{{analysis.config.candle_period}}] {{market}} on {{exchange}} is {{s
 
 The result of the above custom template would generate a message that looks like: [1h] BURST/BTC on bittrex is hot.
 
+### Advanced Templating Example (Prices)
+To include specific price values in your notification, you can use:
+```
+template: "{{market}} is {{status}}! Prices: {{prices}}"
+```
+Or for more granular control:
+```
+template: "{{market}} {{status}}! High for 1h: {{price_value['1h'].high}}"
+```
+*Note: Using `price_value` requires the `ohlcv` informant to be enabled for the specified `candle_period`.*
+
 # 5) Indicators
 
 **enabled**\
 default: True\
-necessity: optional\
-description: Valid values are true or false. Whether to perform analysis on this indicator.
+| necessity: optional\
+| description: Valid values are true or false. Whether to perform analysis on this indicator.
+
+**mute_cold**\
+default: False\
+| necessity: optional\
+| description: If set to `true`, the bot will only send alerts for 'hot' signals, ignoring 'cold' signals for this indicator.
 
 **alert_enabled**\
 default: True\
@@ -438,6 +478,7 @@ indicators:
             - momentum
           hot: 0
           cold: 0
+          mute_cold: true
           candle_period: 1d
           period_count: 10
 ```

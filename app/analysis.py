@@ -14,18 +14,23 @@ from analyzers.informants import *
 
 
 class StrategyAnalyzer():
-    """Contains all the methods required for analyzing strategies.
+    """
+    Capa de Análisis Técnico.
+    Esta clase actúa como un orquestador (dispatcher) para todos los indicadores
+    técnicos, informantes y cruces disponibles en el sistema.
     """
 
     def __init__(self):
-        """Initializes StrategyAnalyzer class """
+        """Inicializa StrategyAnalyzer configurando el logger estructurado."""
         self.logger = structlog.get_logger()
 
     def indicator_dispatcher(self):
-        """Returns a dictionary for dynamic anaylsis selector
-
+        """
+        Mapea nombres clace de indicadores a sus métodos de análisis correspondientes.
+        
         Returns:
-            dictionary: A dictionary of functions to serve as a dynamic analysis selector.
+            dict: Diccionario donde las llaves son strings (ej. 'rsi') y los valores
+                  son las funciones (.analyze) de las clases de indicadores.
         """
 
         dispatcher = {
@@ -53,10 +58,12 @@ class StrategyAnalyzer():
         return dispatcher
 
     def informant_dispatcher(self):
-        """Returns a dictionary for dynamic informant selector
+        """
+        Mapea nombres clave de informantes a sus métodos de análisis correspondientes.
+        Los informantes suelen ser datos base como precios OHLCV o promedios simples.
 
         Returns:
-            dictionary: A dictionary of functions to serve as a dynamic informant selector.
+            dict: Diccionario de funciones de análisis de informantes.
         """
 
         dispatcher = {
@@ -71,10 +78,11 @@ class StrategyAnalyzer():
         return dispatcher
 
     def crossover_dispatcher(self):
-        """Returns a pandas.DataFrame for dynamic crossover selector
-
+        """
+        Mapea lógicas de cruce (ej. cruce de medias) a sus métodos correspondientes.
+        
         Returns:
-            dictionary: A dictionary of functions to serve as a dynamic crossover selector.
+            dict: Diccionario de funciones para análisis de cruces.
         """
 
         dispatcher = {
