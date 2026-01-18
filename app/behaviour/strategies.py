@@ -170,7 +170,7 @@ class StrategyExecutor:
                 if candle_period not in historical_data_cache: continue
                 if historical_data_cache[candle_period]:
                     analysis_args = {'historical_data': historical_data_cache[candle_period]}
-                    if 'period_count' in informant_conf:
+                    if 'period_count' in informant_conf and informant != 'lrsi':
                         analysis_args['period_count'] = informant_conf['period_count']
 
                     results[informant].append({

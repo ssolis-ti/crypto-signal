@@ -42,7 +42,7 @@ class Output():
             output += '\n{}:\t'.format(indicator_type)
             for indicator in results[indicator_type]:
                 for i, analysis in enumerate(results[indicator_type][indicator]):
-                    if analysis['result'].shape[0] == 0:
+                    if isinstance(analysis['result'], str) or analysis['result'].shape[0] == 0:
                         self.logger.info('No results for %s #%s', indicator, i)
                         continue
 
