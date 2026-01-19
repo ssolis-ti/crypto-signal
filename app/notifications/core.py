@@ -91,11 +91,24 @@ class Notifier():
     def set_all_historical_data(self, all_historical_data):
         self.all_historical_data = all_historical_data
 
-    def notify_all(self, new_analysis):
+    def notify_all(self, new_analysis, market_context=None):
         """
         Punto de entrada principal para notificaciones.
-        Usa cola prioritaria para ordenar y controlar rate limits.
+        
+        Usa SmartNotificationManager para:
+        1. Enviar resumen consolidado (1 mensaje)
+        2. Enviar detalles solo para A+/A con charts
+        
+        Args:
+            new_analysis: Resultados del análisis
+            market_context: Opcional dict con btc_trend, btc_change, sentiment
+        
+        Flow:
+            build_messages → create_charts → smart_manager.add_signal() 
+            → smart_manager.finalize_cycle()
         """
+        from notifications.smart import SmartNotificationManager
+        
         # Notificaciones Estructuradas (Telegram, Webhook)
         messages_by_pair = self.builder.build_indicator_messages(new_analysis, self.conditional_config)
         
@@ -103,11 +116,28 @@ class Notifier():
         if self.enable_charts and self.all_historical_data:
             self.create_charts(messages_by_pair)
 
-        # Enviar Telegram con Cola Prioritaria
+        # Enviar Telegram con Sistema Inteligente
         if hasattr(self, 'telegram_configured') and self.telegram_configured:
-            queue = NotificationQueue(min_quality='C')
+            # Configuración del manager
+            smart_config = {
+                'summary_enabled': True,
+                'detail_min_quality': 'A',   # Solo A+ y A reciben detalle
+                'chart_min_quality': 'A',    # Solo A+ y A reciben chart
+                'delay_between_details': 3.0,
+                'delay_after_summary': 2.0,
+            }
             
-            # Recolectar todas las notificaciones
+            smart_manager = SmartNotificationManager(smart_config)
+            
+            # Establecer contexto de mercado si está disponible
+            if market_context:
+                smart_manager.set_market_context(
+                    btc_trend=market_context.get('btc_trend', 'neutral'),
+                    btc_change=market_context.get('btc_change', 0),
+                    sentiment=market_context.get('sentiment', 'neutral')
+                )
+            
+            # Recolectar todas las señales
             for exchange in messages_by_pair:
                 for market in messages_by_pair[exchange]:
                     for period, msgs in messages_by_pair[exchange][market].items():
@@ -120,25 +150,25 @@ class Notifier():
                         chart_file = potential_chart if self.enable_charts and os.path.exists(potential_chart) else None
                         
                         if chart_file:
-                            self.logger.info(f"[QUEUE] Chart found: {potential_chart}")
+                            self.logger.info(f"[SMART] Chart found: {potential_chart}")
                         
-                        # Agregar cada mensaje a la cola
+                        # Agregar cada mensaje al smart manager
                         for msg in msgs:
-                            queue.add(msg, chart_file)
+                            smart_manager.add_signal(msg, chart_file)
             
-            # Log summary antes de procesar
-            summary = queue.get_summary()
-            if summary['count'] > 0:
+            # Log estadísticas del ciclo
+            stats = smart_manager.get_cycle_stats()
+            if stats['count'] > 0:
                 self.logger.info(
-                    f"[QUEUE] {summary['count']} señales | "
-                    f"Top: {summary['top']} | Updates: {summary['updates']}"
+                    f"[SMART] {stats['count']} señales | "
+                    f"Top: {stats.get('top', 'N/A')} | "
+                    f"Alta calidad: {stats.get('high_quality_count', 0)}"
                 )
             
-            # Procesar cola con delays
-            queue.process_all(
-                send_func=lambda msg, chart, is_update: self._send_telegram_queued(msg, chart, is_update),
-                delay_msg=0.5,
-                delay_photo=1.5
+            # Finalizar ciclo y enviar notificaciones
+            smart_manager.finalize_cycle(
+                send_func=self._send_smart_text,
+                send_chart_func=self._send_smart_chart
             )
 
         # Enviar Webhook
@@ -210,6 +240,57 @@ class Notifier():
                     self.telegram_clients[notifier].send_messages([formatted])
             except Exception as e:
                 self.logger.error(f"Error sending queued telegram: {e}")
+    
+    def _send_smart_text(self, message):
+        """
+        Envía mensaje de texto para SmartNotificationManager.
+        
+        Args:
+            message: Puede ser str (resumen) o dict (detalle con template)
+        
+        Flow:
+            SmartNotificationManager.finalize_cycle() → aquí
+        """
+        for notifier in self.telegram_clients:
+            try:
+                if isinstance(message, str):
+                    # Mensaje de resumen (ya formateado)
+                    self.telegram_clients[notifier].send_messages([message])
+                else:
+                    # Mensaje de detalle (necesita template)
+                    tpl = Template(self.notifier_config[notifier]['optional']['template'])
+                    formatted = tpl.render(message)
+                    self.telegram_clients[notifier].send_messages([formatted])
+            except Exception as e:
+                self.logger.error(f"[SMART] Error sending text: {e}")
+    
+    def _send_smart_chart(self, chart_file: str, message_data: dict):
+        """
+        Envía chart con mensaje para SmartNotificationManager.
+        
+        Args:
+            chart_file: Path absoluto al archivo PNG
+            message_data: Dict con datos para el template
+        
+        Flow:
+            SmartNotificationManager.finalize_cycle() → aquí
+        
+        Warning:
+            Si el chart falla, envía solo el texto.
+        """
+        for notifier in self.telegram_clients:
+            tpl = Template(self.notifier_config[notifier]['optional']['template'])
+            formatted = tpl.render(message_data)
+            
+            try:
+                self.telegram_clients[notifier].send_chart_messages(chart_file, [formatted])
+                self.logger.debug(f"[SMART] Chart sent: {chart_file}")
+            except Exception as e:
+                self.logger.error(f"[SMART] Chart failed, sending text only: {e}")
+                try:
+                    self.telegram_clients[notifier].send_messages([formatted])
+                except Exception as e2:
+                    self.logger.error(f"[SMART] Text fallback also failed: {e2}")
 
     def notify_webhook(self, messages, chart_file):
         for notifier in self.webhook_clients:
