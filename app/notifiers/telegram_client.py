@@ -90,6 +90,7 @@ class TelegramNotifier(NotifierUtils):
         Envía una imagen y mensajes de forma asíncrona.
         """
         try:
+            self.logger.debug(f"[TELEGRAM] Attempting to send chart: {photo_url}")
             with open(photo_url, 'rb') as f:
                 await self.bot.send_photo(
                     chat_id=self.chat_id,
@@ -97,8 +98,11 @@ class TelegramNotifier(NotifierUtils):
                     read_timeout=__read_timeout__,
                     connect_timeout=__connect_timeout__
                 )
+            self.logger.debug(f"[TELEGRAM] Chart sent successfully: {photo_url}")
+        except FileNotFoundError:
+            self.logger.error(f'[TELEGRAM] Chart file not found: {photo_url}')
         except Exception as e:
-            self.logger.error('Error enviando gráfico Telegram', error=str(e))
+            self.logger.error(f'[TELEGRAM] Error sending chart {photo_url}: {type(e).__name__}: {e}')
 
         # Enviar mensajes asociados
         for message in messages:
