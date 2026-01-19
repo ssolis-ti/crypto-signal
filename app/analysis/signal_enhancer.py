@@ -108,6 +108,7 @@ class SignalEnhancer:
         # Configuración
         self.config = settings.get('correlation', {}) if settings else {}
         self.enabled = self.config.get('enabled', False)
+        self.logger.info(f"[SignalEnhancer] enabled={self.enabled}, config keys: {list(self.config.keys()) if self.config else 'None'}")
         
         quality_filter = self.config.get('quality_filter', {})
         self.filter_enabled = quality_filter.get('enabled', False)

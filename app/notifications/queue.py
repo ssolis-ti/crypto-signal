@@ -51,7 +51,7 @@ class NotificationQueue:
     
     # Rate limits de Telegram (aproximados)
     DELAY_BETWEEN_MESSAGES = 0.5  # segundos
-    DELAY_BETWEEN_PHOTOS = 1.5    # segundos (fotos son más pesadas)
+    DELAY_BETWEEN_PHOTOS = 3.0    # segundos (fotos necesitan más delay)
     DUPLICATE_WINDOW = 300        # segundos para considerar duplicado (5 min)
     
     def __init__(self, min_quality: str = 'C'):
