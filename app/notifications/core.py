@@ -4,12 +4,14 @@ Orquesta los diferentes clientes de mensajería (Telegram, Webhook, Stdout)
 y utiliza el MessageBuilder para preparar los contenidos.
 """
 
+import os
 import structlog
 from jinja2 import Template
 
 from rendering.core import ChartRenderer
 from notifications.builder import MessageBuilder
 from notifications.validator import ConfigValidator
+from notifications.queue import NotificationQueue
 
 # Clientes de notificación activos
 from notifiers.stdout_client import StdoutNotifier
@@ -92,6 +94,7 @@ class Notifier():
     def notify_all(self, new_analysis):
         """
         Punto de entrada principal para notificaciones.
+        Usa cola prioritaria para ordenar y controlar rate limits.
         """
         # Notificaciones Estructuradas (Telegram, Webhook)
         messages_by_pair = self.builder.build_indicator_messages(new_analysis, self.conditional_config)
@@ -100,26 +103,43 @@ class Notifier():
         if self.enable_charts and self.all_historical_data:
             self.create_charts(messages_by_pair)
 
-        # Enviar Telegram
+        # Enviar Telegram con Cola Prioritaria
         if hasattr(self, 'telegram_configured') and self.telegram_configured:
+            queue = NotificationQueue(min_quality='C')
+            
+            # Recolectar todas las notificaciones
             for exchange in messages_by_pair:
                 for market in messages_by_pair[exchange]:
                     for period, msgs in messages_by_pair[exchange][market].items():
-                        if not msgs: continue
+                        if not msgs: 
+                            continue
                         
-                        chart_file = None
+                        # Determinar chart file
                         market_safe = market.replace('/', '_').lower()
                         potential_chart = './charts/{}_{}_{}.png'.format(exchange, market_safe, period)
+                        chart_file = potential_chart if self.enable_charts and os.path.exists(potential_chart) else None
                         
-                        # Verificar si el archivo existe antes de enviar
-                        import os
-                        if self.enable_charts and os.path.exists(potential_chart):
-                            chart_file = potential_chart
-                            print(f"DEBUG: Chart file found: {potential_chart}")
-                        else:
-                            print(f"DEBUG: Chart file NOT found: {potential_chart}, enable_charts={self.enable_charts}")
+                        if chart_file:
+                            self.logger.info(f"[QUEUE] Chart found: {potential_chart}")
                         
-                        self.notify_telegram(msgs, chart_file)
+                        # Agregar cada mensaje a la cola
+                        for msg in msgs:
+                            queue.add(msg, chart_file)
+            
+            # Log summary antes de procesar
+            summary = queue.get_summary()
+            if summary['count'] > 0:
+                self.logger.info(
+                    f"[QUEUE] {summary['count']} señales | "
+                    f"Top: {summary['top']} | Updates: {summary['updates']}"
+                )
+            
+            # Procesar cola con delays
+            queue.process_all(
+                send_func=lambda msg, chart, is_update: self._send_telegram_queued(msg, chart, is_update),
+                delay_msg=0.5,
+                delay_photo=1.5
+            )
 
         # Enviar Webhook
         if hasattr(self, 'webhook_configured') and self.webhook_configured:
@@ -165,6 +185,31 @@ class Notifier():
                     self.telegram_clients[notifier].send_messages(formatted)
             else:
                  self.telegram_clients[notifier].send_messages(formatted)
+    
+    def _send_telegram_queued(self, message: dict, chart_file: str, is_update: bool):
+        """
+        Envía una notificación individual desde la cola.
+        
+        Args:
+            message: Dict con datos del mensaje
+            chart_file: Path al gráfico o None
+            is_update: Si es señal repetida, agrega prefijo UPDATE
+        """
+        for notifier in self.telegram_clients:
+            tpl = Template(self.notifier_config[notifier]['optional']['template'])
+            formatted = tpl.render(message)
+            
+            # Agregar prefijo UPDATE si es señal repetida
+            if is_update:
+                formatted = "🔄 UPDATE\n" + formatted
+            
+            try:
+                if chart_file:
+                    self.telegram_clients[notifier].send_chart_messages(chart_file, [formatted])
+                else:
+                    self.telegram_clients[notifier].send_messages([formatted])
+            except Exception as e:
+                self.logger.error(f"Error sending queued telegram: {e}")
 
     def notify_webhook(self, messages, chart_file):
         for notifier in self.webhook_clients:
@@ -175,3 +220,4 @@ class Notifier():
         for notifier in self.stdout_clients:
             for message in messages:
                 self.stdout_clients[notifier].notify(message)
+
