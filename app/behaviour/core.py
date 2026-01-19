@@ -186,11 +186,16 @@ class Behaviour():
                     
                     last_row = result.iloc[-1]
                     
+                    # DEBUG CRÍTICO: Ver qué contiene last_row
+                    is_hot = last_row.get('is_hot', False) if hasattr(last_row, 'get') else getattr(last_row, 'is_hot', False)
+                    is_cold = last_row.get('is_cold', False) if hasattr(last_row, 'get') else getattr(last_row, 'is_cold', False)
+                    self.logger.debug(f"[ENHANCE] {symbol}/{indicator}: is_hot={is_hot}, is_cold={is_cold}")
+                    
                     # Determinar tipo de señal
                     signal_type = 'neutral'
-                    if last_row.get('is_hot', False):
+                    if is_hot:
                         signal_type = 'hot'
-                    elif last_row.get('is_cold', False):
+                    elif is_cold:
                         signal_type = 'cold'
                     
                     if signal_type == 'neutral':
