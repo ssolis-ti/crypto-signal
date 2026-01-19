@@ -1,22 +1,25 @@
 # ===========================================
 # CRYPTO-SIGNAL: Configuración Profesional 4H
-# Compatible con Fases 1-2 (Score + Derivados)
+# Compatible con Fases 1-4 + SmartNotifications
+# Última Actualización: 2026-01-19
 # ===========================================
 
 settings:
-  update_interval: 300
-  market_pairs: false
-  enable_charts: true
+  update_interval: 300          # Intervalo entre análisis (segundos)
+  market_pairs: false           # false = usar dynamic_pairs
+  enable_charts: true           # Generar gráficos
   timezone: America/Santiago
   
-  # Configuración de pares dinámicos
+  # ═══════════════════════════════════════════
+  # CONFIGURACIÓN DE PARES DINÁMICOS
+  # ═══════════════════════════════════════════
   dynamic_pairs:
     enabled: true
-    source: volume
-    top_n: 20
-    quote_currency: USDT
-    min_volume_24h: 3000000
-    exclude:
+    source: volume              # Ordenar por: volume
+    top_n: 20                   # Cantidad de pares
+    quote_currency: USDT        # Moneda de cotización
+    min_volume_24h: 3000000     # Volumen mínimo 24h en USDT
+    exclude:                    # Excluir stablecoins
       - USDC/USDT
       - BUSD/USDT
       - TUSD/USDT
@@ -27,82 +30,123 @@ settings:
       - USD1/USDT
       - PAXG/USDT
   
+  # ═══════════════════════════════════════════
   # ANÁLISIS DE CORRELACIÓN (Fase 4)
+  # ═══════════════════════════════════════════
   correlation:
     enabled: true
     reference_pair: BTC/USDT
     thresholds:
-      btc_bullish: 1.5
-      btc_bearish: -1.0
-      outperform_ratio: 1.3
+      btc_bullish: 1.5          # % cambio BTC para considerar alcista
+      btc_bearish: -1.0         # % cambio BTC para considerar bajista
+      outperform_ratio: 1.3     # Ratio ALT/BTC para outperform
     quality_filter:
       enabled: false
       min_quality: A
 
+# ═══════════════════════════════════════════
+# EXCHANGES
+# ═══════════════════════════════════════════
 exchanges:
   binance:
     required:
       enabled: true
 
+# ═══════════════════════════════════════════
+# NOTIFICADORES
+# ═══════════════════════════════════════════
 notifiers:
   telegram:
     required:
-      token: "TU_TOKEN"
-      chat_id: "TU_CHAT_ID"
+      token: "TU_TOKEN_AQUI"
+      chat_id: "TU_CHAT_ID_AQUI"
     optional:
       parse_mode: html
+      # ─────────────────────────────────────────
+      # TEMPLATE DE MENSAJE
+      # ─────────────────────────────────────────
+      # Campos disponibles:
+      #   status        : hot / cold
+      #   market        : BTC/USDT
+      #   base_currency : BTC
+      #   quote_currency: USDT
+      #   exchange      : binance
+      #   indicator     : rsi
+      #   indicator_number: 0
+      #   indicator_label: RSI 4h
+      #   values        : {'rsi': '25.50'}
+      #   prices        : Open: X High: Y Low: Z Close: W
+      #   lrsi          : 0.05
+      #   creation_date : 2026-01-19 15:30:00
+      #   hot_cold_label: 🟢 RSI pullback
+      #   analysis.config.candle_period: 4h
+      #   analysis.config.hot / cold: umbrales
+      #   analysis.config.period_count: 14
+      #   
+      # Campos de Correlación (si enabled):
+      #   quality        : A+ / A / B / C
+      #   score          : 0-100
+      #   confidence     : 0-100
+      #   btc_trend      : bullish / bearish / neutral
+      #   btc_change_24h : -2.5
+      #   relative_strength: 1.2
+      #   market_sentiment: risk_on / risk_off / neutral
+      #   context_note   : Explicación contextual
+      #
+      # Campos Derivados (Fase 2):
+      #   rsi_slope, macd_acceleration, vwap_distance, momentum_divergence
+      # ─────────────────────────────────────────
       template: |
         {% if status == 'hot' %}🟢 <b>COMPRA</b>{% else %}🔴 <b>VENTA</b>{% endif %} {% if quality == 'A+' %}⭐⭐⭐{% elif quality == 'A' %}⭐⭐{% elif quality == 'B' %}⭐{% endif %}
         
         📊 <b>{{market}}</b> | {{analysis.config.candle_period}}
         🎯 {{hot_cold_label|default('Señal detectada')}}
         
-        {% if btc_trend == 'bullish' %}🟢 BTC Alcista (+{{btc_change_24h|default(0)|round(1)}}%){% elif btc_trend == 'bearish' %}🔴 BTC Bajista ({{btc_change_24h|default(0)|round(1)}}%){% else %}⚪ BTC Neutral{% endif %}
+        {% if btc_trend == 'bullish' %}🟢 BTC Alcista (+{{btc_change_24h|round(2)}}%){% elif btc_trend == 'bearish' %}🔴 BTC Bajista ({{btc_change_24h|round(2)}}%){% else %}⚪ BTC Neutral{% endif %}
         
-        {% if quality == 'A+' %}⚡ A+ Señal muy fuerte ({{score|default(50)|int}}){% elif quality == 'A' %}✅ A Señal sólida ({{score|default(50)|int}}){% elif quality == 'B' %}⚠️ B Confirmar ({{score|default(50)|int}}){% else %}❌ C Precaución ({{score|default(50)|int}}){% endif %}
+        {% if quality == 'A+' %}⚡ <b>A+</b> Señal muy fuerte ({{score|int}}/100){% elif quality == 'A' %}✅ <b>A</b> Señal sólida ({{score|int}}/100){% elif quality == 'B' %}⚠️ <b>B</b> Confirmar ({{score|int}}/100){% else %}❌ <b>C</b> Precaución ({{score|int}}/100){% endif %}
         
         {% if context_note %}💡 {{context_note}}{% endif %}
         
         ━━━━━━━━━━━━━━━━━━━━
         <code>
-        [TECHNICAL_DATA]
-        timestamp={{creation_date}}
-        pair={{market}}
-        base={{base_currency}}
-        quote={{quote_currency}}
-        exchange={{exchange}}
-        timeframe={{analysis.config.candle_period}}
-        signal_type={% if status == 'hot' %}BUY{% else %}SELL{% endif %}
-        signal_status={{status}}
-        last_status={{last_status|default('none')}}
-        indicator_name={{indicator}}
-        indicator_index={{indicator_number}}
-        indicator_label={{indicator_label|default(indicator)}}
-        raw_values={{values}}
-        hot_threshold={{analysis.config.hot|default('N/A')}}
-        cold_threshold={{analysis.config.cold|default('N/A')}}
-        period_count={{analysis.config.period_count|default('N/A')}}
-        quality_grade={{quality|default('B')}}
-        confidence_score={{confidence|default(0)}}
-        score={{score|default(50)}}
-        btc_trend={{btc_trend|default('neutral')}}
-        btc_24h_pct={{btc_change_24h|default(0)}}
-        alt_vs_btc_strength={{relative_strength|default(0)}}
-        market_sentiment={{market_sentiment|default('neutral')}}
-        context_note={{context_note|default('')}}
-        ohlcv={{prices}}
-        lrsi_value={{lrsi|default('N/A')}}
-        rsi_slope={{rsi_slope|default(0)}}
-        macd_acceleration={{macd_acceleration|default(0)}}
-        vwap_distance={{vwap_distance|default(0)}}
-        momentum_divergence={{momentum_divergence|default('none')}}
-        [/TECHNICAL_DATA]
+        [INFO]
+        📅 {{creation_date}}
+        💹 {{exchange}} | {{market}}
+        📈 {{indicator}} #{{indicator_number}}
+        🎚️ {{values}}
+        📊 {{prices}}
+        
+        [CONTEXT]
+        🎯 Quality: {{quality}} | Score: {{score|round(1)}}
+        📉 BTC: {{btc_trend}} ({{btc_change_24h|round(2)}}%)
+        💪 ALT/BTC: {{relative_strength|round(3)}}
+        🌡️ Sentiment: {{market_sentiment}}
+        
+        [THRESHOLDS]
+        🔥 Hot: {{analysis.config.hot|default('N/A')}}
+        ❄️ Cold: {{analysis.config.cold|default('N/A')}}
+        📏 Period: {{analysis.config.period_count|default('N/A')}}
         </code>
 
-# ===========================================
+# ═══════════════════════════════════════════
 # INDICADORES (4H)
-# ===========================================
+# ═══════════════════════════════════════════
 indicators:
+  rsi:
+    - enabled: true
+      alert_enabled: true
+      alert_frequency: once
+      signal: [rsi]
+      hot: 30
+      cold: 70
+      hot_label: "🟢 RSI pullback zona sobreventa"
+      cold_label: "� RSI agotamiento zona sobrecompra"
+      indicator_label: "RSI 4h"
+      mute_cold: false
+      candle_period: 4h
+      period_count: 14
+
   macd_cross:
     - enabled: true
       alert_enabled: true
@@ -114,33 +158,11 @@ indicators:
       mute_cold: false
       candle_period: 4h
 
-  rsi:
-    - enabled: true
-      alert_enabled: true
-      alert_frequency: once
-      signal: [rsi]
-      hot: 30
-      cold: 70
-      hot_label: "🟢 RSI pullback"
-      cold_label: "🔴 RSI agotamiento"
-      mute_cold: false
-      candle_period: 4h
-      period_count: 14
-
+  # ─────────────────────────────────────────
+  # DESHABILITADOS
+  # ─────────────────────────────────────────
   stochrsi_cross:
     - enabled: false
-      alert_enabled: true
-      alert_frequency: once
-      smooth_k: 10
-      smooth_d: 3
-      signal: [stoch_rsi, smooth_k, smooth_d]
-      hot_label: "🟢 StochRSI cruce alcista"
-      cold_label: "🔴 StochRSI cruce bajista"
-      indicator_label: "StochRSI Cross 4h"
-      mute_cold: false
-      candle_period: 4h
-
-  # Deshabilitados
   momentum:
     - enabled: false
   mfi:
@@ -156,9 +178,9 @@ indicators:
   iiv:
     - enabled: false
 
-# ===========================================
-# INFORMANTES
-# ===========================================
+# ═══════════════════════════════════════════
+# INFORMANTES (para análisis, no alertas)
+# ═══════════════════════════════════════════
 informants:
   ema:
     - enabled: true
@@ -195,6 +217,9 @@ informants:
       candle_period: 4h
       period_count: 15
 
+# ═══════════════════════════════════════════
+# CROSSOVERS
+# ═══════════════════════════════════════════
 crossovers:
   std_crossover:
     - enabled: false
