@@ -369,7 +369,15 @@ class SignalEnhancer:
                 elif rsi < 30:
                     score -= 10  # Sobreventa
         
-        return max(0, min(100, score))
+        # Log de calibración (desglose del score)
+        final_score = max(0, min(100, score))
+        self.logger.debug(
+            f"[CALIB] SCORE: Base=50 + BTC({btc_adjustment:+.0f}) + "
+            f"ALT({alt_adjustment:+.0f}) + Sent({sent_adjustment:+.0f}) + "
+            f"RSI(adj) = {final_score:.0f}"
+        )
+        
+        return final_score
     
     def _score_to_quality(self, score: float) -> str:
         """Mapea score continuo a calidad discreta."""
