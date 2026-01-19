@@ -163,6 +163,8 @@ class Behaviour():
             - context_note: Explicación
             - enhanced: Dict completo de contexto
         """
+        self.logger.debug(f"[ENHANCE] Processing pair: {symbol}")
+        
         for indicator_type in pair_results:
             if indicator_type not in ['indicators', 'crossovers']:
                 continue

@@ -161,6 +161,7 @@ class SignalEnhancer:
         
         try:
             # Obtener contexto
+            self.logger.debug(f"[ENHANCE] Calling get_context for {exchange}, symbol {enhanced.symbol}")
             context = self.mc.get_context(exchange)
             alt_strength = self.mc.get_alt_strength(enhanced.symbol, exchange)
             
