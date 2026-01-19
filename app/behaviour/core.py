@@ -141,7 +141,12 @@ class Behaviour():
         if not self.signal_enhancer:
             return results
         
+        # DEBUG: Ver estructura de results vs market_data
+        self.logger.debug(f"[ENHANCE] results keys: {list(results.keys())[:10]}")
+        
         for exchange in market_data:
+            self.logger.debug(f"[ENHANCE] market_data[{exchange}] keys: {list(market_data[exchange].keys())[:10]}")
+            
             context = self.market_context.get_context(exchange)
             self.logger.info(
                 f"Market Context: BTC {context.btc_trend} ({context.btc_change_24h}%)"
@@ -149,6 +154,7 @@ class Behaviour():
             
             for market_pair in market_data[exchange]:
                 if market_pair not in results:
+                    self.logger.debug(f"[ENHANCE] SKIP: {market_pair} not in results")
                     continue
                 self._enhance_pair_signals(results[market_pair], market_pair, exchange)
         
