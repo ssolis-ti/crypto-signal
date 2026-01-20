@@ -38,7 +38,7 @@ class TelegramNotifier(NotifierUtils):
             parse_mode: Modo de parseo (HTML, Markdown, MarkdownV2).
         """
         self.logger = structlog.get_logger()
-        self.bot = Bot(token=token)
+        self.token = token
         self.chat_id = chat_id
         self.parse_mode = parse_mode
 
@@ -57,12 +57,13 @@ class TelegramNotifier(NotifierUtils):
         """
         Envía un mensaje de texto de forma asíncrona.
         """
+        bot = Bot(token=self.token)
         message_chunks = self.chunk_message(
             message=message, max_message_size=__max_message_size__
         )
         for message_chunk in message_chunks:
             try:
-                await self.bot.send_message(
+                await bot.send_message(
                     chat_id=self.chat_id,
                     text=message_chunk,
                     parse_mode=self.parse_mode,
@@ -89,10 +90,11 @@ class TelegramNotifier(NotifierUtils):
         """
         Envía una imagen y mensajes de forma asíncrona.
         """
+        bot = Bot(token=self.token)
         try:
             self.logger.debug(f"[TELEGRAM] Attempting to send chart: {photo_url}")
             with open(photo_url, 'rb') as f:
-                await self.bot.send_photo(
+                await bot.send_photo(
                     chat_id=self.chat_id,
                     photo=f,
                     read_timeout=__read_timeout__,
