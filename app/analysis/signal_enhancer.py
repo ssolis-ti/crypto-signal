@@ -178,7 +178,8 @@ class SignalEnhancer:
                 btc_trend=context.btc_trend,
                 alt_strength=alt_strength,
                 sentiment=context.market_sentiment,
-                rsi_value=rsi_value
+                rsi_value=rsi_value,
+                context_data=indicator_data  # <- CRÍTICO: Pasar contexto para EMA filter
             )
             
             enhanced.quality = quality
@@ -295,7 +296,8 @@ class SignalEnhancer:
         btc_trend: str,
         alt_strength: AltStrengthData,
         sentiment: str,
-        rsi_value: float = None
+        rsi_value: float = None,
+        context_data: Dict = None  # <- NUEVO: Contexto para filtros cruzados
     ) -> tuple:
         """
         Calcula calidad usando scoring continuo (Fase 1).
@@ -303,7 +305,7 @@ class SignalEnhancer:
         Returns:
             (quality, confidence, note, score)
         """
-        score = self._calculate_score(signal_type, btc_trend, alt_strength, sentiment, rsi_value)
+        score = self._calculate_score(signal_type, btc_trend, alt_strength, sentiment, rsi_value, context_data)
         quality = self._score_to_quality(score)
         confidence = int(score)
         note = self._generate_score_note(btc_trend, alt_strength, score, signal_type)
