@@ -207,7 +207,10 @@ class Behaviour():
                         'values': {}
                     }
                     
-                    enhanced = self.signal_enhancer.enhance(signal, exchange)
+                    # Extraer valor de RSI si es el indicador actual
+                    rsi_val = float(last_row[indicator]) if indicator == 'rsi' and indicator in last_row else None
+                    
+                    enhanced = self.signal_enhancer.enhance(signal, exchange, rsi_value=rsi_val)
                     
                     # Agregar al análisis
                     analysis['enhanced'] = enhanced.to_dict()
