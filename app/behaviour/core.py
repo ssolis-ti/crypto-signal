@@ -93,6 +93,9 @@ class Behaviour():
         self.enable_charts = config.settings['enable_charts']
         self.timezone = config.settings['timezone']
         self.all_historical_data = dict()
+        
+        # Cache para control de repetición de señales (Anti-Spam)
+        self.last_notifications = {}
 
     def run(self, market_data, output_mode):
         """
@@ -160,15 +163,49 @@ class Behaviour():
     
     def _enhance_pair_signals(self, pair_results: dict, symbol: str, exchange: str):
         """
-        Enriquece señales de un par específico.
+        Enriquece señales de un par específico con visión holística.
         
-        Agrega a cada análisis:
-            - quality: A+/A/B/C
-            - context_note: Explicación
-            - enhanced: Dict completo de contexto
+        Pasos:
+        1. Recolectar 'indicator_context' (últimos valores de RSI, MACD, Precio, EMA).
+        2. Iterar sobre señales crudas.
+        3. Pasar contexto completo al enhancer para filtros cruzados.
         """
         self.logger.debug(f"[ENHANCE] Processing pair: {symbol}")
         
+        # 1. Recolectar Contexto del Par (Snapshot)
+        indicator_context = {}
+        
+        # Extraer datos de 'informants' (Precio, EMA)
+        if 'informants' in pair_results:
+            for ind_name, analyses in pair_results['informants'].items():
+                for analysis in analyses:
+                    result = analysis.get('result')
+                    if result is not None and not isinstance(result, str) and not result.empty:
+                        last_row = result.iloc[-1]
+                        
+                        if ind_name == 'ohlcv':
+                            indicator_context['close'] = float(last_row['close'])
+                        elif ind_name == 'ema':
+                            indicator_context['ema_99'] = float(last_row['ema']) # Asumiendo EMA 99 configurada
+        
+        # Extraer datos de 'indicators' (RSI, MACD)
+        if 'indicators' in pair_results:
+            for ind_name, analyses in pair_results['indicators'].items():
+                for analysis in analyses:
+                    result = analysis.get('result')
+                    if result is not None and not isinstance(result, str) and not result.empty:
+                        last_row = result.iloc[-1]
+                        
+                        if ind_name == 'rsi':
+                            indicator_context['rsi'] = float(last_row['rsi'])
+                        elif ind_name == 'macd_cross':
+                            # MACD Cross suele tener hist o macd/signal
+                            if 'histogram' in last_row:
+                                indicator_context['macd_hist'] = float(last_row['histogram'])
+                            elif 'macd' in last_row:
+                                indicator_context['macd_val'] = float(last_row['macd'])
+
+        # 2. Procesar Señales con Contexto Completo
         for indicator_type in pair_results:
             if indicator_type not in ['indicators', 'crossovers']:
                 continue
@@ -184,12 +221,11 @@ class Behaviour():
                     
                     last_row = result.iloc[-1]
                     
-                    # DEBUG CRÍTICO: Ver qué contiene last_row
+                    # Detectar Flags
                     is_hot = last_row.get('is_hot', False) if hasattr(last_row, 'get') else getattr(last_row, 'is_hot', False)
                     is_cold = last_row.get('is_cold', False) if hasattr(last_row, 'get') else getattr(last_row, 'is_cold', False)
-                    self.logger.debug(f"[ENHANCE] {symbol}/{indicator}: is_hot={is_hot}, is_cold={is_cold}")
                     
-                    # Determinar tipo de señal
+                    # Determinar tipo de señal base
                     signal_type = 'neutral'
                     if is_hot:
                         signal_type = 'hot'
@@ -199,7 +235,7 @@ class Behaviour():
                     if signal_type == 'neutral':
                         continue
                     
-                    # Enriquecer
+                    # Paquete de señal
                     signal = {
                         'symbol': symbol,
                         'type': signal_type,
@@ -207,12 +243,46 @@ class Behaviour():
                         'values': {}
                     }
                     
-                    # Extraer valor de RSI si es el indicador actual
-                    rsi_val = float(last_row[indicator]) if indicator == 'rsi' and indicator in last_row else None
+                    # RSI específico de ESTA señal (para consistencia)
+                    rsi_val = indicator_context.get('rsi')
                     
-                    enhanced = self.signal_enhancer.enhance(signal, exchange, rsi_value=rsi_val)
+                    # Enhancer con visión completa
+                    enhanced = self.signal_enhancer.enhance(
+                        signal, 
+                        exchange, 
+                        rsi_value=rsi_val,
+                        indicator_data=indicator_context 
+                    )
                     
+                    # ─────────────────────────────────────────
+                    # Filtro de Repetición / Anti-Spam
+                    # ─────────────────────────────────────────
+                    cache_key = f"{symbol}_{signal_type}"
+                    last_state = self.last_notifications.get(cache_key)
+                    
+                    should_notify = True
+                    if last_state:
+                         # Regla: Notificar solo si Score varía significativamente (>10) o Calidad mejora
+                        score_diff = abs(enhanced.score - last_state['score'])
+                        
+                        # Calidad orden: A+ > A > B > C. Usamos orden explicito.
+                        q_rank = {'A+': 4, 'A': 3, 'B': 2, 'C': 1}
+                        current_rank = q_rank.get(enhanced.quality, 0)
+                        last_rank = q_rank.get(last_state['quality'], 0)
+                        
+                        if score_diff < 10 and current_rank <= last_rank:
+                            should_notify = False
+                    
+                    if should_notify:
+                        import time
+                        self.last_notifications[cache_key] = {
+                            'timestamp': time.time(),
+                            'score': enhanced.score,
+                            'quality': enhanced.quality
+                        }
+                        
                     # Agregar al análisis
                     analysis['enhanced'] = enhanced.to_dict()
                     analysis['quality'] = enhanced.quality
                     analysis['context_note'] = enhanced.context_note
+                    analysis['should_notify'] = should_notify

@@ -315,82 +315,92 @@ class SignalEnhancer:
         btc_trend: str,
         alt: AltStrengthData,
         sentiment: str,
-        rsi: float = None
+        rsi: float = None,
+        context_data: Dict = None # Nuevo: Contexto completo para filtros cruzados
     ) -> float:
         """
-        Calcula score continuo 0-100 (Fase 1).
-        
-        Factores:
-            - BTC trend: ±20 pts
-            - ALT relative strength: ±30 pts
-            - Market sentiment: ±10 pts
-            - RSI zone: ±15 pts
+        Calcula score continuo 0-100 con reglas heurísticas estrictas.
         """
         score = 50.0  # Base neutral
+        context_data = context_data or {}
         
-        # Factor BTC trend
-        btc_factors = {'bullish': 20, 'neutral': 0, 'bearish': -20}
+        # ─────────────────────────────────────────
+        # 1. Filtros de Estructura (EMA 99)
+        # ─────────────────────────────────────────
+        price = context_data.get('close', 0)
+        ema_99 = context_data.get('ema_99', 0)
+        
+        structure_bullish = price > ema_99 if price > 0 and ema_99 > 0 else True # Default True si no hay data
+        
+        # Penalización por estructura bajista en señales de compra
+        if signal_type == 'hot' and not structure_bullish:
+            score -= 10
+            self.logger.debug("Penalización: Estructura bajista (Precio < EMA 99)")
+
+        # ─────────────────────────────────────────
+        # 2. Factores de Mercado
+        # ─────────────────────────────────────────
+        # BTC Trend
+        btc_factors = {'bullish': 15, 'neutral': 0, 'bearish': -15}
         btc_adjustment = btc_factors.get(btc_trend, 0)
         
-        # Factor ALT strength (relativo a 1.0)
-        alt_adjustment = (alt.relative_strength - 1.0) * 30
-        alt_adjustment = max(-30, min(30, alt_adjustment))  # Clamp
+        # Penalizar compras si BTC no ayuda
+        if signal_type == 'hot' and btc_trend != 'bullish':
+            score -= 5
+            
+        # ALT Strength
+        alt_adjustment = (alt.relative_strength - 1.0) * 25 # Reducido de 30 a 25
+        alt_adjustment = max(-25, min(25, alt_adjustment))
         
-        # Factor sentiment
-        sent_factors = {'risk_on': 10, 'neutral': 0, 'risk_off': -10}
+        # Sentiment
+        sent_factors = {'risk_on': 5, 'neutral': 0, 'risk_off': -5} # Reducido de 10 a 5
         sent_adjustment = sent_factors.get(sentiment, 0)
         
-        # Ajustar según tipo de señal
-        if signal_type == 'hot':  # Compra
-            score += btc_adjustment
-            score += alt_adjustment
-            score += sent_adjustment
+        # Aplicar Factores Base
+        if signal_type == 'hot':
+            score += btc_adjustment + alt_adjustment + sent_adjustment
+        elif signal_type == 'cold':
+            score -= (btc_adjustment + alt_adjustment + sent_adjustment)
+
+        # ─────────────────────────────────────────
+        # 3. Validación RSI + MACD
+        # ─────────────────────────────────────────
+        rsi_bonus = 0
+        if rsi is not None:
+            # RSI < 30 solo suma si MACD confirma
+            macd_hist = context_data.get('macd_hist', 0)
             
-            # Bonus RSI
-            if rsi is not None:
+            if signal_type == 'hot':
                 if rsi < 30:
-                    score += 15  # Sobreventa extrema
+                    # Validar con MACD (Histograma subiendo o positivo es mejor)
+                    if macd_hist > 0 or (context_data.get('macd_momentum', 0) > 0): 
+                        rsi_bonus = 10  # Max +10 por RSI
+                    else:
+                        rsi_bonus = 5   # Menos bonus si MACD no ayuda
                 elif rsi < 40:
-                    score += 10  # Sobreventa
+                    rsi_bonus = 5
                 elif rsi > 70:
-                    score -= 15  # Sobrecompra
-                elif rsi > 60:
-                    score -= 5   # Cerca de sobrecompra
-        
-        elif signal_type == 'cold':  # Venta
-            score -= btc_adjustment  # Invertir: BTC bearish es bueno para ventas
-            score -= alt_adjustment  # ALT débil es bueno para ventas
-            score -= sent_adjustment
-            
-            # Bonus RSI para ventas
-            if rsi is not None:
+                    rsi_bonus = -15     # Sobrecompra peligrosa
+                    
+            elif signal_type == 'cold':
                 if rsi > 70:
-                    score += 15  # Sobrecompra extrema
+                    rsi_bonus = 10
                 elif rsi > 60:
-                    score += 10
+                    rsi_bonus = 5
                 elif rsi < 30:
-                    score -= 10  # Sobreventa
+                    rsi_bonus = -10
+
+        score += rsi_bonus
         
-        # Log de calibración (desglose del score)
+        # Clamp final
         final_score = max(0, min(100, score))
+        
         self.logger.debug(
-            f"[CALIB] SCORE: Base=50 + BTC({btc_adjustment:+.0f}) + "
-            f"ALT({alt_adjustment:+.0f}) + Sent({sent_adjustment:+.0f}) + "
-            f"RSI(adj) = {final_score:.0f}"
+            f"[CALIB] SCORE: Base=50 + Struct({'Bearish' if not structure_bullish else 'Bullish'}) "
+            f"+ BTC({btc_adjustment}) + ALT({alt_adjustment:.1f}) + RSI({rsi_bonus}) = {final_score:.0f}"
         )
         
         return final_score
-    
-    def _score_to_quality(self, score: float) -> str:
-        """Mapea score continuo a calidad discreta."""
-        if score >= 75:
-            return 'A+'
-        elif score >= 60:
-            return 'A'
-        elif score >= 40:
-            return 'B'
-        else:
-            return 'C'
     
     def _generate_score_note(
         self, 
@@ -421,70 +431,35 @@ class SignalEnhancer:
             parts.append('Score bajo - precaución')
         
         return ', '.join(parts)
-    
-    def _quality_for_hot(
-        self, 
-        btc_trend: str, 
-        alt: AltStrengthData, 
-        sentiment: str,
-        rsi: float = None
-    ) -> tuple:
-        """Clasifica señales HOT (compra)."""
+
+    def _score_to_quality(self, score: float) -> str:
+        """Mapea score a calidad con umbrales estrictos."""
+        if score >= 80:      # Antes 75
+            return 'A+'
+        elif score >= 65:    # Antes 60
+            return 'A'
+        elif score >= 50:    # Antes 40
+            return 'B'
+        else:
+            return 'C'
+
+    def _quality_for_hot(self, score: float, context_data: Dict) -> tuple:
+        """Clasificación heurística para HOT."""
+        # Esta función ahora delega al score, pero puede imponer techos
+        price = context_data.get('close', 0)
+        ema_99 = context_data.get('ema_99', 0)
         
-        # MEJOR: BTC bullish + ALT outperforming + RSI bajo
-        if btc_trend == 'bullish' and alt.outperforming:
-            if rsi and rsi < 40:
-                return 'A+', 90, f'BTC alcista, ALT supera ({alt.relative_strength:.1f}x), RSI bajo'
-            return 'A', 80, f'BTC alcista, ALT supera ({alt.relative_strength:.1f}x)'
+        # REGLA: Si Precio < EMA 99, Calidad MÁXIMA = B
+        if price > 0 and ema_99 > 0 and price < ema_99:
+            valid_quality = self._score_to_quality(score)
+            if valid_quality in ['A+', 'A']:
+                return 'B', score, 'Rebote Técnico (Contra-tendencia)'
         
-        # BUENO: BTC bullish + ALT neutral
-        if btc_trend == 'bullish' and not alt.outperforming:
-            return 'A', 75, 'BTC alcista, ALT alineada'
-        
-        # NEUTRAL: BTC neutral
-        if btc_trend == 'neutral':
-            if alt.outperforming:
-                return 'A', 70, f'BTC lateral, ALT muestra fuerza ({alt.relative_strength:.1f}x)'
-            if alt.divergence == 'negative':
-                return 'C', 30, 'BTC lateral, ALT débil (divergencia negativa)'
-            return 'B', 50, 'BTC lateral, sin confirmación'
-        
-        # MALO: BTC bearish (compra contra tendencia)
-        if btc_trend == 'bearish':
-            if alt.divergence == 'positive':
-                return 'B', 45, 'BTC bajista, pero ALT resiste (riesgo)'
-            return 'C', 25, 'BTC bajista, evitar compra contra tendencia'
-        
-        return 'B', 50, 'Clasificación por defecto'
-    
-    def _quality_for_cold(
-        self, 
-        btc_trend: str, 
-        alt: AltStrengthData, 
-        sentiment: str
-    ) -> tuple:
-        """Clasifica señales COLD (venta)."""
-        
-        # MEJOR venta: BTC bearish + ALT underperforming
-        if btc_trend == 'bearish' and not alt.outperforming:
-            return 'A+', 90, 'BTC bajista, ALT débil - venta confirmada'
-        
-        # BUENO: BTC bearish
-        if btc_trend == 'bearish':
-            return 'A', 80, 'BTC bajista, venta válida'
-        
-        # NEUTRAL: BTC neutral + ALT débil
-        if btc_trend == 'neutral' and not alt.outperforming:
-            return 'A', 70, 'BTC lateral, ALT débil'
-        
-        if btc_trend == 'neutral':
-            return 'B', 50, 'BTC lateral, venta con precaución'
-        
-        # MALO: Venta en mercado alcista
-        if btc_trend == 'bullish':
-            return 'C', 25, 'BTC alcista, evitar venta contra tendencia'
-        
-        return 'B', 50, 'Clasificación por defecto'
+        return self._score_to_quality(score), score, 'Tendencia Alineada' if score >= 65 else 'Confirmar'
+
+    def _quality_for_cold(self, score: float, context_data: Dict) -> tuple:
+        # Similar logic for cold if needed
+        return self._score_to_quality(score), score, ''
     
     def _get_recommendation(self, quality: str, signal_type: str) -> str:
         """Genera recomendación basada en calidad y tipo."""
