@@ -105,7 +105,7 @@ class SignalEnhancer:
         self.mc = market_context
         self.logger = structlog.get_logger()
         
-        # Configuración
+        # Configuración base
         self.config = settings.get('correlation', {}) if settings else {}
         self.enabled = self.config.get('enabled', False)
         self.logger.info(f"[SignalEnhancer] enabled={self.enabled}, config keys: {list(self.config.keys()) if self.config else 'None'}")
@@ -113,6 +113,31 @@ class SignalEnhancer:
         quality_filter = self.config.get('quality_filter', {})
         self.filter_enabled = quality_filter.get('enabled', False)
         self.min_quality = quality_filter.get('min_quality', 'C')
+        
+        # ─────────────────────────────────────────
+        # Parámetros de Scoring (desde config.yml)
+        # ─────────────────────────────────────────
+        scoring_cfg = self.config.get('scoring', {})
+        self.btc_weight = scoring_cfg.get('btc_weight', 15)
+        self.structure_weight = scoring_cfg.get('structure_weight', 10)
+        self.rsi_weight = scoring_cfg.get('rsi_weight', 5)
+        self.sentiment_weight = scoring_cfg.get('sentiment_weight', 5)
+        
+        # Umbrales RSI
+        self.rsi_extreme_low = scoring_cfg.get('rsi_extreme_low', 25)
+        self.rsi_oversold = scoring_cfg.get('rsi_oversold', 40)
+        self.rsi_overbought = scoring_cfg.get('rsi_overbought', 60)
+        self.rsi_extreme_high = scoring_cfg.get('rsi_extreme_high', 75)
+        
+        # Debug
+        self.verbose_scoring = scoring_cfg.get('verbose_scoring', False)
+        
+        if scoring_cfg:
+            self.logger.info(
+                f"[SignalEnhancer] Scoring config: BTC={self.btc_weight}, "
+                f"Struct={self.structure_weight}, RSI={self.rsi_weight}, "
+                f"Thresholds=[{self.rsi_extreme_low}/{self.rsi_oversold}/{self.rsi_overbought}/{self.rsi_extreme_high}]"
+            )
     
     def enhance(
         self, 
@@ -318,13 +343,17 @@ class SignalEnhancer:
         alt: AltStrengthData,
         sentiment: str,
         rsi: float = None,
-        context_data: Dict = None # Nuevo: Contexto completo para filtros cruzados
+        context_data: Dict = None
     ) -> float:
         """
-        Calcula score continuo 0-100 con reglas heurísticas estrictas.
+        Calcula score continuo 0-100 con reglas heurísticas configurables.
+        Los pesos se leen desde config.yml → correlation.scoring
         """
         score = 50.0  # Base neutral
         context_data = context_data or {}
+        
+        # Para debug detallado
+        score_breakdown = {'base': 50}
         
         # ─────────────────────────────────────────
         # 1. Filtros de Estructura (EMA 99)
@@ -332,31 +361,37 @@ class SignalEnhancer:
         price = context_data.get('close', 0)
         ema_99 = context_data.get('ema_99', 0)
         
-        structure_bullish = price > ema_99 if price > 0 and ema_99 > 0 else True # Default True si no hay data
+        structure_bullish = price > ema_99 if price > 0 and ema_99 > 0 else True
+        structure_label = 'Bullish' if structure_bullish else 'Bearish'
         
-        # Penalización por estructura bajista en señales de compra
         if signal_type == 'hot' and not structure_bullish:
-            score -= 10
-            self.logger.debug("Penalización: Estructura bajista (Precio < EMA 99)")
+            score -= self.structure_weight
+            score_breakdown['structure'] = -self.structure_weight
+            self.logger.debug(f"Penalización: Estructura bajista (Precio {price:.2f} < EMA {ema_99:.2f})")
 
         # ─────────────────────────────────────────
-        # 2. Factores de Mercado
+        # 2. Factores de Mercado (desde config)
         # ─────────────────────────────────────────
-        # BTC Trend
-        btc_factors = {'bullish': 15, 'neutral': 0, 'bearish': -15}
+        btc_factors = {'bullish': self.btc_weight, 'neutral': 0, 'bearish': -self.btc_weight}
         btc_adjustment = btc_factors.get(btc_trend, 0)
+        score_breakdown['btc'] = btc_adjustment
         
         # Penalizar compras si BTC no ayuda
+        hot_btc_penalty = 0
         if signal_type == 'hot' and btc_trend != 'bullish':
-            score -= 5
+            hot_btc_penalty = -5
+            score += hot_btc_penalty
+            score_breakdown['hot_btc_penalty'] = hot_btc_penalty
             
         # ALT Strength
-        alt_adjustment = (alt.relative_strength - 1.0) * 25 # Reducido de 30 a 25
+        alt_adjustment = (alt.relative_strength - 1.0) * 25
         alt_adjustment = max(-25, min(25, alt_adjustment))
+        score_breakdown['alt'] = round(alt_adjustment, 1)
         
-        # Sentiment
-        sent_factors = {'risk_on': 5, 'neutral': 0, 'risk_off': -5} # Reducido de 10 a 5
+        # Sentiment (desde config)
+        sent_factors = {'risk_on': self.sentiment_weight, 'neutral': 0, 'risk_off': -self.sentiment_weight}
         sent_adjustment = sent_factors.get(sentiment, 0)
+        score_breakdown['sentiment'] = sent_adjustment
         
         # Aplicar Factores Base
         if signal_type == 'hot':
@@ -365,42 +400,56 @@ class SignalEnhancer:
             score -= (btc_adjustment + alt_adjustment + sent_adjustment)
 
         # ─────────────────────────────────────────
-        # 3. Validación RSI + MACD
+        # 3. Validación RSI (desde config)
         # ─────────────────────────────────────────
         rsi_bonus = 0
+        rsi_label = 'N/A'
         if rsi is not None:
-            # RSI < 30 solo suma si MACD confirma
             macd_hist = context_data.get('macd_hist', 0)
             
             if signal_type == 'hot':
-                if rsi < 30:
-                    # Validar con MACD (Histograma subiendo o positivo es mejor)
-                    if macd_hist > 0 or (context_data.get('macd_momentum', 0) > 0): 
-                        rsi_bonus = 10  # Max +10 por RSI
+                if rsi < self.rsi_extreme_low:  # Extreme oversold
+                    rsi_label = 'Extreme'
+                    if macd_hist > 0:
+                        rsi_bonus = self.rsi_weight * 2  # Double bonus si MACD confirma
                     else:
-                        rsi_bonus = 5   # Menos bonus si MACD no ayuda
-                elif rsi < 40:
-                    rsi_bonus = 5
-                elif rsi > 70:
-                    rsi_bonus = -15     # Sobrecompra peligrosa
+                        rsi_bonus = self.rsi_weight
+                elif rsi < self.rsi_oversold:  # Oversold
+                    rsi_label = 'Oversold'
+                    rsi_bonus = self.rsi_weight
+                elif rsi > self.rsi_extreme_high:  # Extreme overbought en compra = malo
+                    rsi_label = 'Overbought'
+                    rsi_bonus = -self.rsi_weight * 3
                     
             elif signal_type == 'cold':
-                if rsi > 70:
-                    rsi_bonus = 10
-                elif rsi > 60:
-                    rsi_bonus = 5
-                elif rsi < 30:
-                    rsi_bonus = -10
-
+                if rsi > self.rsi_extreme_high:
+                    rsi_label = 'Extreme'
+                    rsi_bonus = self.rsi_weight * 2
+                elif rsi > self.rsi_overbought:
+                    rsi_label = 'Overbought'
+                    rsi_bonus = self.rsi_weight
+                elif rsi < self.rsi_extreme_low:
+                    rsi_label = 'Oversold'
+                    rsi_bonus = -self.rsi_weight * 2
+        
         score += rsi_bonus
+        score_breakdown['rsi'] = rsi_bonus
         
         # Clamp final
         final_score = max(0, min(100, score))
         
-        self.logger.debug(
-            f"[CALIB] SCORE: Base=50 + Struct({'Bearish' if not structure_bullish else 'Bullish'}) "
-            f"+ BTC({btc_adjustment}) + ALT({alt_adjustment:.1f}) + RSI({rsi_bonus}) = {final_score:.0f}"
-        )
+        # Logging según config
+        if self.verbose_scoring:
+            self.logger.info(
+                f"[SCORE] {signal_type.upper()} | Struct:{structure_label} | "
+                f"BTC:{btc_adjustment:+d} | ALT:{alt_adjustment:+.1f} | "
+                f"RSI:{rsi_bonus:+d} ({rsi_label}) | TOTAL:{final_score:.0f}"
+            )
+        else:
+            self.logger.debug(
+                f"[CALIB] SCORE: Base=50 + Struct({structure_label}) "
+                f"+ BTC({btc_adjustment}) + ALT({alt_adjustment:.1f}) + RSI({rsi_bonus}) = {final_score:.0f}"
+            )
         
         return final_score
     

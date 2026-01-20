@@ -19,7 +19,7 @@ settings:
     top_n: 20                   # Cantidad de pares
     quote_currency: USDT        # Moneda de cotización
     min_volume_24h: 3000000     # Volumen mínimo 24h en USDT
-    exclude:                    # Excluir stablecoins
+    exclude:                    # Excluir stablecoins y pares problemáticos
       - USDC/USDT
       - BUSD/USDT
       - TUSD/USDT
@@ -29,6 +29,7 @@ settings:
       - FRAX/USDT
       - USD1/USDT
       - PAXG/USDT
+      - 币安人生/USDT          # Par inválido con caracteres especiales
   
   # ═══════════════════════════════════════════
   # ANÁLISIS DE CORRELACIÓN (Fase 4)
@@ -43,6 +44,22 @@ settings:
     quality_filter:
       enabled: false
       min_quality: A
+    # ─────────────────────────────────────────
+    # SCORING AVANZADO (Nuevos parámetros)
+    # ─────────────────────────────────────────
+    scoring:
+      # Pesos de factores (ajustables)
+      btc_weight: 15            # Puntos ± por tendencia BTC
+      structure_weight: 10      # Penalización si Precio < EMA 99
+      rsi_weight: 5             # Bonus por RSI oversold/overbought
+      sentiment_weight: 5       # Puntos ± por sentiment
+      # Umbrales de RSI
+      rsi_extreme_low: 25       # RSI < 25 = Extreme oversold
+      rsi_oversold: 40          # RSI < 40 = Oversold
+      rsi_overbought: 60        # RSI > 60 = Overbought
+      rsi_extreme_high: 75      # RSI > 75 = Extreme overbought
+      # Debug
+      verbose_scoring: true     # Log detallado de cálculo de score
 
 # ═══════════════════════════════════════════
 # EXCHANGES
