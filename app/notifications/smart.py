@@ -100,6 +100,11 @@ class SmartNotificationManager:
         'chart_min_quality': 'A',   # Mínimo para enviar con chart
         'delay_between_details': 3.0,  # Segundos entre detalles
         'delay_after_summary': 2.0,    # Segundos después del resumen
+        # [A] Gate global
+        'market_scan_mode': True,      # Si all C + bearish → solo summary
+        # [C] Límite señales C
+        'max_c_signals': 5,            # Máximo señales C en summary
+        'sort_by_score': True,         # Ordenar por score descendente
     }
     
     # Orden de calidades para comparación
@@ -249,11 +254,25 @@ class SmartNotificationManager:
         # Ordenar por score descendente
         sorted_signals = sorted(self.summaries, key=lambda x: x.score, reverse=True)
         
+        # ─────────────────────────────────────────
+        # [C] Aplicar límite de señales C
+        # ─────────────────────────────────────────
+        max_c = self.config.get('max_c_signals', 5)
+        high_quality = [s for s in sorted_signals if s.quality in ['A+', 'A', 'B']]
+        low_quality = [s for s in sorted_signals if s.quality == 'C']
+        
+        # Limitar señales C
+        limited_c = low_quality[:max_c]
+        truncated_count = len(low_quality) - len(limited_c)
+        
+        # Combinar (alta calidad primero, luego C limitadas)
+        display_signals = high_quality + limited_c
+        
         lines = []
         
         # Header
-        count = len(sorted_signals)
-        lines.append(f"🔔 <b>{count} señales detectadas</b>")
+        total_count = len(sorted_signals)
+        lines.append(f"🔔 <b>{total_count} señales detectadas</b>")
         lines.append("")
         
         # Contexto BTC
@@ -269,8 +288,8 @@ class SmartNotificationManager:
                 lines.append("⚪ BTC Neutral")
             lines.append("")
         
-        # Lista de señales
-        for sig in sorted_signals:
+        # Lista de señales (limitada)
+        for sig in display_signals:
             # Estrellas de calidad
             stars = "⭐⭐⭐" if sig.quality == 'A+' else "⭐⭐" if sig.quality == 'A' else "⭐" if sig.quality == 'B' else ""
             
@@ -283,6 +302,10 @@ class SmartNotificationManager:
             # Línea formateada
             line = f"{stars:6} {sig.quality}  {sig.symbol:12} {rsi_str:8} {direction}"
             lines.append(line)
+        
+        # Indicar si se truncaron señales
+        if truncated_count > 0:
+            lines.append(f"<i>... y {truncated_count} señales C más (score bajo)</i>")
         
         lines.append("")
         lines.append(f"<i>Detalles enviados para A+ y A</i>")

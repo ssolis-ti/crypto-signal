@@ -121,6 +121,7 @@ class SignalEnhancer:
         self.btc_weight = scoring_cfg.get('btc_weight', 15)
         self.structure_weight = scoring_cfg.get('structure_weight', 10)
         self.rsi_weight = scoring_cfg.get('rsi_weight', 5)
+        self.rsi_weight_bearish = scoring_cfg.get('rsi_weight_bearish', 3)  # [B] RSI reducido
         self.sentiment_weight = scoring_cfg.get('sentiment_weight', 5)
         
         # Umbrales RSI
@@ -132,11 +133,19 @@ class SignalEnhancer:
         # Debug
         self.verbose_scoring = scoring_cfg.get('verbose_scoring', False)
         
+        # ─────────────────────────────────────────
+        # Output Control (desde config.yml)
+        # ─────────────────────────────────────────
+        output_cfg = self.config.get('output', {})
+        self.market_scan_mode = output_cfg.get('market_scan_mode', True)  # [A]
+        self.max_c_signals = output_cfg.get('max_c_signals', 5)           # [C]
+        self.sort_by_score = output_cfg.get('sort_by_score', True)
+        
         if scoring_cfg:
             self.logger.info(
-                f"[SignalEnhancer] Scoring config: BTC={self.btc_weight}, "
-                f"Struct={self.structure_weight}, RSI={self.rsi_weight}, "
-                f"Thresholds=[{self.rsi_extreme_low}/{self.rsi_oversold}/{self.rsi_overbought}/{self.rsi_extreme_high}]"
+                f"[SignalEnhancer] Scoring: BTC={self.btc_weight}, Struct={self.structure_weight}, "
+                f"RSI={self.rsi_weight}/{self.rsi_weight_bearish}(bearish), "
+                f"Output: max_c={self.max_c_signals}, scan_mode={self.market_scan_mode}"
             )
     
     def enhance(
@@ -401,9 +410,14 @@ class SignalEnhancer:
 
         # ─────────────────────────────────────────
         # 3. Validación RSI (desde config)
+        # [B] Si estructura bearish, usar peso reducido
         # ─────────────────────────────────────────
         rsi_bonus = 0
         rsi_label = 'N/A'
+        
+        # Seleccionar peso RSI según estructura
+        effective_rsi_weight = self.rsi_weight_bearish if not structure_bullish else self.rsi_weight
+        
         if rsi is not None:
             macd_hist = context_data.get('macd_hist', 0)
             
@@ -411,12 +425,12 @@ class SignalEnhancer:
                 if rsi < self.rsi_extreme_low:  # Extreme oversold
                     rsi_label = 'Extreme'
                     if macd_hist > 0:
-                        rsi_bonus = self.rsi_weight * 2  # Double bonus si MACD confirma
+                        rsi_bonus = effective_rsi_weight * 2  # Double bonus si MACD confirma
                     else:
-                        rsi_bonus = self.rsi_weight
+                        rsi_bonus = effective_rsi_weight
                 elif rsi < self.rsi_oversold:  # Oversold
                     rsi_label = 'Oversold'
-                    rsi_bonus = self.rsi_weight
+                    rsi_bonus = effective_rsi_weight
                 elif rsi > self.rsi_extreme_high:  # Extreme overbought en compra = malo
                     rsi_label = 'Overbought'
                     rsi_bonus = -self.rsi_weight * 3

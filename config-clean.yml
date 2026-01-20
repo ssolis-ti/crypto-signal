@@ -52,6 +52,7 @@ settings:
       btc_weight: 15            # Puntos ± por tendencia BTC
       structure_weight: 10      # Penalización si Precio < EMA 99
       rsi_weight: 5             # Bonus por RSI oversold/overbought
+      rsi_weight_bearish: 3     # [B] RSI reducido cuando estructura bearish
       sentiment_weight: 5       # Puntos ± por sentiment
       # Umbrales de RSI
       rsi_extreme_low: 25       # RSI < 25 = Extreme oversold
@@ -60,6 +61,15 @@ settings:
       rsi_extreme_high: 75      # RSI > 75 = Extreme overbought
       # Debug
       verbose_scoring: true     # Log detallado de cálculo de score
+    # ─────────────────────────────────────────
+    # OUTPUT CONTROL (Ajustes quirúrgicos)
+    # ─────────────────────────────────────────
+    output:
+      # [A] Gate global por contexto BTC
+      market_scan_mode: true    # Si bearish + all C → solo summary
+      # [C] Límite de señales C
+      max_c_signals: 5          # Máximo señales C en summary
+      sort_by_score: true       # Ordenar por score descendente
 
 # ═══════════════════════════════════════════
 # EXCHANGES
