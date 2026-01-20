@@ -270,28 +270,52 @@ class SmartNotificationManager:
         
         lines = []
         
-        # Header
+        # ─────────────────────────────────────────
+        # [B] Semántica de Trader Senior
+        # ─────────────────────────────────────────
         total_count = len(sorted_signals)
-        lines.append(f"🔔 <b>{total_count} señales detectadas</b>")
+        has_actionable = len(high_quality) > 0
+        all_c = len(high_quality) == 0
+        
+        # Header contextual
+        if all_c and self.btc_context.get('trend') == 'bearish':
+            # Modo Market Scan - no hay señales operables
+            lines.append("📊 <b>MARKET SCAN</b> | Sin señales operables")
+            lines.append(f"<i>{total_count} condiciones detectadas</i>")
+        elif has_actionable:
+            lines.append(f"🔔 <b>{len(high_quality)} SEÑALES OPERABLES</b>")
+            if low_quality:
+                lines.append(f"<i>+ {len(low_quality)} en watchlist</i>")
+        else:
+            lines.append(f"📋 <b>{total_count} condiciones de mercado</b>")
+        
         lines.append("")
         
-        # Contexto BTC
+        # Contexto BTC (más profesional)
         if self.btc_context:
             trend = self.btc_context.get('trend', 'neutral')
             change = self.btc_context.get('change', 0)
+            sentiment = self.btc_context.get('sentiment', 'neutral')
             
             if trend == 'bullish':
-                lines.append(f"🟢 BTC Alcista (+{change:.1f}%)")
+                lines.append(f"🟢 BTC +{change:.1f}% | Risk On")
             elif trend == 'bearish':
-                lines.append(f"🔴 BTC Bajista ({change:.1f}%)")
+                lines.append(f"🔴 BTC {change:.1f}% | Risk Off")
             else:
-                lines.append("⚪ BTC Neutral")
+                lines.append("⚪ BTC Lateral | Neutral")
             lines.append("")
         
-        # Lista de señales (limitada)
+        # Lista de señales/condiciones
         for sig in display_signals:
             # Estrellas de calidad
-            stars = "⭐⭐⭐" if sig.quality == 'A+' else "⭐⭐" if sig.quality == 'A' else "⭐" if sig.quality == 'B' else ""
+            if sig.quality == 'A+':
+                prefix = "⭐⭐⭐"
+            elif sig.quality == 'A':
+                prefix = "⭐⭐ "
+            elif sig.quality == 'B':
+                prefix = "⭐  "
+            else:
+                prefix = "   "
             
             # Emoji de dirección
             direction = "🟢" if sig.signal_type == 'hot' else "🔴"
@@ -300,15 +324,20 @@ class SmartNotificationManager:
             rsi_str = f"RSI {sig.rsi_value:.0f}" if sig.rsi_value > 0 else sig.indicator[:8]
             
             # Línea formateada
-            line = f"{stars:6} {sig.quality}  {sig.symbol:12} {rsi_str:8} {direction}"
+            line = f"{prefix} {sig.quality}  {sig.symbol:12} {rsi_str:8} {direction}"
             lines.append(line)
         
-        # Indicar si se truncaron señales
+        # Indicar si se truncaron
         if truncated_count > 0:
-            lines.append(f"<i>... y {truncated_count} señales C más (score bajo)</i>")
+            lines.append(f"<i>... +{truncated_count} más en watchlist</i>")
         
         lines.append("")
-        lines.append(f"<i>Detalles enviados para A+ y A</i>")
+        
+        # Footer contextual
+        if has_actionable:
+            lines.append("<i>📎 Detalles + charts para A+/A</i>")
+        elif all_c:
+            lines.append("<i>⏸️ Sin acción recomendada - Modo observación</i>")
         
         return "\n".join(lines)
     
