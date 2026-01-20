@@ -39,6 +39,16 @@ def configure_logging(loglevel, log_mode):
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
     root_logger.setLevel(loglevel)
+    
+    # Silenciar loggers ruidosos de librerías externas
+    noisy_loggers = [
+        'urllib3', 'requests', 'ccxt', 'httpcore', 'httpx',
+        'urllib3.connectionpool', 'urllib3.util.retry',
+        'telegram', 'telegram.ext', 'httpcore.http11',
+        'asyncio', 'matplotlib', 'PIL'
+    ]
+    for logger_name in noisy_loggers:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
     structlog.configure(
         processors=[
