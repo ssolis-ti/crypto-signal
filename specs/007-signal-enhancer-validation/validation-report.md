@@ -102,11 +102,15 @@ operator sees.** Today, `notifications/core.py::notify_all` hardcodes `detail_mi
 `chart_min_quality: 'A'`, meaning only `A`/`A+` signals get a full detail message + chart; everything
 else appears in the summary only. Given this validation, that gate is not evidence-based.
 
-This is flagged as a **Convergence finding requiring operator sign-off (FR-009's second branch)**
+This was flagged as a **Convergence finding requiring operator sign-off (FR-009's second branch)**
 rather than a unilateral code change, because loosening the gate changes real Telegram message volume
 and chart-rendering load for an active deployment — a live-behavior change with a real operational
-cost, not a pure bug fix. See `tasks.md` Phase 4 for the recorded finding and the options put to the
-operator.
+cost, not a pure bug fix.
+
+**Operator decision (2026-09-28): keep the gate as-is (`detail_min_quality: 'A'` unchanged)**,
+pending a redesigned/recalibrated `SignalEnhancer` scoring heuristic and a fresh run of this same
+validation methodology (`validate_signal_enhancer.py`) against it before restoring confidence in
+the gate. No code changed by this slice. See `tasks.md` Phase 4, finding F1.
 
 ## Assumptions and limitations (for future reference)
 
