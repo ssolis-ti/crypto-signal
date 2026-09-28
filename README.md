@@ -158,6 +158,9 @@ dependencias pinneadas).
 | [009](specs/009-agent-api/) | API REST de solo lectura para integración con agentes/IA |
 | [010](specs/010-btc-change-1h-fix/) | `btc_change_1h` usaba el delta absoluto de CCXT, no un %; ahora se calcula desde OHLCV real |
 | [011](specs/011-macd-cross-validation/) | Validación histórica del score aplicada a `macd_cross` (1,776 señales) — confirma y refuerza el hallazgo de 007 |
+| [012](specs/012-wyckoff-fractal-research/) | Investigación (sin código): método Wyckoff + temporalidades fractales como hipótesis alternativa |
+| [013](specs/013-wyckoff-effort-result/) | `WyckoffPrimitives`: ratio esfuerzo/resultado, flags de clímax/movimiento delgado — primitivas puras, sin conectar a alertas todavía |
+| 014-016 | Roadmap Wyckoff especificado y bloqueado en cascada (detección de rango/spring/upthrust → validación histórica, incluyendo el horizonte de 1-2 semanas recordado por el operador → integración multi-timeframe condicional al resultado de la validación) |
 
 ---
 
