@@ -39,19 +39,27 @@ class Behaviour():
         - Notifier: Envía alertas
     """
 
-    def __init__(self, config, exchange_interface, notifier, data_manager=None):
+    def __init__(self, config, exchange_interface, notifier, data_manager=None, state_store=None,
+                 worker_name=None):
         """
         Inicializa el comportamiento con la configuración global.
-        
+
         Args:
             config: Objeto Configuration
             exchange_interface: CCXTDriver
             notifier: Notifier
             data_manager: DataManager (opcional, para MarketContext)
+            state_store: AgentStateStore (opcional, specs/009-agent-api/) -- si se pasa, cada
+                ciclo persiste contexto de mercado, señales enriquecidas, snapshot de
+                indicadores y un heartbeat, para que la API de agentes los sirva.
+            worker_name: nombre del AnalysisWorker dueño de esta instancia (para el heartbeat).
         """
         self.logger = structlog.get_logger()
         self.config = config
-        
+        self.state_store = state_store
+        self.worker_name = worker_name or 'unknown'
+        self.cycle_count = 0
+
         # ─────────────────────────────────────────
         # Componentes Core
         # ─────────────────────────────────────────
@@ -72,9 +80,9 @@ class Behaviour():
         
         correlation_config = config.settings.get('correlation', {})
         correlation_enabled = correlation_config.get('enabled', False)
-        print(f"DEBUG: correlation_config = {correlation_config}")
-        print(f"DEBUG: correlation_enabled = {correlation_enabled}, data_manager = {data_manager is not None}")
-        
+        self.logger.debug(f"correlation_config = {correlation_config}")
+        self.logger.debug(f"correlation_enabled = {correlation_enabled}, data_manager = {data_manager is not None}")
+
         if correlation_enabled and data_manager:
             self.logger.info("Correlation analysis ENABLED")
             self.market_context = MarketContext(data_manager, config.settings)
@@ -115,10 +123,15 @@ class Behaviour():
 
         # 2. Ejecución de Estrategias
         new_result = self.strategy_executor.test_strategies(
-            market_data, 
-            self.all_historical_data, 
+            market_data,
+            self.all_historical_data,
             output_mode
         )
+
+        # 2b. Persistir snapshot de indicadores para la API de agentes (specs/009-agent-api/)
+        # Independiente de si signal_enhancer esta habilitado -- "que sepa todo del bot".
+        if self.state_store:
+            self._record_indicator_snapshots(new_result)
 
         # 3. Enriquecer señales con contexto (si habilitado)
         if self.signal_enhancer:
@@ -132,6 +145,46 @@ class Behaviour():
             self.notifier.set_all_historical_data(self.all_historical_data)
 
         self.notifier.notify_all(new_result)
+
+        # 5. Heartbeat para la API de agentes
+        if self.state_store:
+            self.cycle_count += 1
+            all_pairs = [p for ex in market_data for p in market_data[ex]]
+            self.state_store.record_worker_heartbeat(
+                self.worker_name, all_pairs, self.cycle_count
+            )
+
+    def _record_indicator_snapshots(self, results: dict):
+        """
+        Persiste el ultimo valor de cada indicador/informante/crossover calculado, por
+        par y periodo de vela -- snapshot de estado actual, no historico (ver
+        specs/009-agent-api/research.md: tabla latest-only).
+        """
+        for exchange in results:
+            for market_pair in results[exchange]:
+                pair_results = results[exchange][market_pair]
+                for indicator_type in pair_results:
+                    if indicator_type not in ('indicators', 'informants', 'crossovers'):
+                        continue
+                    for indicator_name, analyses in pair_results[indicator_type].items():
+                        for analysis in analyses:
+                            result = analysis.get('result')
+                            if result is None or isinstance(result, str) or result.empty:
+                                continue
+                            last_row = result.iloc[-1]
+                            values = {
+                                col: (float(last_row[col]) if not isinstance(last_row[col], (bool, str))
+                                      else last_row[col])
+                                for col in result.columns
+                            }
+                            candle_period = analysis.get('config', {}).get('candle_period', 'unknown')
+                            try:
+                                self.state_store.record_indicator_snapshot(
+                                    exchange, market_pair, candle_period,
+                                    indicator_type, indicator_name, values
+                                )
+                            except Exception as e:
+                                self.logger.debug(f"[AGENT_API] snapshot skip {market_pair}/{indicator_name}: {e}")
 
     def _enhance_signals(self, results: dict, market_data: dict) -> dict:
         """
@@ -152,7 +205,9 @@ class Behaviour():
             self.logger.info(
                 f"Market Context: BTC {context.btc_trend} ({context.btc_change_24h}%)"
             )
-            
+            if self.state_store:
+                self.state_store.record_market_context(exchange, context.to_dict())
+
             for market_pair in market_data[exchange]:
                 if market_pair not in results[exchange]:
                     continue
@@ -286,3 +341,6 @@ class Behaviour():
                     analysis['quality'] = enhanced.quality
                     analysis['context_note'] = enhanced.context_note
                     analysis['should_notify'] = should_notify
+
+                    if self.state_store:
+                        self.state_store.record_signal(exchange, enhanced.to_dict(), should_notify)

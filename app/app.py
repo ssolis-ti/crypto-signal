@@ -17,14 +17,38 @@ import traceback
 from threading import Thread
 
 import structlog
+import uvicorn
 
 import conf
 import logs
+from api.server import create_app
+from api.store import AgentStateStore
 from behaviour.core import Behaviour
 from conf import Configuration
 from exchanges import ExchangeInterface
 from notifications.core import Notifier
 from data import DataManager, PairResolver
+
+AGENT_API_DB_PATH = 'agent_state/agent_state.db'
+AGENT_API_PORT = 8090
+
+
+def _start_agent_api(state_store, config, logger):
+    """
+    Arranca uvicorn en un hilo daemon dentro del mismo proceso (specs/009-agent-api/research.md:
+    comparten el mismo AgentStateStore sin IPC). Bind a 0.0.0.0 dentro del contenedor -- el
+    aislamiento a "solo localhost del host" se aplica en docker-compose.yml publicando el
+    puerto como 127.0.0.1:8090, no aqui.
+    """
+    app_api = create_app(state_store, config.to_sanitized_dict)
+    uvicorn_config = uvicorn.Config(
+        app_api, host='0.0.0.0', port=AGENT_API_PORT, log_level='warning'
+    )
+    server = uvicorn.Server(uvicorn_config)
+
+    thread = Thread(target=server.run, daemon=True, name='AgentAPI')
+    thread.start()
+    logger.info(f"Agent API listening on :{AGENT_API_PORT} (published as 127.0.0.1 by docker-compose)")
 
 
 def main():
@@ -43,6 +67,11 @@ def main():
     logs.configure_logging(settings['log_level'], settings['log_mode'])
     logger = structlog.get_logger()
 
+    # 2b. Iniciar API de agentes (specs/009-agent-api/): solo lectura, en un hilo daemon,
+    # publicada por docker-compose.yml como 127.0.0.1:8090 (no accesible fuera del host).
+    state_store = AgentStateStore(AGENT_API_DB_PATH)
+    _start_agent_api(state_store, config, logger)
+
     # 3. Inicializar interfaz de exchange
     exchange_interface = ExchangeInterface(config.exchanges)
 
@@ -55,7 +84,7 @@ def main():
     market_data = {}
     for exchange_name in exchange_interface.get_exchanges():
         pairs = pair_resolver.resolve(exchange_name)
-        logger.info(f"DEBUG: Resolver returned {len(pairs) if pairs else 0} pairs for {exchange_name}")
+        logger.debug(f"Resolver returned {len(pairs) if pairs else 0} pairs for {exchange_name}")
         
         if pairs:
             logger.info("Found configured markets: %s", pairs)
@@ -78,11 +107,16 @@ def main():
 
             notifier = Notifier(
                 config.notifiers, config.indicators, config.conditionals, market_data_chunk)
-            
-            # Pasar data_manager para habilitar MarketContext y SignalEnhancer
-            behaviour = Behaviour(config, exchange_interface, notifier, data_manager)
 
             workerName = "Worker-{}".format(num)
+
+            # Pasar data_manager para habilitar MarketContext y SignalEnhancer; pasar
+            # state_store para que la API de agentes vea el estado de este worker.
+            behaviour = Behaviour(
+                config, exchange_interface, notifier, data_manager,
+                state_store=state_store, worker_name=workerName
+            )
+
             worker = AnalysisWorker(
                 workerName, behaviour, notifier, market_data_chunk, settings, logger)
             thread_list.append(worker)

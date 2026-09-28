@@ -6,6 +6,10 @@
 python-telegram-bot==22.8        # CRÍTICO: v21+ para Python 3.12+
 requests==2.34.2                 # Para webhook
 
+# API de integracion para agentes (specs/009-agent-api/)
+fastapi==0.141.1
+uvicorn==0.54.0
+
 # Exchanges
 ccxt==4.5.84
 

@@ -3,7 +3,10 @@
 
 import os
 
+import structlog
 import yaml
+
+logger = structlog.get_logger()
 
 
 class Configuration():
@@ -29,7 +32,7 @@ class Configuration():
             if key in user_config:
                 if 'settings' not in user_config: user_config['settings'] = {}
                 if key not in user_config['settings']:
-                    print(f"WARNING: '{key}' found in root. Moving to 'settings'.")
+                    logger.warning(f"'{key}' found in root. Moving to 'settings'.")
                     user_config['settings'][key] = user_config[key]
             
             # 2. Chequear dentro de exchanges (error común de indentación)
@@ -37,7 +40,7 @@ class Configuration():
                 if key in user_config['exchanges']:
                     if 'settings' not in user_config: user_config['settings'] = {}
                     if key not in user_config['settings']:
-                        print(f"WARNING: '{key}' found inside 'exchanges'. Moving to 'settings'.")
+                        logger.warning(f"'{key}' found inside 'exchanges'. Moving to 'settings'.")
                         user_config['settings'][key] = user_config['exchanges'][key]
                         # Limpiar para que no falle validación de exchanges
                         del user_config['exchanges'][key]
@@ -46,9 +49,9 @@ class Configuration():
         self.config = self._deep_merge(default_config, user_config)
         
         self.settings = self.config.get('settings', {})
-        print(f"DEBUG: Loaded settings keys: {list(self.settings.keys())}")
+        logger.debug(f"Loaded settings keys: {list(self.settings.keys())}")
         if 'dynamic_pairs' in self.settings:
-            print(f"DEBUG: dynamic_pairs config: {self.settings['dynamic_pairs']}")
+            logger.debug(f"dynamic_pairs config: {self.settings['dynamic_pairs']}")
         self.notifiers = self.config.get('notifiers', {})
         self._apply_env_secrets()
         self.indicators = self.config.get('indicators', {})
@@ -88,3 +91,26 @@ class Configuration():
             required['token'] = token
         if chat_id:
             required['chat_id'] = chat_id
+
+    def to_sanitized_dict(self) -> dict:
+        """
+        Config apta para exponer via API (app/api/server.py::/config, specs/009-agent-api/).
+
+        Allow-list explicito, no deny-list: copia settings/indicators/informants/crossovers
+        tal cual (no contienen secretos), y de notifiers/exchanges solo expone que claves
+        estan configuradas/habilitadas -- nunca el contenido de ningun bloque 'required'
+        (token, chat_id, url, credenciales), sin importar como se llame el campo dentro de
+        el. Ver specs/009-agent-api/research.md.
+        """
+        enabled_exchanges = [
+            name for name, cfg in self.exchanges.items()
+            if isinstance(cfg, dict) and cfg.get('required', {}).get('enabled', False)
+        ]
+        return {
+            'settings': self.settings,
+            'indicators': self.indicators,
+            'informants': self.informants,
+            'crossovers': self.crossovers,
+            'enabled_notifiers': list(self.notifiers.keys()),
+            'enabled_exchanges': enabled_exchanges,
+        }

@@ -17,6 +17,7 @@ settings.env
 # Generados por el bot
 app/charts/
 app/user_data/
+app/agent_state/
 
 # TA-Lib (ahora se descarga en Docker)
 lib/

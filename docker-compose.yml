@@ -5,10 +5,14 @@ services:
     restart: unless-stopped
     # Credenciales (TELEGRAM_TOKEN, TELEGRAM_CHAT_ID) fuera del repo y de la imagen: ver .env.example
     env_file: .env
+    ports:
+      # API de agentes (specs/009-agent-api/): solo localhost del host, sin auth por diseño
+      - "127.0.0.1:8090:8090"
     volumes:
       # config.yml en la raíz del proyecto (ignorado por git), montado en solo lectura
       - ./config.yml:/app/config.yml:ro
       - ./app/charts:/app/charts
+      - ./app/agent_state:/app/agent_state
     logging:
       driver: json-file
       options:
