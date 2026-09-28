@@ -122,7 +122,7 @@ class MarketContext:
                 return MarketContextData()
             
             # Extraer datos de BTC
-            btc_data = self._get_btc_data(tickers)
+            btc_data = self._get_btc_data(tickers, exchange)
             
             # Calcular gainers/losers
             gainers, losers = self._calculate_gainers_losers(tickers)
@@ -202,14 +202,37 @@ class MarketContext:
     # MÉTODOS PRIVADOS
     # ─────────────────────────────────────────
     
-    def _get_btc_data(self, tickers: Dict) -> Dict:
+    def _get_btc_data(self, tickers: Dict, exchange: str) -> Dict:
         """Extrae datos de BTC con fallbacks."""
         btc_ticker = tickers.get(self.reference_pair, {})
         return {
             'change_24h': self._safe_float(btc_ticker.get('percentage', 0)),
-            'change_1h': self._safe_float(btc_ticker.get('change', 0)),
+            'change_1h': self._compute_change_1h(exchange),
             'last': self._safe_float(btc_ticker.get('last', 0))
         }
+
+    def _compute_change_1h(self, exchange: str) -> float:
+        """
+        % cambio real en la ultima hora cerrada del par de referencia (specs/010-btc-change-1h-fix/).
+
+        El ticker unificado de CCXT no expone un cambio de 1h real: su campo 'change' es el
+        delta absoluto de precio del periodo del ticker (24h en Binance), no un porcentaje ni
+        una ventana de 1h -- usarlo como 'btc_change_1h' producia valores sin sentido (ver
+        specs/009-agent-api/tasks.md, Convergence Finding F1). Se calcula aqui desde OHLCV real
+        de 1h via DataManager, que ya garantiza no-repaint (Principio II, specs/001-.../).
+        """
+        try:
+            candles = self.dm.get_ohlcv(exchange, self.reference_pair, '1h')
+            if len(candles) < 2:
+                return 0.0
+            prev_close = candles[-2][4]
+            last_close = candles[-1][4]
+            if not prev_close:
+                return 0.0
+            return (last_close - prev_close) / prev_close * 100.0
+        except Exception as e:
+            self.logger.debug(f"No se pudo calcular btc_change_1h: {e}")
+            return 0.0
     
     def _calculate_gainers_losers(self, tickers: Dict) -> Tuple[List, List]:
         """Separa pares en gainers y losers."""

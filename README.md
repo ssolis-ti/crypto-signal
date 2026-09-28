@@ -156,6 +156,7 @@ dependencias pinneadas).
 | [007](specs/007-signal-enhancer-validation/) | Backtest histórico real del score 0-100 — **sin valor predictivo medible** |
 | [008](specs/008-pin-dependencies/) | Dependencias fijadas a versión exacta (antes todas `>=`) |
 | [009](specs/009-agent-api/) | API REST de solo lectura para integración con agentes/IA |
+| [010](specs/010-btc-change-1h-fix/) | `btc_change_1h` usaba el delta absoluto de CCXT, no un %; ahora se calcula desde OHLCV real |
 
 ---
 
@@ -168,8 +169,6 @@ dependencias pinneadas).
   (`detail_min_quality: 'A'`) sin cambios hasta rediseñar y re-validar el heurístico — ver
   [`validation-report.md`](specs/007-signal-enhancer-validation/validation-report.md).
 - ⚠️ `macd_cross` nunca fue backtesteado (solo RSI).
-- ⚠️ `MarketContext.btc_change_1h` tiene un bug conocido (usa el cambio absoluto de CCXT, no un
-  porcentaje) — hallazgo pendiente, ver `specs/009-agent-api/tasks.md`.
 - ⚠️ Gran parte del código heredado (indicadores individuales, `build_indicator_messages`,
   `rendering/plotters.py`) no tiene tests propios todavía — solo lo tocado por los slices arriba.
 
