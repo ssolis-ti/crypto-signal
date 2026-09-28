@@ -135,3 +135,59 @@ class TestDataManagerGetOhlcvWiring:
 
         result = manager.get_ohlcv("binance", "BTC/USDT", "4h")
         assert result == []
+
+
+class TestGetTopPairs:
+    """specs/006-deferred-cleanup-findings/: cobertura previamente inexistente, ademas de
+    confirmar que la limpieza del logging DEBUG (001-F3) no cambio el comportamiento."""
+
+    def _manager_with_tickers(self, tickers):
+        driver = MagicMock()
+        driver.get_all_tickers.return_value = tickers
+        return DataManager(driver)
+
+    def test_filters_by_quote_currency(self):
+        manager = self._manager_with_tickers({
+            'BTC/USDT': {'quoteVolume': 100},
+            'ETH/BTC': {'quoteVolume': 999},
+        })
+
+        result = manager.get_top_pairs('binance', quote='USDT')
+
+        assert result == ['BTC/USDT']
+
+    def test_filters_by_min_volume(self):
+        manager = self._manager_with_tickers({
+            'BTC/USDT': {'quoteVolume': 100},
+            'ETH/USDT': {'quoteVolume': 5},
+        })
+
+        result = manager.get_top_pairs('binance', quote='USDT', min_volume=50)
+
+        assert result == ['BTC/USDT']
+
+    def test_sorts_descending_by_volume_and_truncates_to_top_n(self):
+        manager = self._manager_with_tickers({
+            'A/USDT': {'quoteVolume': 10},
+            'B/USDT': {'quoteVolume': 300},
+            'C/USDT': {'quoteVolume': 200},
+        })
+
+        result = manager.get_top_pairs('binance', quote='USDT', top_n=2)
+
+        assert result == ['B/USDT', 'C/USDT']
+
+    def test_missing_or_null_quote_volume_treated_as_zero(self):
+        manager = self._manager_with_tickers({
+            'A/USDT': {},
+            'B/USDT': {'quoteVolume': None},
+        })
+
+        result = manager.get_top_pairs('binance', quote='USDT', min_volume=0)
+
+        assert set(result) == {'A/USDT', 'B/USDT'}
+
+    def test_no_matching_tickers_returns_empty_list(self):
+        manager = self._manager_with_tickers({'ETH/BTC': {'quoteVolume': 999}})
+
+        assert manager.get_top_pairs('binance', quote='USDT') == []

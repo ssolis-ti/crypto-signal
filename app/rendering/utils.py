@@ -3,7 +3,6 @@ Módulo de Utilidades de Renderizado
 Contiene funciones matemáticas, conversión de datos y lógica de verificación de patrones.
 """
 
-import datetime
 import sys
 import pandas as pd
 import numpy as np
@@ -14,13 +13,15 @@ from analyzers.indicators import candle_recognition, ichimoku
 logger = structlog.get_logger()
 
 def convert_to_dataframe(historical_data):
-    """Convierte datos OHLCV crudos a un DataFrame de Pandas."""
+    """Convierte datos OHLCV crudos a un DataFrame de Pandas.
+
+    UTC directo (specs/006-deferred-cleanup-findings/): mismo patron que
+    analyzers/utils.py, sin depender de la zona horaria local del host.
+    """
     dataframe = pd.DataFrame(historical_data)
     dataframe.transpose()
     dataframe.columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
-    dataframe['timestamp'] = dataframe['timestamp'].apply(
-        lambda x: datetime.datetime.fromtimestamp(x / 1000.0)
-    )
+    dataframe['timestamp'] = pd.to_datetime(dataframe['timestamp'], unit='ms', utc=True)
     dataframe.set_index('timestamp', inplace=True, drop=False)
     return dataframe
 

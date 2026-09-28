@@ -136,10 +136,9 @@ verified by code + automated tests (15/15 passing). 2/4 success criteria verifie
 - [ ] T016 [F2][MEDIUM] Operator: with the bot running, confirm across two consecutive cycles that
       land inside the same unclosed candle (per quickstart.md) that indicator values are identical.
       Duplicate of T009, kept as an explicit convergence-tracked item for the same reason.
-- [ ] T017 [F3][LOW] Future slice (not 001): remove leftover `DEBUG:`/commented `logger.debug` lines
-      in `app/data/manager.py::get_top_pairs` (lines with `f"DEBUG: ..."` and a commented-out
-      `# self.logger.debug(...)`), per Constitution Principle VII. Out of scope for repaint fix;
-      tracked here so it is not lost.
+- [X] T017 [F3][LOW] **Resolved in specs/006-deferred-cleanup-findings/** (2026-09-28): removed
+      leftover `DEBUG:`/commented `logger.debug` lines in `app/data/manager.py::get_top_pairs`, per
+      Constitution Principle VII.
 
 **Outcome**: `tasks_appended` — 3 items (2 require operator action outside this session; 1 is
 explicitly deferred to a future slice, not a defect in this one).

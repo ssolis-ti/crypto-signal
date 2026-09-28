@@ -15,7 +15,7 @@ Uso:
 import structlog
 import pandas as pd
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class CalibrationLogger:
@@ -80,7 +80,7 @@ class CalibrationLogger:
         for candle in last_candles:
             if len(candle) >= 6:
                 ts, o, h, l, c, v = candle[:6]
-                time_str = datetime.fromtimestamp(ts/1000).strftime('%Y-%m-%d %H:%M')
+                time_str = datetime.fromtimestamp(ts/1000, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')
                 self.logger.info(
                     f"[CALIB] {symbol} | {time_str} | "
                     f"O:{o:.4f} H:{h:.4f} L:{l:.4f} C:{c:.4f} V:{v:.0f}"
@@ -224,7 +224,7 @@ class CalibrationLogger:
             'symbol': symbol,
             'type': anomaly_type,
             'details': details,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         self.anomalies.append(anomaly)
         self.logger.error(f"[CALIB] ⚠️ ANOMALÍA {symbol}: {anomaly_type} - {details}")

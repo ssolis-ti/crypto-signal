@@ -82,8 +82,8 @@ Development Workflow — recorded here for a future slice instead).
 | ID | Gap Type | Severity | Source | Evidence | Remaining Work |
 |----|----------|----------|--------|----------|----------------|
 | F1 | unrequested | HIGH | Principle V (new evidence, not in original spec scope) | `app/exchanges/driver.py:145` `_calculate_start_date` uses naive `datetime.now()` to compute the `since` timestamp passed to `fetch_ohlcv` — unlike the two fixed spots, this feeds an actual exchange API parameter, so a non-UTC host could request the wrong historical window | New slice: apply the same UTC-aware fix to `_calculate_start_date` |
-| F2 | unrequested | LOW | Principle V | `app/rendering/utils.py:22` uses naive `datetime.datetime.fromtimestamp` for chart x-axis labels (presentation-layer, likely low impact, needs check against `settings.timezone` threading) | Future slice: audit chart timestamp display |
-| F3 | unrequested | LOW | Principle VII (overlaps slice 001 F3) | `app/utils/calibration.py:83,227` naive datetime in debug/calibration logging | Same future slice as slice 001's F3 (debug logging cleanup) |
+| F2 | unrequested | LOW | Principle V | `app/rendering/utils.py:22` uses naive `datetime.datetime.fromtimestamp` for chart x-axis labels | **Resolved in specs/006-deferred-cleanup-findings/** (2026-09-28): UTC-aware fix, same pattern as F1/slice 002/003 |
+| F3 | unrequested | LOW | Principle VII (overlaps slice 001 F3) | `app/utils/calibration.py:83,227` naive datetime in debug/calibration logging | **Resolved in specs/006-deferred-cleanup-findings/** (2026-09-28) |
 
 **Summary metrics**: 5/5 FR verified by code + tests (23/23 passing) · 4/4 SC verified · 7/7
 constitution principles checked, no violations in this slice's own scope · 3 `unrequested`
