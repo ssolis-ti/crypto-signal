@@ -295,7 +295,7 @@ class Notifier():
     def notify_webhook(self, messages, chart_file):
         for notifier in self.webhook_clients:
             for message in messages:
-                self.webhook_clients[notifier].notify(message)
+                self.webhook_clients[notifier].notify(message, chart_file)
 
     def notify_stdout(self, messages):
         for notifier in self.stdout_clients:
