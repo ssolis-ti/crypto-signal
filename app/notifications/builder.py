@@ -25,8 +25,13 @@ class MessageBuilder:
         self.first_run = True
 
     def parse_alert_frequency(self, alert_frequency):
-        """Parsea cadenas como '1h', '5m' a objetos datetime."""
-        now = datetime.datetime.now()
+        """Parsea cadenas como '1h', '5m' a objetos datetime.
+
+        Internamente en UTC (specs/002-utc-internal-time/): el resultado se usa solo como
+        marca de "no volver a alertar antes de X" en should_i_alert, nunca se muestra al
+        usuario, asi que no debe depender de la zona horaria local del host.
+        """
+        now = datetime.datetime.now(datetime.timezone.utc)
         matches = re.findall(r'\d+[dhms]', alert_frequency)
         if not matches:
             return None
@@ -51,7 +56,7 @@ class MessageBuilder:
     def should_i_alert(self, alert_frequency_key, alert_frequency):
         """Determina si se debe enviar una alerta basada en la frecuencia configurada."""
         if alert_frequency_key in self.alert_frequencies:
-            if self.alert_frequencies[alert_frequency_key] > datetime.datetime.now():
+            if self.alert_frequencies[alert_frequency_key] > datetime.datetime.now(datetime.timezone.utc):
                 return False
         
         timedelta = self.parse_alert_frequency(alert_frequency)

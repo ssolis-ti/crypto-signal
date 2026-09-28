@@ -2,7 +2,6 @@
 """
 
 import math
-from datetime import datetime
 
 import pandas
 import structlog
@@ -22,7 +21,10 @@ class IndicatorUtils():
             historical_data (list): A matrix of historical OHCLV data.
 
         Returns:
-            pandas.DataFrame: Contains the historical data in a pandas dataframe.
+            pandas.DataFrame: Contains the historical data in a pandas dataframe, indexed by a
+                UTC-aware datetime built directly from each candle's epoch-millisecond timestamp
+                (specs/002-utc-internal-time/) — independent of the host's system timezone/locale,
+                unlike a datetime.fromtimestamp()/strftime() round trip.
         """
 
         dataframe = pandas.DataFrame(historical_data)
@@ -30,9 +32,8 @@ class IndicatorUtils():
 
         dataframe.columns = ['timestamp', 'open',
                              'high', 'low', 'close', 'volume']
-        dataframe['datetime'] = dataframe.timestamp.apply(
-            lambda x: pandas.to_datetime(
-                datetime.fromtimestamp(x / 1000).strftime('%c'))
+        dataframe['datetime'] = pandas.to_datetime(
+            dataframe['timestamp'], unit='ms', utc=True
         )
 
         dataframe.set_index('datetime', inplace=True, drop=True)
