@@ -157,18 +157,21 @@ dependencias pinneadas).
 | [008](specs/008-pin-dependencies/) | Dependencias fijadas a versión exacta (antes todas `>=`) |
 | [009](specs/009-agent-api/) | API REST de solo lectura para integración con agentes/IA |
 | [010](specs/010-btc-change-1h-fix/) | `btc_change_1h` usaba el delta absoluto de CCXT, no un %; ahora se calcula desde OHLCV real |
+| [011](specs/011-macd-cross-validation/) | Validación histórica del score aplicada a `macd_cross` (1,776 señales) — confirma y refuerza el hallazgo de 007 |
 
 ---
 
 ## 📊 Estado actual y límites conocidos
 
-- ✅ Pipeline de datos sin repintado, UTC consistente en todo punto crítico, ~115 tests pasando.
+- ✅ Pipeline de datos sin repintado, UTC consistente en todo punto crítico, ~121 tests pasando.
 - ✅ Corriendo en producción, ciclo real Binance → Telegram confirmado end-to-end.
-- ⚠️ **El score de `SignalEnhancer` fue validado históricamente (642 señales reales, 10 meses) y no
-  mostró valor predictivo medible** (slice 007). Se decidió mantener el filtro de detalle/chart
-  (`detail_min_quality: 'A'`) sin cambios hasta rediseñar y re-validar el heurístico — ver
-  [`validation-report.md`](specs/007-signal-enhancer-validation/validation-report.md).
-- ⚠️ `macd_cross` nunca fue backtesteado (solo RSI).
+- ⚠️ **El score de `SignalEnhancer` fue validado históricamente contra los dos indicadores
+  habilitados en producción (RSI: 642 señales — slice 007; macd_cross: 1.776 señales — slice 011) y
+  no mostró valor predictivo** — en macd_cross a 72h la correlación es incluso significativamente
+  **negativa** (p=0.0055). Se decidió mantener el filtro de detalle/chart (`detail_min_quality: 'A'`)
+  sin cambios hasta rediseñar y re-validar el heurístico — ver
+  [`validation-report.md` (RSI)](specs/007-signal-enhancer-validation/validation-report.md) y
+  [`validation-report.md` (macd_cross)](specs/011-macd-cross-validation/validation-report.md).
 - ⚠️ Gran parte del código heredado (indicadores individuales, `build_indicator_messages`,
   `rendering/plotters.py`) no tiene tests propios todavía — solo lo tocado por los slices arriba.
 
