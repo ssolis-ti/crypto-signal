@@ -1,226 +1,177 @@
 # 🚀 Crypto-Signal
 
-Bot de análisis técnico para criptomonedas con notificaciones a Telegram.
+Bot de análisis técnico para criptomonedas, con notificaciones a Telegram. Solo lectura: usa datos
+públicos de mercado vía CCXT, no tiene claves de exchange y no puede operar ni mover fondos.
 
-> **Versión Modernizada** - Compatible con Python 3.12+ y pandas 2.0+
+> **Estado**: en producción (ver [Estado actual](#-estado-actual-y-límites-conocidos)). Desarrollado
+> desde 2026-09-28 con [GitHub Spec Kit](https://github.com/github/spec-kit) sobre una
+> [constitución](.specify/memory/constitution.md) de 7 principios — ver [Desarrollo](#-desarrollo-spec-kit--slices).
 
 ---
 
 ## ✨ Características
 
-- 📊 **+15 Indicadores técnicos**: RSI, MACD, Bollinger, Ichimoku, Stoch RSI, ADX, y más
-- 📈 **Gráficos automáticos**: Genera charts con velas, RSI, MACD e Ichimoku
-- 📱 **Notificaciones en tiempo real**: Telegram, Discord, Slack, Webhook
-- 🔄 **Multi-exchange**: Binance, Bittrex, Coinbase Pro, y 100+ exchanges via CCXT
-- ⚙️ **Altamente configurable**: Templates personalizados, umbrales ajustables
+- 📊 **+15 indicadores técnicos**: RSI, MACD, Bollinger, Ichimoku, Stoch RSI, ADX, y más
+- 📈 **Gráficos automáticos**: velas, RSI, MACD e Ichimoku
+- 📱 **Notificaciones inteligentes a Telegram**: resumen consolidado por ciclo + detalle/chart para
+  las señales de mayor calidad
+- 🧠 **Scoring contextual**: cada señal se clasifica (A+/A/B/C) según tendencia de BTC, fuerza
+  relativa ALT/BTC, sentiment de mercado y estructura de precio
+- 🤖 **API de integración para agentes** (nuevo): estado del bot, contexto de mercado y señales
+  consultables por HTTP, pensada para que un agente/IA la use como fuente de verdad
+- 🔄 **Multi-exchange** vía CCXT (hoy configurado para Binance)
+- ⚙️ **Altamente configurable**: templates de Telegram, umbrales por indicador, pares dinámicos por
+  volumen
 
 ---
 
-## 🆕 Mejoras de Esta Versión
+## 🏗️ Arquitectura
 
-| Mejora | Descripción |
-|--------|-------------|
-| **Python 3.12+** | Compatibilidad total con Python moderno |
-| **Telegram v21** | Migrado a la nueva API asíncrona de python-telegram-bot |
-| **Pandas 2.0+** | Corregidas deprecaciones de DataFrame.append |
-| **Arquitectura modular** | Código reorganizado en paquetes (exchanges/, notifications/, rendering/) |
-| **TA-Lib nativo** | Eliminada dependencia de tulipy (incompatible) |
-| **Docker optimizado** | Imagen Python 3.12-slim con TA-Lib pre-compilado |
+```
+app/
+├── app.py              # Entry point: arranca workers de análisis + API de agentes
+├── conf.py             # Carga config.yml + defaults.yml + secretos desde .env
+├── behaviour/          # Orquesta un ciclo: datos → indicadores → contexto → notificar
+├── data/                # DataManager (OHLCV+cache), PairResolver (qué pares analizar)
+├── exchanges/           # CCXTDriver (solo lectura: fetch_ohlcv, fetch_tickers)
+├── analyzers/           # Indicadores/informantes/crossovers (TA-Lib)
+├── analysis/            # MarketContext (BTC trend/sentiment) + SignalEnhancer (scoring 0-100)
+├── notifications/       # Notifier, cola de prioridad, smart notifications, builder de mensajes
+├── notifiers/           # Clientes: Telegram, Webhook, Stdout
+├── rendering/           # Generación de gráficos (matplotlib)
+├── api/                 # API REST de agentes (SQLite + FastAPI) — specs/009-agent-api/
+└── utils/               # CalibrationLogger (diagnóstico, opcional)
+
+specs/                   # Spec Kit: una carpeta NNN-slug/ por feature (spec, plan, tests, decisiones)
+.specify/memory/constitution.md   # Principios que gobiernan todo el desarrollo
+tests/                    # pytest, espejo de la estructura de app/
+```
+
+Ver [`ARCHITECTURE.md`](ARCHITECTURE.md) para el mapa de dependencias real del código (generado con
+[Graphify](https://github.com/Graphify-Labs/graphify)): módulos más conectados, comunidades, y qué
+tan acoplado está cada uno.
 
 ---
 
-## 📋 Requisitos
-
-### Para Docker (Recomendado)
-- Docker Desktop instalado
-- Git
-
-### Para Instalación Local
-- Python 3.12 o superior
-- TA-Lib instalado en el sistema
-- Git
-
----
-
-## 🐳 Instalación con Docker (Recomendado)
+## 🐳 Despliegue con Docker (recomendado)
 
 ```bash
-# 1. Clonar repositorio
+# 1. Clonar y entrar al repo
 git clone https://github.com/ssolis-ti/crypto-signal.git
 cd crypto-signal
+git checkout main
 
-# 2. Copiar el archivo de ejemplo a la RAÍZ del proyecto
-cp app/config.yml.example config.yml
+# 2. Configurar Telegram (token + chat_id van en .env, NUNCA en config.yml)
+cp .env.example .env
+#   Editar .env con tu TELEGRAM_TOKEN y TELEGRAM_CHAT_ID
+#   (o usar el script Configurar_Telegram_CryptoSignal.bat si estás en Windows)
 
-# 3. Editar config.yml (en la raíz, NO en app/)
-#    Configura tu token y chat_id de Telegram
-#    Usa app/config.yml.example como referencia
+# 3. Copiar y ajustar la configuración
+cp config-clean.yml config.yml
+#   Editar config.yml: pares, indicadores, umbrales (ver docs/config.md)
 
-# 4. Ejecutar
-docker compose up --build
+# 4. Construir y arrancar
+docker compose up -d --build
 ```
 
-> ⚠️ **IMPORTANTE**: El archivo `config.yml` debe estar en la **raíz del proyecto** (junto a `docker-compose.yml`), NO dentro de la carpeta `app/`.
+> ⚠️ `config.yml` va en la **raíz del proyecto** (junto a `docker-compose.yml`), montado en modo
+> solo-lectura dentro del contenedor. Las credenciales de Telegram viven solo en `.env`
+> (`app/conf.py::_apply_env_secrets` las inyecta en tiempo de ejecución, con prioridad sobre
+> cualquier valor en `config.yml`) — ambos archivos están en `.gitignore`.
 
----
-
-## 💻 Instalación Local (Sin Docker)
-
-### Requisitos previos
-1. Python 3.12+ instalado
-2. TA-Lib instalado:
-   - **Windows**: Descargar wheel desde [aquí](https://github.com/cgohlke/talib-build/releases)
-   - **Linux**: `sudo apt-get install libta-lib-dev`
-   - **macOS**: `brew install ta-lib`
-
-### Pasos
+### Verificar que está funcionando
 
 ```bash
-# 1. Clonar y entrar al directorio app/
-git clone https://github.com/ssolis-ti/crypto-signal.git
-cd crypto-signal/app
-
-# 2. Instalar dependencias
-pip install -r requirements-step-1.txt
-pip install -r requirements-step-2.txt
-
-# 3. Copiar el archivo de ejemplo
-cp config.yml.example config.yml
-
-# 4. Editar config.yml con tu token de Telegram
-#    Revisa config.yml.example para ver todas las opciones
-
-# 5. Ejecutar
-python app.py
+docker logs -f crypto-signal          # ver el ciclo de análisis en vivo
+curl http://127.0.0.1:8090/health     # API de agentes viva
+curl http://127.0.0.1:8090/status     # workers, pares, último ciclo
 ```
 
-> 📝 **Nota**: En instalación local, el `config.yml` SÍ va dentro de `app/`.
+---
 
+## 🤖 API de integración para agentes
 
-## ⚙️ Configuración Básica
+Desde `specs/009-agent-api/`, el bot expone en `http://127.0.0.1:8090` (solo accesible desde el host
+donde corre Docker, sin autenticación) todo lo que ya calcula cada ciclo pero antes solo existía como
+log de texto:
 
-### Estructura de Archivos
+| Endpoint | Qué devuelve |
+|---|---|
+| `GET /health` | Liveness check |
+| `GET /status` | Pares cubiertos, ciclos completados, último error por worker |
+| `GET /market-context?exchange=&history=N` | BTC trend, sentiment, gainers/losers — histórico |
+| `GET /signals/recent?pair=&quality=&signal_type=` | Señales con su score/quality completo, más recientes primero |
+| `GET /indicators?pair=&exchange=` | Último valor de cada indicador/informante, por par |
+| `GET /config` | Configuración activa (indicadores, settings) — nunca incluye tokens/credenciales |
+| `GET /docs` | Documentación interactiva (OpenAPI/Swagger), autodescriptiva |
 
-| Archivo | Ubicación | Propósito |
-|---------|-----------|-----------|
-| `defaults.yml` | `app/` | Valores por defecto (NO EDITAR) |
-| `config.yml` | `app/` | Tu configuración personal |
-| `config.yml.example` | `app/` | Plantilla de ejemplo |
+El historial de señales y contexto de mercado persiste en SQLite (`app/agent_state/`, sobrevive
+reinicios); los snapshots de indicadores reflejan solo el estado más reciente (no historial completo).
 
-### Ejemplo Mínimo (`app/config.yml`)
+---
+
+## ⚙️ Configuración
+
+Ver [`docs/config.md`](docs/config.md) para el detalle completo de `config.yml`. Puntos clave:
+
+- **Pares**: manual (`settings.market_pairs`) o dinámico por volumen
+  (`settings.dynamic_pairs`, top-N en Binance).
+- **Indicadores**: cada uno con `hot`/`cold`, `candle_period`, `period_count` propios.
+- **Scoring** (`settings.correlation.scoring`): pesos de BTC trend, estructura (EMA99), RSI y
+  sentiment — ver [limitaciones conocidas](#-estado-actual-y-límites-conocidos), el score **no
+  está validado como filtro** hoy.
+- **Notificadores**: Telegram (recomendado), Webhook, Stdout.
+
+### Personalizar el mensaje de Telegram
 
 ```yaml
-settings:
-  update_interval: 300      # Segundos entre análisis
-  market_pairs:
-    - BTC/USDT
-    - ETH/USDT
-  enable_charts: true
-
-exchanges:
-  binance:
-    required:
-      enabled: true
-
 notifiers:
   telegram:
-    required:
-      token: "TU_TOKEN"
-      chat_id: "TU_CHAT_ID"
-
-indicators:
-  rsi:
-    - enabled: true
-      alert_enabled: true
-      hot: 30               # RSI < 30 = Compra
-      cold: 70              # RSI > 70 = Venta
-      candle_period: 4h
-      period_count: 14
+    optional:
+      template: |
+        {% if status == 'hot' %}🟢 COMPRAR{% else %}🔴 VENDER{% endif %}
+        📊 {{market}} | {{indicator|upper}} | Quality: {{quality}} ({{score|round}})
+        💵 {{prices}}
 ```
 
 ---
 
-## 📱 Configurar Telegram
+## 🧭 Desarrollo: Spec Kit + Slices
 
-1. Habla con [@BotFather](https://t.me/BotFather) y usa `/newbot`
-2. Copia el **token** que te da
-3. Habla con [@userinfobot](https://t.me/userinfobot) para obtener tu **chat_id**
-4. Pega ambos valores en `app/config.yml`
+Todo cambio de código en este repo sigue [GitHub Spec Kit](https://github.com/github/spec-kit):
+cada feature vive en `specs/NNN-slug/` con su `spec.md` (requisitos), `plan.md` (Constitution Check),
+`research.md` (decisiones), `tasks.md` (implementación + Convergencia), y — si toca lógica —
+tests en `tests/`. La [constitución](.specify/memory/constitution.md) fija 7 principios no
+negociables (solo lectura, sin repintado, validar heurísticos, UTC interno, tests obligatorios,
+dependencias pinneadas).
 
----
-
-## 🎨 Personalizar Notificaciones
-
-### Variables Disponibles
-
-| Variable | Ejemplo |
-|----------|---------|
-| `{{market}}` | BTC/USDT |
-| `{{status}}` | hot / cold |
-| `{{indicator}}` | rsi |
-| `{{values}}` | {'rsi': '28.50'} |
-| `{{price_value.close}}` | 95000.00 |
-| `{{creation_date}}` | 2026-01-17 23:00:00 |
-
-### Template Ejemplo
-
-```yaml
-template: |
-  {% if status == 'hot' %}🟢 COMPRAR{% else %}🔴 VENDER{% endif %}
-  📊 {{market}} | {{indicator|upper}}
-  💵 Precio: ${{price_value.close}}
-```
+| Slice | Qué resolvió |
+|---|---|
+| [001](specs/001-no-repaint-signals/) | Repintado: el bot leía la vela en formación como señal |
+| [002](specs/002-utc-internal-time/) | Hora naive/local → UTC en índice de indicadores y anti-spam |
+| [003](specs/003-utc-start-date/) | Mismo bug en el `since` enviado al exchange |
+| [004](specs/004-core-pipeline-test-coverage/) | Cobertura de tests: crossover, pares, cola, smart notifications |
+| [005](specs/005-notifier-core-coverage/) | Cobertura de `Notifier` + bug real de webhook corregido |
+| [006](specs/006-deferred-cleanup-findings/) | Logs de debug residuales + último bug UTC (charts/calibración) |
+| [007](specs/007-signal-enhancer-validation/) | Backtest histórico real del score 0-100 — **sin valor predictivo medible** |
+| [008](specs/008-pin-dependencies/) | Dependencias fijadas a versión exacta (antes todas `>=`) |
+| [009](specs/009-agent-api/) | API REST de solo lectura para integración con agentes/IA |
 
 ---
 
-## 📊 Indicadores Disponibles
+## 📊 Estado actual y límites conocidos
 
-### Indicadores de Momentum
-- **RSI** - Índice de Fuerza Relativa
-- **Stoch RSI** - RSI Estocástico
-- **MFI** - Money Flow Index
-- **MACD** - Convergencia/Divergencia de Medias Móviles
-- **Momentum** - Momentum clásico
-
-### Indicadores de Tendencia
-- **Ichimoku** - Nube de Ichimoku
-- **ADX** - Índice Direccional Promedio
-- **MA Crossover** - Cruce de Medias Móviles
-- **MA Ribbon** - Cinta de Medias Móviles
-
-### Indicadores de Volatilidad
-- **Bollinger Bands** - Bandas de Bollinger
-- **Squeeze Momentum** - Indicador de Compresión
-
-### Otros
-- **OBV** - On Balance Volume
-- **IIV** - Incremento en Volumen (detección de pump/dump)
-- **Klinger Oscillator** - Oscilador de Klinger
-- **Candle Recognition** - Reconocimiento de patrones de velas
-
----
-
-## 🔄 Escanear Todos los Pares
-
-En lugar de listar cada par manualmente:
-
-```yaml
-exchanges:
-  binance:
-    required:
-      enabled: true
-    all_pairs:              # Escanea TODO contra USDT
-      - USDT
-    exclude:                # Excepto estos
-      - USDC
-      - BUSD
-```
-
----
-
-## 📖 Documentación Completa
-
-Para configuraciones avanzadas, consulta [`docs/config.md`](docs/config.md).
+- ✅ Pipeline de datos sin repintado, UTC consistente en todo punto crítico, ~115 tests pasando.
+- ✅ Corriendo en producción, ciclo real Binance → Telegram confirmado end-to-end.
+- ⚠️ **El score de `SignalEnhancer` fue validado históricamente (642 señales reales, 10 meses) y no
+  mostró valor predictivo medible** (slice 007). Se decidió mantener el filtro de detalle/chart
+  (`detail_min_quality: 'A'`) sin cambios hasta rediseñar y re-validar el heurístico — ver
+  [`validation-report.md`](specs/007-signal-enhancer-validation/validation-report.md).
+- ⚠️ `macd_cross` nunca fue backtesteado (solo RSI).
+- ⚠️ `MarketContext.btc_change_1h` tiene un bug conocido (usa el cambio absoluto de CCXT, no un
+  porcentaje) — hallazgo pendiente, ver `specs/009-agent-api/tasks.md`.
+- ⚠️ Gran parte del código heredado (indicadores individuales, `build_indicator_messages`,
+  `rendering/plotters.py`) no tiene tests propios todavía — solo lo tocado por los slices arriba.
 
 ---
 
@@ -228,10 +179,8 @@ Para configuraciones avanzadas, consulta [`docs/config.md`](docs/config.md).
 
 - Proyecto original: [CryptoSignal](https://github.com/CryptoSignal/Crypto-Signal)
 - Fork mejorado: [w1ld3r/crypto-signal](https://github.com/w1ld3r/crypto-signal)
-- Modernización: [ssolis-ti/crypto-signal](https://github.com/ssolis-ti/crypto-signal)
-
----
+- Esta versión: [ssolis-ti/crypto-signal](https://github.com/ssolis-ti/crypto-signal)
 
 ## 📄 Licencia
 
-MIT License - Ver [LICENSE](LICENSE) para detalles.
+MIT License — ver [LICENSE](LICENSE).
