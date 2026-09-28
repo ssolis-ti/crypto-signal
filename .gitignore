@@ -25,3 +25,10 @@ lib/
 __pycache__/
 *.pyc
 *.pyo
+
+# Graphify (mapa de código, regenerable, no versionar)
+graphify-out/
+
+# Spec Kit (estado local; el contenido de specs/ sí se versiona)
+.specify/feature.json
+.specify/cache/

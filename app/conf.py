@@ -3,7 +3,6 @@
 
 import os
 
-import ccxt
 import yaml
 
 
@@ -15,11 +14,11 @@ class Configuration():
         """Initializes the Configuration class"""
 
         with open('defaults.yml', 'r') as config_file:
-            default_config = yaml.load(config_file, Loader=yaml.FullLoader)
+            default_config = yaml.safe_load(config_file)
 
         if os.path.isfile('config.yml'):
             with open('config.yml', 'r') as config_file:
-                user_config = yaml.load(config_file, Loader=yaml.FullLoader)
+                user_config = yaml.safe_load(config_file) or dict()
         else:
             user_config = dict()
 
@@ -51,6 +50,7 @@ class Configuration():
         if 'dynamic_pairs' in self.settings:
             print(f"DEBUG: dynamic_pairs config: {self.settings['dynamic_pairs']}")
         self.notifiers = self.config.get('notifiers', {})
+        self._apply_env_secrets()
         self.indicators = self.config.get('indicators', {})
         self.informants = self.config.get('informants', {})
         self.crossovers = self.config.get('crossovers', {})
@@ -73,10 +73,18 @@ class Configuration():
             return merged
         return override
 
-        for exchange in ccxt.exchanges:
-            if exchange not in self.exchanges:
-                self.exchanges[exchange] = {
-                    'required': {
-                        'enabled': False
-                    }
-                }
+    def _apply_env_secrets(self):
+        """
+        Credenciales desde variables de entorno (archivo .env vía docker compose), para no
+        guardarlas en config.yml. Si TELEGRAM_TOKEN / TELEGRAM_CHAT_ID existen, tienen prioridad.
+        """
+        token = os.environ.get('TELEGRAM_TOKEN', '').strip()
+        chat_id = os.environ.get('TELEGRAM_CHAT_ID', '').strip()
+        if not (token or chat_id):
+            return
+        telegram = self.notifiers.setdefault('telegram', {})
+        required = telegram.setdefault('required', {})
+        if token:
+            required['token'] = token
+        if chat_id:
+            required['chat_id'] = chat_id

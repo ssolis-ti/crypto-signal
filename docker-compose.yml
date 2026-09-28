@@ -1,5 +1,21 @@
-version: '3'
-
 services:
-  app:
+  crypto-signal:
     build: .
+    container_name: crypto-signal
+    restart: unless-stopped
+    # Credenciales (TELEGRAM_TOKEN, TELEGRAM_CHAT_ID) fuera del repo y de la imagen: ver .env.example
+    env_file: .env
+    volumes:
+      # config.yml en la raíz del proyecto (ignorado por git), montado en solo lectura
+      - ./config.yml:/app/config.yml:ro
+      - ./app/charts:/app/charts
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 768m

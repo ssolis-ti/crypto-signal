@@ -14,9 +14,54 @@ Uso:
 """
 
 import time
+from datetime import datetime, timezone
+
+import ccxt
 import structlog
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+
+
+def drop_unclosed_candle(
+    ohlcv: List[List],
+    timeframe: str,
+    now_utc: Optional[datetime] = None
+) -> List[List]:
+    """
+    Elimina la vela final de una serie OHLCV si todavía no cerró.
+
+    El exchange siempre incluye la vela en formación como último elemento de
+    fetch_ohlcv. Todo el pipeline de indicadores (StrategyExecutor, outputs.py,
+    notifications/builder.py) lee esa última fila con iloc[-1] como "la señal
+    actual", así que si esa vela no cerró, el resultado puede cambiar (repintarse)
+    en el siguiente ciclo sin dejar rastro. Ver specs/001-no-repaint-signals/.
+
+    Args:
+        ohlcv: Lista ascendente de [timestamp_ms, open, high, low, close, volume].
+        timeframe: Periodo de vela (ej. '4h', '1d'), tal como lo entiende ccxt.
+        now_utc: Instante actual en UTC. Si no se pasa, se usa datetime.now(UTC).
+            Parametrizable para tests deterministas.
+
+    Returns:
+        La misma lista si la última vela ya cerró, o sin su último elemento si
+        no cerró. Nunca elimina más de un elemento. Lista vacía -> lista vacía.
+    """
+    if not ohlcv:
+        return ohlcv
+
+    if now_utc is None:
+        now_utc = datetime.now(timezone.utc)
+
+    period_seconds = ccxt.Exchange.parse_timeframe(timeframe)
+    now_ms = int(now_utc.timestamp() * 1000)
+
+    last_candle_start_ms = ohlcv[-1][0]
+    last_candle_close_ms = last_candle_start_ms + period_seconds * 1000
+
+    if last_candle_close_ms > now_ms:
+        return ohlcv[:-1]
+
+    return ohlcv
 
 
 @dataclass
@@ -217,7 +262,11 @@ class DataManager:
             time_unit=timeframe,
             max_periods=limit
         )
-        
+
+        # No repaint (Constitution Principio II): nunca cachear ni devolver la
+        # vela todavia en formacion. Ver specs/001-no-repaint-signals/.
+        ohlcv = drop_unclosed_candle(ohlcv, timeframe)
+
         self.cache.set(cache_key, ohlcv, self.TTL_OHLCV)
         return ohlcv
     
