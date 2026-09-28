@@ -142,9 +142,12 @@ class CCXTDriver(BaseExchange):
 
         delta_args = {period_map.get(period, 'hours'): quantity}
         start_date_delta = timedelta(**delta_args)
-        max_days_date = datetime.now() - (max_periods * start_date_delta)
-        
-        return int(max_days_date.replace(tzinfo=timezone.utc).timestamp() * 1000)
+        # UTC desde el origen (specs/003-utc-start-date/): datetime.now() sin argumento + un
+        # .replace(tzinfo=...) posterior NO convierte, solo re-etiqueta la hora local del host
+        # como si ya fuera UTC. datetime.now(timezone.utc) evita ese error clasico.
+        max_days_date = datetime.now(timezone.utc) - (max_periods * start_date_delta)
+
+        return int(max_days_date.timestamp() * 1000)
 
     @retry(retry=retry_if_exception_type(ccxt.NetworkError), stop=stop_after_attempt(3))
     def get_markets(self, exchange: str, markets: List[str] = None) -> Dict:
