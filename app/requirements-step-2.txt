@@ -3,27 +3,27 @@
 # LIMPIEZA: Solo Telegram como notificador principal
 
 # Comunicación
-python-telegram-bot>=21.0        # CRÍTICO: v21+ para Python 3.12+
-requests>=2.28.0                 # Para webhook
+python-telegram-bot==22.8        # CRÍTICO: v21+ para Python 3.12+
+requests==2.34.2                 # Para webhook
 
 # Exchanges
-ccxt>=4.0.0
+ccxt==4.5.84
 
 # Logging
-structlog>=23.0.0
+structlog==26.1.0
 
 # Análisis de Datos
-stockstats>=0.5.0
-pandas>=2.0.0
-TA-lib>=0.4.28
-scipy>=1.10.0
-numpy>=1.24.0
+stockstats==0.6.8
+pandas==3.0.6
+TA-lib==0.8.1
+scipy==1.18.1
+numpy==2.5.3
 
 # Utilidades
-tenacity>=8.0.0
-jinja2>=3.1.0
-PyYAML>=6.0
-pytz>=2023.0
+tenacity==9.1.4
+jinja2==3.1.6
+PyYAML==6.0.3
+pytz==2026.4
 
 # Visualización
-matplotlib>=3.7.0
+matplotlib==3.11.2
