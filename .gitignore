@@ -12,6 +12,7 @@ env/
 
 # Archivos temporales
 .env
+.env.bak
 settings.env
 
 # Generados por el bot

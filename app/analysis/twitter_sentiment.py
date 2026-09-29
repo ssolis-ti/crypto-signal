@@ -26,8 +26,8 @@ import structlog
 GETXAPI_BASE_URL = "https://api.getxapi.com"
 GETXAPI_SEARCH_PATH = "/twitter/tweet/advanced_search"
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
-REQUEST_TIMEOUT_SECONDS = 10
+DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest"
+REQUEST_TIMEOUT_SECONDS = 25
 MAX_TWEETS_FOR_PROMPT = 15
 MAX_TWEET_TEXT_CHARS = 240
 
@@ -119,7 +119,7 @@ class TwitterSentimentAnalyzer:
 
         response = requests.post(
             f"{GEMINI_API_BASE}/{self.gemini_model}:generateContent",
-            params={"key": self.gemini_key},
+            headers={"x-goog-api-key": self.gemini_key},
             json={"contents": [{"parts": [{"text": prompt}]}]},
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
