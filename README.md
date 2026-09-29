@@ -168,6 +168,7 @@ dependencias pinneadas).
 | [019](specs/019-wyckoff-confluence-and-ta-confirmation/) | Confluencia 1D/4h + RSI/ADX como refinamiento: **ninguno de los tres sumó nada** (los tres empeoraron fuera de muestra) — el volumen extremo en la ruptura sigue siendo el único edge validado |
 | [020](specs/020-orderflow-and-social-data-research/) | Investigación (verificada en vivo): Binance ya expone taker buy/sell volume gratis; getxapi sí tiene búsqueda histórica real en Twitter/X |
 | [021](specs/021-wyckoff-taker-flow/) | Taker buy/sell flow como refinamiento: hipótesis de absorción pasa la barra mecánica pero con signo invertido in-sample/out-of-sample — **inconcluso**, no se suma como edge validado |
+| [022](specs/022-twitter-attention-pilot/) | Piloto de atención en Twitter/X: `tweet_count` de getxapi resultó capeado (~19 siempre) — método descartado, frenado a tiempo tras 10/41 consultas |
 
 ---
 
