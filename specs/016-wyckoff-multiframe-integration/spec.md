@@ -4,12 +4,14 @@
 
 **Created**: 2026-09-28
 
-**Status**: Draft, CONDITIONAL — **blocked on `specs/015-wyckoff-historical-validation` showing a
-real, statistically credible effect.** This spec is written now so the roadmap is fully formalized
-end-to-end per the operator's request, but per Constitution Principle III it MUST NOT be implemented
-if slice 015 concludes "no measurable predictive value" (the same outcome slices 007 and 011 both
-reached for the existing scoring heuristic) — in that case, this spec is retired/rewritten based on
-whatever slice 015 actually finds, not implemented as currently written.
+**Status**: Draft, CONDITIONAL — **awaiting operator decision.** `specs/015-wyckoff-historical-validation`
+landed 2026-09-28 with a genuinely mixed result (see its `validation-report.md` and Convergence
+Finding F1): a real, statistically significant win-rate edge exists (52.6%-54.8% across all four
+horizons, unlike slices 007/011's null/negative results) — but the effect is small, doesn't sharpen
+with volume-confirmation, and does not replicate the magnitude the operator specifically recalled
+(+20-30% over 1-2 weeks). This is NOT a clean "validated, proceed" nor a clean "invalidated, stop" —
+per Constitution Principle III, whether to build this integration on the smaller, real-but-modest
+edge slice 015 actually found is an operator call, not something to proceed on unilaterally.
 
 **Input**: Fourth and final slice of the roadmap in `specs/012-wyckoff-fractal-research/research.md`
 — top-down multi-timeframe composition (1D/1W structural bias filtering 4h Spring/Upthrust triggers),

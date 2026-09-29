@@ -161,8 +161,8 @@ dependencias pinneadas).
 | [012](specs/012-wyckoff-fractal-research/) | Investigación (sin código): método Wyckoff + temporalidades fractales como hipótesis alternativa |
 | [013](specs/013-wyckoff-effort-result/) | `WyckoffPrimitives`: ratio esfuerzo/resultado, flags de clímax/movimiento delgado — primitivas puras, sin conectar a alertas todavía |
 | [014](specs/014-wyckoff-range-spring-upthrust/) | Detección de rango de trading, Spring y Upthrust — reglas de precio explícitas, aún sin conectar a alertas |
-| [015](specs/015-wyckoff-historical-validation/) | Próximo: validación histórica (24h/72h/7d/14d — este último para chequear el recuerdo del operador de +20-30% en 1-2 semanas) |
-| [016](specs/016-wyckoff-multiframe-integration/) | Condicional: integración multi-timeframe, solo si 015 valida |
+| [015](specs/015-wyckoff-historical-validation/) | Validación histórica de Spring/Upthrust (2,839 eventos): win-rate significativo (53-55%) en los 4 horizontes — primer efecto real de las 3 validaciones — pero **no replica** la magnitud de +20-30%/1-2 semanas recordada |
+| [016](specs/016-wyckoff-multiframe-integration/) | Condicional: integración multi-timeframe — pendiente decisión del operador (resultado de 015 es real pero modesto) |
 
 ---
 
