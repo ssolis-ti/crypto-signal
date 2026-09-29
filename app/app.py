@@ -221,9 +221,10 @@ class AnalysisWorker(Thread):
                 except (ValueError, TypeError):
                     update_interval = 300.0
 
-                self.logger.info("%s sleeping for %s seconds",
-                                 self.threadName, update_interval)
-                time.sleep(seconds_until_next_cycle(update_interval))
+                wait_seconds = seconds_until_next_cycle(update_interval)
+                self.logger.info("%s sleeping for %.0f seconds (next cycle aligned to the clock)",
+                                 self.threadName, wait_seconds)
+                time.sleep(wait_seconds)
             except Exception as e:
                 self.logger.error(f"CRITICAL ERROR in {self.threadName}: {e}")
                 self.logger.error(traceback.format_exc())
