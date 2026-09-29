@@ -7,7 +7,7 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
 
 ## Estado
 
-- Commit `ee27cd4` en `main`, 336 tests pasando, desplegado en Docker (`docker compose up -d --build`). Specs 001-040.
+- `main` con 360 tests pasando, desplegado en Docker (`docker compose up -d --build`). Specs 001-041. Vigila 30 pares (`top_n: 30` en `config.yml`, gitignored).
 - Vigila 20 pares USDT de Binance por volumen (stablecoins y tokens de oro excluidos). Los 36 slices están en `specs/`.
 - **Único edge validado:** Spring de Wyckoff (long) en 4h con volumen de ruptura >= 2.5x, manteniendo ~72 h con stop -10%
   (acierto 56-58%, +1.5% a +1.8% por trade tomando todas las señales; con tope de 3 posiciones ~+1% y 50-56%).
@@ -29,12 +29,17 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
 - **040** `validate_forward.py` para validar con alertas reales (se niega a concluir con < 50 maduras). Fix: alerta no entregada por
   Telegram se reintenta (hasta 12 ciclos), reintento por fragmento sin duplicar, `RetryAfter` repetido, la API de agentes loguea errores SQLite.
 
+- **041** Horarios/continentes (brainstorm con opencode y agy): ningún corte horario aprueba. Auditoría del reloj: aviso con hora UTC + Santiago,
+  reloj del exchange para decidir velas cerradas, ciclo alineado al reloj de pared, logs con hora UTC, un solo worker con Wyckoff activo.
+  El 31% de los avisos llega entre 00:00 y 07:00 hora de Santiago.
+
 ## Pendiente
 
 1. Esperar >= 50 alertas reales maduras (>= 72 h) y correr `specs/040-validacion-hacia-adelante/validate_forward.py`
    (hoy hay 6, todas Upthrust). Decidir ahí si la barrida >= 1% u otro dato pasa de "mostrar" a "filtrar".
 2. Pedir al operador su capital y tamaño de posición reales (nunca se asumen).
-3. Ideas sin probar: mean-reversion informativa tras caída >= 15% en 24h (funciona señal a señal, no con pocas posiciones).
+3. Ideas sin probar: mean-reversion informativa tras caída >= 15% en 24h (funciona señal a señal, no con pocas posiciones); "sesión propia del par"
+   (clasificar pares por su horario dominante a priori); calendario macro; decidir si mostrar un resumen matutino en hora de Santiago.
 
 ## Reglas de trabajo que resultaron necesarias
 
