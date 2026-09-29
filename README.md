@@ -164,6 +164,7 @@ dependencias pinneadas).
 | [015](specs/015-wyckoff-historical-validation/) | Validación histórica de Spring/Upthrust (2,839 eventos): win-rate significativo (53-55%) en los 4 horizontes — primer efecto real de las 3 validaciones — pero **no replica** la magnitud de +20-30%/1-2 semanas recordada |
 | [016](specs/016-wyckoff-multiframe-integration/) | Condicional: integración multi-timeframe — pendiente decisión del operador (resultado de 015 es real pero modesto) |
 | [017](specs/017-wyckoff-edge-refinement/) | Búsqueda de edge con split in-sample/out-of-sample: **volumen extremo en la ruptura (≥2.5x) confirma** — 62.4% win-rate fuera de muestra (n=101, 14d) — pendiente decisión de conectarlo a Telegram |
+| [018](specs/018-wyckoff-timing-and-drawdown/) | Timing y drawdown con velas de 1h: win-rate más alto (72-78%) en las primeras 1-2h con magnitud chica; sostener hasta 14d da más magnitud (+2.84% mediana) pero 26.5% de eventos ven drawdown ≥10% — pendiente decisión de cómo encuadrar la alerta |
 
 ---
 
