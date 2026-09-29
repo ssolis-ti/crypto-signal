@@ -175,6 +175,7 @@ dependencias pinneadas).
 | [026](specs/026-broader-signal-catalog/) | Investigación (no implementación): catálogo de 150+ funciones TA-Lib sin probar, patrones de vela y filtros de volumen como candidatos; order book verificado factible en vivo pero **sin historial** en Binance — no validable con el mismo rigor sin recolección propia |
 | [027](specs/027-wyckoff-volume-context-filters/) | CMF/PVT/NVI como filtro de contexto adicional sobre el edge ya validado: **ninguno mejora el baseline** — NVI pasó la vara mecánica pero falló el estándar real (empeora in-sample, "mejora" solo out-of-sample = ruido, mismo patrón que spec 021) |
 | [028](specs/028-twitter-event-triggered-pilot/) | Corrección de spec 022 (Twitter por altcoin, no BTC genérico): **mismo tope de ~19 tweets persiste** sin importar cap de la moneda ni ancho de ventana — confirma que `advanced_search_tweets` no sirve para medir volumen de conversación, con cualquier acotamiento |
+| [029](specs/029-wyckoff-candle-pattern-filter/) | Patrones de vela TA-Lib (60+ CDL*, y un subset "core" curado) como filtro adicional: **ninguno confirma** — un candidato pasó la vara mecánica a 14d pero el chequeo de consistencia in/out-of-sample (agregado tras la lección de spec 027) lo descartó como falso positivo automáticamente |
 
 ---
 
