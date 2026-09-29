@@ -1,4 +1,4 @@
-# Estado de crypto-signal y pendientes (registro al 2026-09-29)
+# Estado de crypto-signal y pendientes (registro al 2026-09-29, actualizado al final del día)
 
 Trabajo en tres fases: (1) Freqtrade (proyecto aparte, `~/freq`: bots en dry-run y laboratorio de backtests),
 (2) crypto-signal (esta base de código, hecha), (3) fase de análisis (pendiente, la define el operador).
@@ -7,7 +7,7 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
 
 ## Estado
 
-- Commit `b7394da` en `main`, 316 tests pasando, desplegado en Docker (`docker compose up -d --build`).
+- Commit `ee27cd4` en `main`, 336 tests pasando, desplegado en Docker (`docker compose up -d --build`). Specs 001-040.
 - Vigila 20 pares USDT de Binance por volumen (stablecoins y tokens de oro excluidos). Los 36 slices están en `specs/`.
 - **Único edge validado:** Spring de Wyckoff (long) en 4h con volumen de ruptura >= 2.5x, manteniendo ~72 h con stop -10%
   (acierto 56-58%, +1.5% a +1.8% por trade tomando todas las señales; con tope de 3 posiciones ~+1% y 50-56%).
@@ -18,14 +18,23 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
 - Guía de ejecución medida con velas de 1 minuto (spec 036): el retraso de ~7 min no cuesta; esperar 1-2 h cuesta ~0.3-0.4%;
   orden límite, esperar confirmación, cortar por retrocesos chicos y mover el stop a break-even empeoran el resultado.
 
+## Hecho desde el primer registro (specs 037-040)
+
+- **037** Registro en vivo de funding, open interest, long/short y libro en cada alerta (`micro` en el jsonl, solo se registra).
+  Experimento de funding: ninguna de 3 hipótesis aprueba (IS sin efecto; solo mejora en 2025-26 = ruido).
+- **038** Experimentos de laboratorio pendientes: ninguno aprueba. Trailing, TP y 48 h empeoran; barrida >= 1% / 1.5% y caída 24h
+  mejoran en ambos períodos pero sus IC incluyen 0.
+- **039** Springs perdidos con el bot apagado: ahora se revisan las 3 velas anteriores (hasta 12 h) y se avisan como retardados
+  (costo medido ~0.5 pp por 4 h). Mínimos iguales (EQL): no aprueba y va al revés.
+- **040** `validate_forward.py` para validar con alertas reales (se niega a concluir con < 50 maduras). Fix: alerta no entregada por
+  Telegram se reintenta (hasta 12 ciclos), reintento por fragmento sin duplicar, `RetryAfter` repetido, la API de agentes loguea errores SQLite.
+
 ## Pendiente
 
-1. Validar hacia adelante con >= 50 alertas reales los campos registrados y el radar de menciones.
-2. Robustez: detectar springs confirmados con la PC apagada (hoy solo se lee la última vela); reintentar si Telegram falla
-   varias veces seguidas o llega un segundo `RetryAfter`; la base de la API de agentes ignora errores de escritura en silencio.
-3. Experimentos de laboratorio sin correr (`specs/035-auditoria-resultados/scripts_estrategia/experimentos_lab.py`):
-   barrida profunda (con criterio fijado antes), take-profit a 48 h, trailing, y combinación spring + caída fuerte de 24 h.
-4. Pedir al operador su capital y tamaño de posición reales (nunca se asumen).
+1. Esperar >= 50 alertas reales maduras (>= 72 h) y correr `specs/040-validacion-hacia-adelante/validate_forward.py`
+   (hoy hay 6, todas Upthrust). Decidir ahí si la barrida >= 1% u otro dato pasa de "mostrar" a "filtrar".
+2. Pedir al operador su capital y tamaño de posición reales (nunca se asumen).
+3. Ideas sin probar: mean-reversion informativa tras caída >= 15% en 24h (funciona señal a señal, no con pocas posiciones).
 
 ## Reglas de trabajo que resultaron necesarias
 
