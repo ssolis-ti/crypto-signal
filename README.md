@@ -170,6 +170,7 @@ dependencias pinneadas).
 | [021](specs/021-wyckoff-taker-flow/) | Taker buy/sell flow como refinamiento: hipótesis de absorción pasa la barra mecánica pero con signo invertido in-sample/out-of-sample — **inconcluso**, no se suma como edge validado |
 | [022](specs/022-twitter-attention-pilot/) | Piloto de atención en Twitter/X: `tweet_count` de getxapi resultó capeado (~19 siempre) — método descartado, frenado a tiempo tras 10/41 consultas |
 | [023](specs/023-wyckoff-live-alerts/) | **En producción**: alerta Wyckoff Spring/Upthrust (volumen extremo ≥2.5x) a Telegram, con encuadre dual (rápida/sostenida) y números reales — independiente de `SignalEnhancer` |
+| [024](specs/024-ta-crossover-validation/) | Validación de `ma_crossover` (golden/death cross) y `sqzmom` (squeeze momentum), solos y con filtro de volumen extremo: **ninguno confirmó** out-of-sample — se mantiene el volumen extremo en rupturas Wyckoff como único edge validado del proyecto |
 
 ---
 
