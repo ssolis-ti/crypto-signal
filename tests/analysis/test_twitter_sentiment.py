@@ -181,6 +181,16 @@ class TestMentionVelocity:
         baseline_query = mock_get.call_args_list[1].kwargs['params']['q']
         assert baseline_query.startswith('$SOL until_time:')
 
+    def test_summary_is_html_escaped(self):
+        section = TwitterSentimentAnalyzer.format_section({
+            'current': None, 'baseline': None, 'ratio': None, 'max_views': 0,
+            'sentiment_extreme': 'none', 'social_spike_confirmed': False,
+            'catalyst_present': False, 'summary': 'ETFs & ballenas <b>rompen</b>',
+        })
+        assert '&amp;' in section
+        assert '&lt;b&gt;' in section
+        assert '<b>rompen</b>' not in section
+
     def test_format_shows_acceleration_and_viral(self):
         section = TwitterSentimentAnalyzer.format_section({
             'current': 12.0, 'baseline': 3.0, 'ratio': 4.0, 'max_views': 80_000,

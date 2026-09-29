@@ -16,12 +16,16 @@ class DataCollector:
     Optimiza las llamadas a la API basándose en la configuración de indicadores.
     """
 
-    def __init__(self, exchange_interface, indicator_conf, informant_conf, strategy_analyzer):
+    def __init__(self, exchange_interface, indicator_conf, informant_conf, strategy_analyzer,
+                 required_periods=()):
         self.logger = structlog.get_logger()
         self.exchange_interface = exchange_interface
         self.indicator_conf = indicator_conf
         self.informant_conf = informant_conf
         self.strategy_analyzer = strategy_analyzer
+        # Periodos que otros modulos (p. ej. WyckoffAlerter: '4h') necesitan aunque ningun
+        # indicador/informante habilitado los use.
+        self.required_periods = tuple(required_periods)
 
     def get_all_historical_data(self, market_data):
         """
@@ -68,6 +72,12 @@ class DataCollector:
                                 data[exchange][market_pair][candle_period] = self._get_historical_data(
                                     market_pair, exchange, candle_period
                                 )
+
+                for candle_period in self.required_periods:
+                    if candle_period not in data[exchange][market_pair]:
+                        data[exchange][market_pair][candle_period] = self._get_historical_data(
+                            market_pair, exchange, candle_period
+                        )
         return data
 
     def _get_historical_data(self, market_pair, exchange, candle_period):

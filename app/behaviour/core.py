@@ -65,11 +65,15 @@ class Behaviour():
         # Componentes Core
         # ─────────────────────────────────────────
         self.strategy_analyzer = StrategyAnalyzer()
+        # WyckoffAlerter reutiliza el OHLCV de 4h: se pide explicitamente para que la alerta
+        # validada no dependa de que algun indicador legacy este configurado en 4h.
+        wyckoff_enabled = config.settings.get('wyckoff_alerts', {}).get('enabled', False)
         self.data_collector = DataCollector(
-            exchange_interface, 
-            config.indicators, 
-            config.informants, 
-            self.strategy_analyzer
+            exchange_interface,
+            config.indicators,
+            config.informants,
+            self.strategy_analyzer,
+            required_periods=('4h',) if wyckoff_enabled else (),
         )
         self.strategy_executor = StrategyExecutor(config, self.strategy_analyzer)
         

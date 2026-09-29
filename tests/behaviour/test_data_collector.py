@@ -27,6 +27,30 @@ def test_unclosed_4h_candle_is_dropped():
     assert result == [closed]
 
 
+def test_required_period_is_fetched_without_any_indicator():
+    now_ms = int(time.time() * 1000)
+    start = now_ms - (now_ms % FOUR_H_MS)
+    closed = [start - FOUR_H_MS, 1, 1, 1, 1, 1]
+    interface = MagicMock()
+    interface.get_historical_data.return_value = [closed]
+    collector = DataCollector(interface, indicator_conf={}, informant_conf={},
+                              strategy_analyzer=MagicMock(), required_periods=('4h',))
+
+    data = collector.get_all_historical_data({'binance': {'BTC/USDT': {}}})
+
+    assert data['binance']['BTC/USDT']['4h'] == [closed]
+
+
+def test_no_required_periods_fetches_nothing_extra():
+    interface = MagicMock()
+    collector = DataCollector(interface, indicator_conf={}, informant_conf={}, strategy_analyzer=MagicMock())
+
+    data = collector.get_all_historical_data({'binance': {'BTC/USDT': {}}})
+
+    assert data['binance']['BTC/USDT'] == {}
+    interface.get_historical_data.assert_not_called()
+
+
 def test_closed_candles_are_kept():
     now_ms = int(time.time() * 1000)
     open_candle_start = now_ms - (now_ms % FOUR_H_MS)

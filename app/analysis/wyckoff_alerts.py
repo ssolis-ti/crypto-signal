@@ -18,7 +18,7 @@ detail_min_quality ni al score 0-100.
 import json
 import os
 from datetime import datetime, timezone
-from typing import Optional, Set
+from typing import Dict, Optional
 
 import pandas as pd
 import structlog
@@ -29,6 +29,9 @@ from analysis.twitter_sentiment import TwitterSentimentAnalyzer
 
 DEFAULT_RECORD_PATH = 'agent_state/rumor_radar.jsonl'
 DEFAULT_RADAR_MIN_RATIO = 2.0
+RADAR_MAX_FAILURES = 3
+STALE_ALERT_SECONDS = 2 * 3600
+CANDLE_SECONDS = 4 * 3600
 
 VALIDATED_CANDLE_PERIOD = '4h'
 LOOKBACK = 20
@@ -68,7 +71,9 @@ class WyckoffAlerter:
         self.logger = structlog.get_logger()
         self.notifier = notifier
         self.enabled = enabled
-        self._alerted_signatures: Set[str] = set()
+        # dict (no set): conserva el orden de insercion, asi el prune descarta lo mas viejo.
+        self._alerted_signatures: Dict[str, None] = {}
+        self._radar_failures: Dict[str, int] = {}
         self.twitter_sentiment = TwitterSentimentAnalyzer(enabled=twitter_sentiment_enabled)
         # El radar necesita Twitter: sin el no hay nada que cruzar con el volumen.
         self.rumor_radar_enabled = rumor_radar_enabled and twitter_sentiment_enabled
@@ -128,8 +133,7 @@ class WyckoffAlerter:
 
         self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp,
                          change_24h=self._change_24h(df))
-        self._alerted_signatures.add(signature)
-        self._prune_signatures()
+        self._remember(signature)
 
     def _check_rumor_radar(self, exchange: str, market_pair: str, df, timestamp) -> None:
         """
@@ -141,17 +145,23 @@ class WyckoffAlerter:
         if pd.isna(rel_vol) or rel_vol < EXTREME_VOLUME_THRESHOLD:
             return
 
-        # Se marca antes de consultar: el ciclo corre cada 5 min y ve la misma vela ~48 veces.
+        # El ciclo corre cada 5 min y ve la misma vela ~48 veces: se marca al obtener respuesta.
+        # Si Twitter falla se reintenta el ciclo siguiente, hasta RADAR_MAX_FAILURES veces.
         signature = f"{exchange}:{market_pair}:radar:{timestamp.isoformat()}"
         if signature in self._alerted_signatures:
             return
-        self._alerted_signatures.add(signature)
-        self._prune_signatures()
 
         ticker = market_pair.split('/')[0]
         velocity = self.twitter_sentiment.mention_velocity(ticker)
         if velocity is None:
+            failures = self._radar_failures.get(signature, 0) + 1
+            self._radar_failures[signature] = failures
+            if failures >= RADAR_MAX_FAILURES:
+                self._remember(signature)
+                self._radar_failures.pop(signature, None)
             return
+        self._radar_failures.pop(signature, None)
+        self._remember(signature)
 
         last = df.iloc[-1]
         candle_change = (last['close'] - last['open']) / last['open'] * 100 if last['open'] else 0.0
@@ -211,6 +221,19 @@ class WyckoffAlerter:
         before = df['close'].iloc[-7]
         return (df['close'].iloc[-1] - before) / before * 100 if before else None
 
+    @staticmethod
+    def _now_utc() -> datetime:
+        return datetime.now(timezone.utc)
+
+    def _stale_notice(self, timestamp) -> str:
+        """Aviso si la vela cerro hace mas de 2h (p. ej. la PC estuvo apagada): el precio ya pudo correr."""
+        if timestamp is None:
+            return ""
+        elapsed = (self._now_utc() - (timestamp + pd.Timedelta(seconds=CANDLE_SECONDS))).total_seconds()
+        if elapsed <= STALE_ALERT_SECONDS:
+            return ""
+        return f"⏱️ <b>ALERTA RETARDADA</b>: la vela cerró hace {elapsed / 3600:.1f} h; revisá si el precio ya se movió\n"
+
     def _send_alert(self, exchange: str, market_pair: str, direction: str,
                      break_relative_volume: float, timestamp=None,
                      change_24h: Optional[float] = None) -> None:
@@ -225,6 +248,7 @@ class WyckoffAlerter:
         change_line = f" | 24h: {change_24h:+.1f}%" if change_24h is not None else ""
         message = (
             f"{headline}\n"
+            f"{self._stale_notice(timestamp)}"
             f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
             f"{label}\n"
             f"Volumen en la ruptura: {break_relative_volume:.1f}x el promedio\n\n"
@@ -254,6 +278,11 @@ class WyckoffAlerter:
             'sentiment': (twitter_result or {}).get('sentiment_extreme'),
         })
 
+    def _remember(self, signature: str) -> None:
+        self._alerted_signatures[signature] = None
+        self._prune_signatures()
+
     def _prune_signatures(self, max_size: int = MAX_DEDUP_SIGNATURES) -> None:
-        if len(self._alerted_signatures) > max_size:
-            self._alerted_signatures = set(list(self._alerted_signatures)[-max_size:])
+        # Descarta las mas antiguas (orden de insercion), nunca las recientes.
+        while len(self._alerted_signatures) > max_size:
+            del self._alerted_signatures[next(iter(self._alerted_signatures))]

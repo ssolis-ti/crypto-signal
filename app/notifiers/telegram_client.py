@@ -6,10 +6,11 @@ Compatible con Python 3.12+
 import asyncio
 import structlog
 from telegram import Bot
-from telegram.error import TimedOut, NetworkError
+from telegram.error import BadRequest, NetworkError, RetryAfter, TimedOut
 from tenacity import (
-    retry, 
-    retry_if_exception_type, 
+    retry,
+    retry_if_exception,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential
 )
@@ -49,7 +50,10 @@ class TelegramNotifier(NotifierUtils):
         asyncio.run(self._async_notify(message))
 
     @retry(
-        retry=retry_if_exception_type((TimedOut, NetworkError)),
+        # BadRequest hereda de NetworkError en python-telegram-bot, pero reintentarlo no sirve:
+        # el mensaje sera rechazado igual. Se maneja aparte dentro de _async_notify.
+        retry=retry_if_exception(lambda e: isinstance(e, (TimedOut, NetworkError))
+                                 and not isinstance(e, BadRequest)),
         stop=stop_after_attempt(__stop_after_attempt__),
         wait=wait_exponential(multiplier=1, min=2, max=10)
     )
@@ -63,16 +67,31 @@ class TelegramNotifier(NotifierUtils):
         )
         for message_chunk in message_chunks:
             try:
-                await bot.send_message(
-                    chat_id=self.chat_id,
-                    text=message_chunk,
-                    parse_mode=self.parse_mode,
-                    read_timeout=__read_timeout__,
-                    connect_timeout=__connect_timeout__
-                )
+                await self._send_chunk(bot, message_chunk, self.parse_mode)
+            except RetryAfter as e:
+                # Flood control de Telegram: esperar lo que pide y reintentar una vez.
+                self.logger.warning('Telegram RetryAfter', seconds=e.retry_after)
+                await asyncio.sleep(float(e.retry_after) + 1)
+                await self._send_chunk(bot, message_chunk, self.parse_mode)
+            except BadRequest as e:
+                if 'parse entities' not in str(e).lower():
+                    self.logger.error('Error enviando mensaje Telegram', error=str(e))
+                    raise
+                # HTML invalido (p. ej. texto de terceros con '<'): mejor llegar sin formato que perderse.
+                self.logger.warning('Telegram rechazo el HTML, reenviando como texto plano')
+                await self._send_chunk(bot, message_chunk, None)
             except Exception as e:
                 self.logger.error('Error enviando mensaje Telegram', error=str(e))
                 raise
+
+    async def _send_chunk(self, bot, text: str, parse_mode):
+        await bot.send_message(
+            chat_id=self.chat_id,
+            text=text,
+            parse_mode=parse_mode,
+            read_timeout=__read_timeout__,
+            connect_timeout=__connect_timeout__
+        )
 
     def send_chart_messages(self, photo_url: str, messages: list = None):
         """

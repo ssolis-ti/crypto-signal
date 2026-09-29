@@ -2,6 +2,7 @@
 Tests para WyckoffAlerter (specs/023-wyckoff-live-alerts/).
 """
 import json
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -233,11 +234,58 @@ class TestRumorRadar:
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
         assert mock_vel.call_count == 1
 
+    def test_twitter_failure_retries_next_cycle_then_gives_up(self, tmp_path):
+        alerter = self._alerter(tmp_path)
+        ohlcv = _volume_spike_no_event_fixture()
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity', return_value=None) as mock_vel:
+            for _ in range(5):
+                alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+        assert mock_vel.call_count == 3  # RADAR_MAX_FAILURES, luego se marca la vela
+
+    def test_twitter_recovers_on_second_cycle(self, tmp_path):
+        alerter = self._alerter(tmp_path)
+        ohlcv = _volume_spike_no_event_fixture()
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity',
+                          side_effect=[None, _velocity(1.1)]) as mock_vel:
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+        assert mock_vel.call_count == 2
+        assert (tmp_path / 'radar.jsonl').exists()
+
     def test_normal_volume_does_not_query_twitter(self, tmp_path):
         alerter = self._alerter(tmp_path)
         with patch.object(alerter.twitter_sentiment, 'mention_velocity') as mock_vel:
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', _no_event_fixture())
         mock_vel.assert_not_called()
+
+
+class TestDedupPruneAndStale:
+    def test_prune_drops_oldest_and_keeps_newest(self):
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True)
+        for i in range(6):
+            alerter._remember(f'sig_{i}')
+        alerter._prune_signatures(max_size=3)
+        assert list(alerter._alerted_signatures) == ['sig_3', 'sig_4', 'sig_5']
+
+    def test_fresh_alert_has_no_stale_notice(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        ohlcv = _spring_fixture()
+        last_open = datetime.fromtimestamp(ohlcv[-1][0] / 1000, tz=timezone.utc)
+        with patch.object(WyckoffAlerter, '_now_utc', return_value=last_open + timedelta(hours=4, minutes=5)):
+            alerter.check_and_alert('binance', 'BTC/USDT', '4h', ohlcv)
+        assert 'RETARDADA' not in notifier.messages[0]
+
+    def test_alert_after_long_downtime_is_marked_stale(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        ohlcv = _spring_fixture()
+        last_open = datetime.fromtimestamp(ohlcv[-1][0] / 1000, tz=timezone.utc)
+        with patch.object(WyckoffAlerter, '_now_utc', return_value=last_open + timedelta(hours=8)):
+            alerter.check_and_alert('binance', 'BTC/USDT', '4h', ohlcv)
+        assert 'ALERTA RETARDADA' in notifier.messages[0]
+        assert 'hace 4.0 h' in notifier.messages[0]
 
 
 class TestWyckoffAlerterGuards:

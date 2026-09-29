@@ -15,6 +15,7 @@ Todo es informativo y NO validado estadisticamente (Principio III): nunca decide
 una alerta Wyckoff se envia. Degrada seguro: cualquier error se loguea y el metodo
 retorna None o un resultado parcial (p. ej. velocidad sin clasificacion si Gemini cae).
 """
+import html
 import json
 import os
 import re
@@ -212,6 +213,7 @@ class TwitterSentimentAnalyzer:
         if result.get('catalyst_present'):
             lines.append("📰 Hay un catalizador/noticia concreta circulando")
         if result.get('summary'):
-            lines.append(f"<i>{result['summary']}</i>")
+            # Texto generado por un LLM a partir de tweets de terceros: escapar para HTML de Telegram.
+            lines.append(f"<i>{html.escape(str(result['summary']), quote=False)}</i>")
 
         return "\n".join(lines) if len(lines) > 1 else ''
