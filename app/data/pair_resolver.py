@@ -91,20 +91,35 @@ class PairResolver:
         """
         Obtiene Top N pares ordenados por volumen 24h.
         """
-        top_n = self.dynamic_conf.get('top_n', 50)
-        quote = self.dynamic_conf.get('quote_currency', 'USDT')
-        min_vol = self.dynamic_conf.get('min_volume_24h', 0)
-        exclude = set(self.dynamic_conf.get('exclude', []))
+        raw_top_n = self.dynamic_conf.get('top_n', 50)
+        try:
+            top_n = int(raw_top_n) if raw_top_n is not None else 50
+        except (ValueError, TypeError):
+            top_n = 50
+
+        quote = self.dynamic_conf.get('quote_currency', 'USDT') or 'USDT'
+        raw_min_vol = self.dynamic_conf.get('min_volume_24h', 0)
+        try:
+            min_vol = float(raw_min_vol) if raw_min_vol is not None else 0.0
+        except (ValueError, TypeError):
+            min_vol = 0.0
+
+        exclude_list = self.dynamic_conf.get('exclude') or []
+        exclude = set(exclude_list) if isinstance(exclude_list, (list, set, tuple)) else set()
         
         self.logger.info(f"Modo dinámico: Top {top_n} por volumen ({quote}), min ${min_vol:,.0f}")
         
-        # Obtener del DataManager (con caché)
-        pairs = self.data_manager.get_top_pairs(
-            exchange=exchange,
-            quote=quote,
-            top_n=top_n + len(exclude),  # Pedir más para compensar exclusiones
-            min_volume=min_vol
-        )
+        # Obtener del DataManager (con caché) de forma protegida
+        try:
+            pairs = self.data_manager.get_top_pairs(
+                exchange=exchange,
+                quote=quote,
+                top_n=top_n + len(exclude),  # Pedir más para compensar exclusiones
+                min_volume=min_vol
+            )
+        except Exception as e:
+            self.logger.error(f"Error obteniendo top pairs para {exchange}: {e}")
+            return []
         
         # Aplicar exclusiones
         filtered = [p for p in pairs if p not in exclude][:top_n]
