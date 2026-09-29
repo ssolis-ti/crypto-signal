@@ -44,16 +44,18 @@ MAX_DEDUP_SIGNATURES = 500
 # Numeros del backtest en Freqtrade (specs/032-freqtrade-lab-wyckoff/), auditados contra los
 # trades crudos (QA de resultados, 2026-09-29): Binance futuros, 29 pares, comisiones y funding
 # reales, IS 2022-2024 / OOS 2025-2026, sin sesgo de lookahead. Cada cifra dice de QUE formato
-# sale: "todas las senales" (sin tope de posiciones) NO es lo mismo que "3 posiciones de 30 USDT".
+# sale: "todas las senales" (sin tope de posiciones) NO es lo mismo que "maximo 3 posiciones".
+# OJO: el tope de 3 posiciones es el de la config de PRUEBA del laboratorio Freqtrade, no el
+# capital ni el tamano de posicion del operador de crypto-signal (bot solo de alertas; opera a mano).
 SPRING_PLAN = (
     "📈 <b>Plan: long, mantener ~3 dias (72h), stop -10% en precio (mark)</b>\n"
     "Tomando TODAS las señales a 1x (con comisiones y funding): acierto 56-58%, "
     "ganancia media +1.5% a +1.8% por trade.\n"
-    "⚠️ Con 100 USDT y solo 3 posiciones de 30 rinde menos: ~+1% medio y 50-56% de acierto, "
-    "porque cuando saltan varias señales juntas quedan afuera las mejores. "
-    "Caida maxima vista 19-27% (en una mala racha puede ser mayor); "
+    "⚠️ Si solo podes tener 3 posiciones abiertas a la vez rinde menos: ~+1% medio y 50-56% "
+    "de acierto, porque cuando saltan varias señales juntas quedan afuera las mejores. "
+    "Caida maxima vista del capital 19-27% (en una mala racha puede ser mayor); "
     "44-50% de los trades pierde y hubo rachas de 6 a 10 perdidas seguidas.\n"
-    "⚠️ Con 3x no es prudente para 100 USDT (caida maxima hasta 46%).\n"
+    "⚠️ Con 3x la caida maxima del capital llego a 46%: no es prudente.\n"
     "⚠️ Operar de 1-2h NO funciona: 44-49% de acierto y pierde con comisiones"
 )
 UPTHRUST_PLAN = (

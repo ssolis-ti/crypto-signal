@@ -23,3 +23,16 @@ Se **muestran** en el mensaje (profundidad de la barrida y pares simultáneos, c
 (`sweep_depth_pct`, `concurrent_pairs`, `change_24h_pct`) para validarlos hacia adelante con
 alertas reales. Regla para el futuro: pasar de "mostrar" a "filtrar" solo si se confirma con
 >= 50 alertas reales o en un experimento de laboratorio pre-registrado.
+
+## Nota de alcance: crypto-signal ≠ Freqtrade
+
+- **crypto-signal** es un bot SOLO de alertas (Telegram): no opera ni tiene capital. El operador opera a mano.
+- **Freqtrade** (`~/freq`) es un proyecto aparte con bots en dry-run (100 USDT simulados, sin Telegram) y un
+  contenedor `lab` que se usa aquí solo como **laboratorio de backtests**.
+- Las auditorías de este spec asumieron por error que "100 USDT y 3 posiciones de 30" era el capital del
+  operador de crypto-signal. Es la configuración de PRUEBA del laboratorio (`config_wyckoff_real.json`).
+  Las cifras de "3 posiciones" siguen siendo válidas como escenario (pocas posiciones simultáneas), pero no
+  describen el capital real del operador; el mensaje de Telegram ya no menciona USDT.
+- En `~/freq` solo se AGREGARON archivos del laboratorio (estrategias `wyckoff_lab.py` y `meanrev_lab.py`,
+  configs `config_wyckoff_*.json`/`config_lookahead.json`, scripts `ops/bt_*.sh`); los bots `P4_B`, `TP10_DRY`,
+  `P4_B_SHADOW` y su `docker-compose.yml` no se tocaron.
