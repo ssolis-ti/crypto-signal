@@ -1,0 +1,27 @@
+1) ROBUSTEZ POR AÑO (todas las senales, 1x, neto)
+        n  media  acierto   stop
+year                            
+2022  227   0.96    52.86  29.96
+2023  305   0.97    50.49  10.49
+2024  329   2.86    60.79  10.64
+2025  313   2.28    60.06  12.78
+2026  212   0.81    52.36  11.32
+   años con media > 0: 5 de 5 -> CUMPLE (criterio: >= 4 de 5)
+
+2) ESTRES DE FRICCION (media por trade; base sin estres = +1.69%)
+    costo extra/trade | peor stop +0pp | peor stop +1pp | peor stop +2pp | peor stop +3pp
+              +0.0 pp |  +1.69%  win  56% |  +1.54%  win  56% |  +1.40%  win  56% |  +1.26%  win  56%
+              +0.1 pp |  +1.59%  win  55% |  +1.44%  win  55% |  +1.30%  win  55% |  +1.16%  win  55%
+              +0.3 pp |  +1.39%  win  54% |  +1.24%  win  54% |  +1.10%  win  54% |  +0.96%  win  54%
+              +0.5 pp |  +1.19%  win  53% |  +1.04%  win  53% |  +0.90%  win  53% |  +0.76%  win  53%
+   con +0.3 pp de costo y +2 pp en stops: media +1.10% -> CUMPLE
+
+3) MONTE CARLO: cartera con tope de 3 posiciones simultaneas (orden cronologico real)
+   trades tomados con tope 3: 562 en 4.7 años (~120/año), media +0.79%, acierto 51%
+   1 año simulado = 119 trades, 5000 remuestreos; f = % del capital por posicion (sin asumir capital)
+       f | DD max p50 DD max p95 | retorno anual p5     p50 | P(anio negativo) | racha perdedora p50/p95
+      5% |       3.3%       6.3% |            -3.0%   +4.5% |              17% | 6 / 9
+     10% |       6.4%      12.6% |            -6.3%   +9.3% |              18% | 6 / 10
+     20% |      12.5%      23.5% |           -12.8%  +18.0% |              20% | 6 / 9
+     33% |      20.0%      36.2% |           -22.4%  +27.6% |              21% | 6 / 9
+   (con remuestreo independiente; los trades reales estan agrupados en dias de capitulacion, asi que el riesgo real puede ser MAYOR)

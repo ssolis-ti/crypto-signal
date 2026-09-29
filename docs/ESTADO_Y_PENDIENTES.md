@@ -37,8 +37,10 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
 
 1. Esperar >= 50 alertas reales maduras (>= 72 h) y correr `specs/040-validacion-hacia-adelante/validate_forward.py`
    (hoy hay 6, todas Upthrust). Decidir ahí si la barrida >= 1% u otro dato pasa de "mostrar" a "filtrar".
-2. Pedir al operador su capital y tamaño de posición reales (nunca se asumen).
-3. Ideas sin probar: mean-reversion informativa tras caída >= 15% en 24h (funciona señal a señal, no con pocas posiciones); "sesión propia del par"
+2. **Sesgo de supervivencia (spec 042, hueco principal):** repetir el backtest incluyendo perpetuos deslistados de Binance; hoy los 29 pares
+   son sobrevivientes y "comprar la caída" puede verse mejor de lo real.
+3. Pedir al operador su capital y tamaño de posición reales (nunca se asumen).
+4. Ideas sin probar: mean-reversion informativa tras caída >= 15% en 24h (funciona señal a señal, no con pocas posiciones); "sesión propia del par"
    (clasificar pares por su horario dominante a priori); calendario macro; decidir si mostrar un resumen matutino en hora de Santiago.
 
 ## Reglas de trabajo que resultaron necesarias
