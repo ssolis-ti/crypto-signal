@@ -1,0 +1,18 @@
+eventos con funding: {'IS': 859, 'OOS': 525}
+funding medio al entrar (%): {'IS': -0.0077, 'OOS': -0.0088}
+
+hipotesis              periodo n filt   media acierto | n resto   media acierto | dif
+H1 funding < 0         IS        380   +1.71     54% |     479   +1.71     56% | -0.00
+H1 funding < 0         OOS       312   +2.19     64% |     213   +0.95     46% | +1.24
+H1 funding < 0         AMBOS     692   +1.93     58% |     692   +1.48     53% | +0.45 IC98.3% por dia [-1.39, +2.30]
+H2 cuartil bajo 90d    IS        552   +1.73     56% |     307   +1.68     53% | +0.05
+H2 cuartil bajo 90d    OOS       312   +2.57     63% |     213   +0.38     48% | +2.19
+H2 cuartil bajo 90d    AMBOS     864   +2.03     59% |     520   +1.15     51% | +0.89 IC98.3% por dia [-1.25, +3.23]
+H3 acum. 24h < 0       IS        310   +1.50     53% |     549   +1.83     56% | -0.32
+H3 acum. 24h < 0       OOS       298   +1.92     62% |     227   +1.38     51% | +0.54
+H3 acum. 24h < 0       AMBOS     608   +1.71     57% |     776   +1.70     55% | +0.01 IC98.3% por dia [-1.89, +1.98]
+
+VEREDICTO (criterio pre-registrado):
+  H1 funding < 0: NO aprueba
+  H2 cuartil bajo 90d: NO aprueba
+  H3 acum. 24h < 0: NO aprueba
