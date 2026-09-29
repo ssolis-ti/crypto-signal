@@ -176,6 +176,7 @@ dependencias pinneadas).
 | [027](specs/027-wyckoff-volume-context-filters/) | CMF/PVT/NVI como filtro de contexto adicional sobre el edge ya validado: **ninguno mejora el baseline** — NVI pasó la vara mecánica pero falló el estándar real (empeora in-sample, "mejora" solo out-of-sample = ruido, mismo patrón que spec 021) |
 | [028](specs/028-twitter-event-triggered-pilot/) | Corrección de spec 022 (Twitter por altcoin, no BTC genérico): **mismo tope de ~19 tweets persiste** sin importar cap de la moneda ni ancho de ventana — confirma que `advanced_search_tweets` no sirve para medir volumen de conversación, con cualquier acotamiento |
 | [029](specs/029-wyckoff-candle-pattern-filter/) | Patrones de vela TA-Lib (60+ CDL*, y un subset "core" curado) como filtro adicional: **ninguno confirma** — un candidato pasó la vara mecánica a 14d pero el chequeo de consistencia in/out-of-sample (agregado tras la lección de spec 027) lo descartó como falso positivo automáticamente |
+| [030](specs/030-twitter-sentiment-classifier/) | Corrección de specs 022/028 (leer **contenido**, no contar tweets): piloto cualitativo de 6 eventos muestra capitulación genuina en springs ganadores vs. euforia sostenida en upthrusts perdedores — patrón coherente con Wyckoff, **no validado estadísticamente** (n=5), esquema de clasificación diseñado, decisión de escalado (manual vs. LLM en vivo) pendiente del operador |
 
 ---
 
