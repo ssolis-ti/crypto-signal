@@ -39,23 +39,27 @@ class StrategyExecutor:
                 if market_pair not in new_result[exchange]:
                     new_result[exchange][market_pair] = dict()
 
-                # Ejecutar Análisis
-                new_result[exchange][market_pair]['indicators'] = self._get_indicator_results(
-                    exchange, market_pair, all_historical_data
-                )
-                new_result[exchange][market_pair]['informants'] = self._get_informant_results(
-                    exchange, market_pair, all_historical_data
-                )
-                new_result[exchange][market_pair]['crossovers'] = self._get_crossover_results(
-                    new_result[exchange][market_pair]
-                )
+                try:
+                    # Ejecutar Análisis
+                    new_result[exchange][market_pair]['indicators'] = self._get_indicator_results(
+                        exchange, market_pair, all_historical_data
+                    )
+                    new_result[exchange][market_pair]['informants'] = self._get_informant_results(
+                        exchange, market_pair, all_historical_data
+                    )
+                    new_result[exchange][market_pair]['crossovers'] = self._get_crossover_results(
+                        new_result[exchange][market_pair]
+                    )
 
-                # Salida por consola (si aplica)
-                if output_mode in self.output:
-                    output_data = deepcopy(new_result[exchange][market_pair])
-                    print(self.output[output_mode](output_data, market_pair), end='')
-                else:
-                    self.logger.warn("Output mode %s not supported", output_mode)
+                    # Salida por consola (si aplica)
+                    if output_mode in self.output:
+                        output_data = deepcopy(new_result[exchange][market_pair])
+                        print(self.output[output_mode](output_data, market_pair), end='')
+                    else:
+                        self.logger.warn("Output mode %s not supported", output_mode)
+                except Exception as e:
+                    self.logger.error("Error analyzing pair %s on %s: %s, skipping", market_pair, exchange, e)
+                    self.logger.debug(traceback.format_exc())
 
         print() # Línea vacía final
         return new_result
@@ -63,19 +67,21 @@ class StrategyExecutor:
     def _get_analysis_result(self, dispatcher, indicator, dispatcher_args, market_pair):
         try:
             results = dispatcher[indicator](**dispatcher_args)
-        except TypeError:
-            self.logger.info(
-                'Invalid type encountered while processing pair %s for indicator %s, skipping',
-                market_pair, indicator
+        except Exception as e:
+            self.logger.warning(
+                'Error processing pair %s for indicator %s: %s, skipping',
+                market_pair, indicator, e
             )
-            self.logger.info(traceback.format_exc())
+            self.logger.debug(traceback.format_exc())
             results = str()
         return results
 
     def _get_indicator_results(self, exchange, market_pair, all_historical_data):
         indicator_dispatcher = self.strategy_analyzer.indicator_dispatcher()
         results = {indicator: list() for indicator in self.indicator_conf.keys()}
-        historical_data_cache = all_historical_data[exchange][market_pair]
+        historical_data_cache = all_historical_data.get(exchange, {}).get(market_pair, {})
+        if not isinstance(historical_data_cache, dict):
+            return results
 
         for indicator in self.indicator_conf:
             if indicator not in indicator_dispatcher:
@@ -156,7 +162,9 @@ class StrategyExecutor:
     def _get_informant_results(self, exchange, market_pair, all_historical_data):
         informant_dispatcher = self.strategy_analyzer.informant_dispatcher()
         results = {informant: list() for informant in self.informant_conf.keys()}
-        historical_data_cache = all_historical_data[exchange][market_pair]
+        historical_data_cache = all_historical_data.get(exchange, {}).get(market_pair, {})
+        if not isinstance(historical_data_cache, dict):
+            return results
 
         for informant in self.informant_conf:
             if informant not in informant_dispatcher:

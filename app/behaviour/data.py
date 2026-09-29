@@ -103,5 +103,9 @@ class DataCollector:
         except AttributeError:
             self.logger.error('Something went wrong fetching data for %s, skipping', market_pair)
             self.logger.debug(traceback.format_exc())
+        except Exception as e:
+            self.logger.error('Unexpected error fetching data for pair %s: %s, skipping', market_pair, e)
+            self.logger.debug(traceback.format_exc())
             
         return historical_data
+

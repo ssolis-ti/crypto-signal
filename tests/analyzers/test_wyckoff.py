@@ -303,3 +303,36 @@ class TestDetectUpthrusts:
 
         assert not springs['is_spring'].any()
         assert bool(upthrusts['is_upthrust'].iloc[6]) is True
+
+
+class TestZeroVolumeDoesNotSilencePair:
+    """
+    Una vela sin volumen (normal en pares ilquidos) no debe convertir en NaN el volumen relativo
+    de todas las velas siguientes: TA-Lib propaga un NaN a toda la serie. Los ceros cuentan en el
+    promedio, que es la definicion con la que se valido el edge (specs/017).
+    """
+
+    def _df(self, volumes):
+        n = len(volumes)
+        return pd.DataFrame({
+            'open': [100.0] * n, 'high': [101.0] * n, 'low': [99.0] * n,
+            'close': [100.0] * n, 'volume': volumes,
+        })
+
+    def test_relative_volume_recovers_after_a_zero_volume_candle(self):
+        volumes = [100.0] * 60
+        volumes[10] = 0.0
+        volumes[-1] = 1000.0  # pico extremo mucho despues del cero
+
+        rel = WyckoffPrimitives.relative_volume(self._df(volumes))
+
+        assert not pd.isna(rel.iloc[-1])
+        assert rel.iloc[-1] >= 2.5
+
+    def test_negative_volume_yields_nan_not_false_extreme_volume(self):
+        volumes = [-100.0] * 30
+        volumes[-1] = -1500.0
+
+        rel = WyckoffPrimitives.relative_volume(self._df(volumes))
+
+        assert pd.isna(rel.iloc[-1])

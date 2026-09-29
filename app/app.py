@@ -178,10 +178,20 @@ class AnalysisWorker(Thread):
         while True:
             try:
                 self.logger.info('Starting %s', self.threadName)
-                self.behaviour.run(self.market_data, self.settings['output_mode'])
+                output_mode = self.settings.get('output_mode', 'cli')
+                self.behaviour.run(self.market_data, output_mode)
+
+                raw_interval = self.settings.get('update_interval', 300)
+                try:
+                    update_interval = float(raw_interval)
+                    if update_interval <= 0:
+                        update_interval = 300.0
+                except (ValueError, TypeError):
+                    update_interval = 300.0
+
                 self.logger.info("%s sleeping for %s seconds",
-                                 self.threadName, self.settings['update_interval'])
-                time.sleep(self.settings['update_interval'])
+                                 self.threadName, update_interval)
+                time.sleep(update_interval)
             except Exception as e:
                 self.logger.error(f"CRITICAL ERROR in {self.threadName}: {e}")
                 self.logger.error(traceback.format_exc())

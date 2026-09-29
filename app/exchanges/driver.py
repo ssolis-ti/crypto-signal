@@ -93,8 +93,9 @@ class CCXTDriver(BaseExchange):
         """Obtiene datos históricos OHLCV con retry automático."""
         
         # Validar timeframe
-        if time_unit not in self.exchanges[exchange].timeframes:
-            valid = list(self.exchanges[exchange].timeframes)
+        timeframes = getattr(self.exchanges[exchange], 'timeframes', None) or {}
+        if time_unit not in timeframes:
+            valid = list(timeframes.keys()) if isinstance(timeframes, dict) else list(timeframes)
             raise ValueError(f"{exchange} no soporta {time_unit}. Válidos: {valid}")
 
         # Calcular fecha de inicio si no se proporciona
@@ -109,6 +110,14 @@ class CCXTDriver(BaseExchange):
 
         if not historical_data:
             raise ValueError('No se obtuvieron datos históricos del exchange.')
+
+        # Filtrar filas malformadas (None, filas vacias o incompletas)
+        historical_data = [
+            d for d in historical_data
+            if isinstance(d, (list, tuple)) and len(d) >= 6 and d[0] is not None
+        ]
+        if not historical_data:
+            raise ValueError('No se obtuvieron velas válidas del exchange.')
 
         # Ordenar por timestamp ascendente
         historical_data.sort(key=lambda d: d[0])

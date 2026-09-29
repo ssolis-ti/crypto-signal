@@ -145,10 +145,16 @@ class Behaviour():
         # 1b. Alertas Wyckoff en vivo (specs/023-wyckoff-live-alerts/): reusa el OHLCV de
         # 4h ya recolectado, no pide datos nuevos al exchange (Principio I).
         for exchange in self.all_historical_data:
-            for market_pair, periods in self.all_historical_data[exchange].items():
+            exchange_data = self.all_historical_data.get(exchange) or {}
+            for market_pair, periods in exchange_data.items():
+                if not isinstance(periods, dict):
+                    continue
                 historical_data = periods.get('4h')
                 if historical_data:
-                    self.wyckoff_alerter.check_and_alert(exchange, market_pair, '4h', historical_data)
+                    try:
+                        self.wyckoff_alerter.check_and_alert(exchange, market_pair, '4h', historical_data)
+                    except Exception as e:
+                        self.logger.error(f"[WYCKOFF] Exception checking pair {market_pair} on {exchange}: {e}")
 
         # 2. Ejecución de Estrategias
         new_result = self.strategy_executor.test_strategies(
