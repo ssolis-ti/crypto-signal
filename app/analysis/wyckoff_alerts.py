@@ -39,14 +39,19 @@ CONFIRM_WINDOW = 3
 EXTREME_VOLUME_THRESHOLD = 2.5
 MAX_DEDUP_SIGNATURES = 500
 
-# Numeros del backtest en Freqtrade (specs/032-freqtrade-lab-wyckoff/): Binance futuros,
-# 30 pares, comisiones y funding reales, IS 2022-2024 / OOS 2025-2026, sin sesgo de lookahead.
+# Numeros del backtest en Freqtrade (specs/032-freqtrade-lab-wyckoff/), auditados contra los
+# trades crudos (QA de resultados, 2026-09-29): Binance futuros, 29 pares, comisiones y funding
+# reales, IS 2022-2024 / OOS 2025-2026, sin sesgo de lookahead. Cada cifra dice de QUE formato
+# sale: "todas las senales" (sin tope de posiciones) NO es lo mismo que "3 posiciones de 30 USDT".
 SPRING_PLAN = (
-    "📈 <b>Plan validado: long, mantener ~3 dias (72h)</b>\n"
-    "Acierto 56-58% | ganancia media +1.5% a +1.8% por trade (1x, con comisiones)\n"
-    "Stop sugerido: -10% en precio\n"
-    "Con 100 USDT (3 posiciones de 30): +92% en 2022-24, +63% en 2025-26 a 1x; "
-    "caida maxima 19-27% (a 3x: hasta 46%)\n"
+    "📈 <b>Plan: long, mantener ~3 dias (72h), stop -10% en precio (mark)</b>\n"
+    "Tomando TODAS las señales a 1x (con comisiones y funding): acierto 56-58%, "
+    "ganancia media +1.5% a +1.8% por trade.\n"
+    "⚠️ Con 100 USDT y solo 3 posiciones de 30 rinde menos: ~+1% medio y 50-56% de acierto, "
+    "porque cuando saltan varias señales juntas quedan afuera las mejores. "
+    "Caida maxima vista 19-27% (en una mala racha puede ser mayor); "
+    "44-50% de los trades pierde y hubo rachas de 6 a 10 perdidas seguidas.\n"
+    "⚠️ Con 3x no es prudente para 100 USDT (caida maxima hasta 46%).\n"
     "⚠️ Operar de 1-2h NO funciona: 44-49% de acierto y pierde con comisiones"
 )
 UPTHRUST_PLAN = (
@@ -194,7 +199,7 @@ class WyckoffAlerter:
         if triggered:
             twitter_result = self.twitter_sentiment.analyze(ticker, 'radar', velocity=velocity)
             self._send_radar_alert(exchange, market_pair, rel_vol, candle_change, twitter_result,
-                                   change_24h=self._change_24h(df))
+                                   change_24h=self._change_24h(df), timestamp=timestamp)
 
         self._record({
             'type': 'radar', 'exchange': exchange, 'pair': market_pair,
@@ -207,11 +212,12 @@ class WyckoffAlerter:
 
     def _send_radar_alert(self, exchange: str, market_pair: str, rel_vol: float,
                           candle_change: float, twitter_result,
-                          change_24h: Optional[float] = None) -> None:
+                          change_24h: Optional[float] = None, timestamp=None) -> None:
         color = "verde" if candle_change >= 0 else "roja"
         change_line = f" | 24h: {change_24h:+.1f}%" if change_24h is not None else ""
         message = (
             f"🛰️ <b>RADAR VOLUMEN + RUMOR</b> (sin dirección)\n"
+            f"{self._stale_notice(timestamp)}"
             f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
             f"Volumen: {rel_vol:.1f}x el promedio | vela {color} {candle_change:+.1f}%\n\n"
             f"{TwitterSentimentAnalyzer.format_section(twitter_result)}\n\n"

@@ -326,6 +326,34 @@ class TestDedupPruneAndStale:
         assert 'hace 4.0 h' in notifier.messages[0]
 
 
+class TestMessageHonestyAndRadarStale:
+    def test_spring_message_separates_all_signals_from_three_positions(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
+
+        msg = notifier.messages[0]
+        assert 'TODAS las señales' in msg
+        assert '3 posiciones de 30' in msg
+        assert 'no es prudente' in msg
+        assert '+92%' not in msg  # cifra de un formato distinto; se presentaba como tasa de la estrategia
+
+    def test_radar_alert_after_downtime_is_marked_stale(self, tmp_path):
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, twitter_sentiment_enabled=True,
+                                 rumor_radar_enabled=True, record_path=str(tmp_path / 'radar.jsonl'))
+        ohlcv = _volume_spike_no_event_fixture()
+        last_open = datetime.fromtimestamp(ohlcv[-1][0] / 1000, tz=timezone.utc)
+        with patch.object(WyckoffAlerter, '_now_utc', return_value=last_open + timedelta(hours=9)), \
+             patch.object(alerter.twitter_sentiment, 'mention_velocity', return_value=_velocity(3.0)), \
+             patch.object(alerter.twitter_sentiment, 'analyze', return_value={
+                 'current': 9.0, 'baseline': 3.0, 'ratio': 3.0, 'max_views': 0,
+                 'sentiment_extreme': None, 'social_spike_confirmed': False,
+                 'catalyst_present': False, 'summary': ''}):
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+
+        assert 'ALERTA RETARDADA' in alerter.notifier.messages[0]
+
+
 class TestWyckoffAlerterGuards:
     def test_disabled_never_alerts(self):
         notifier = RecordingNotifier()
