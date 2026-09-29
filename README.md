@@ -171,6 +171,7 @@ dependencias pinneadas).
 | [022](specs/022-twitter-attention-pilot/) | Piloto de atención en Twitter/X: `tweet_count` de getxapi resultó capeado (~19 siempre) — método descartado, frenado a tiempo tras 10/41 consultas |
 | [023](specs/023-wyckoff-live-alerts/) | **En producción**: alerta Wyckoff Spring/Upthrust (volumen extremo ≥2.5x) a Telegram, con encuadre dual (rápida/sostenida) y números reales — independiente de `SignalEnhancer` |
 | [024](specs/024-ta-crossover-validation/) | Validación de `ma_crossover` (golden/death cross) y `sqzmom` (squeeze momentum), solos y con filtro de volumen extremo: **ninguno confirmó** out-of-sample — se mantiene el volumen extremo en rupturas Wyckoff como único edge validado del proyecto |
+| [025](specs/025-wyckoff-multi-timeframe-validation/) | Validación del mismo mecanismo (Spring/Upthrust + volumen extremo) en 1h/2h/8h/1d: **solo 4h confirma** — timeframes rápidos pierden poder predictivo, 1d tiene muestra insuficiente (10 meses) |
 
 ---
 
