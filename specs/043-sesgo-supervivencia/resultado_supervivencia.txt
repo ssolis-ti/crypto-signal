@@ -1,0 +1,56 @@
+simbolos: 30 sobrevivientes, 177 deslistados con datos suficientes
+
+RESULTADOS (simulador simple, sin funding; referencia del laboratorio con funding: +1.69% / 56% acierto sobre los 29)
+  sobrevivientes (29)  n=1610 media= +1.58% acierto= 56% stop=13.8% peor= -10.10%
+      IS  n= 990 media= +1.54% acierto= 56% stop=15.3% peor= -10.10%
+      OOS n= 620 media= +1.64% acierto= 57% stop=11.5% peor= -10.10%
+  deslistados          n=2894 media= +0.82% acierto= 48% stop=28.3% peor= -10.10%
+      IS  n=1515 media= +1.78% acierto= 55% stop=23.5% peor= -10.10%
+      OOS n=1379 media= -0.23% acierto= 39% stop=33.5% peor= -10.10%
+  AMBOS                n=4504 media= +1.09% acierto= 51% stop=23.1% peor= -10.10%
+      IS  n=2505 media= +1.69% acierto= 55% stop=20.2% peor= -10.10%
+      OOS n=1999 media= +0.35% acierto= 45% stop=26.7% peor= -10.10%
+  deslistados: cierres por delisting en medio de la operacion: 1 | media de esas: +0.76%
+
+Media de los deslistados: +0.82%  IC95 por dia [-0.43, +2.06]
+Diferencia deslistados - sobrevivientes: -0.76 pp  IC95 por dia [-1.65, +0.23]
+Efecto de incluir los deslistados en el universo: media +1.58% -> +1.09%
+
+Peores 12 operaciones de deslistados:
+  sym                      open   ret  how
+ REEF 2025-01-13 20:00:00+00:00 -10.1 stop
+ KLAY 2022-11-08 16:00:00+00:00 -10.1 stop
+  BSW 2025-03-10 08:00:00+00:00 -10.1 stop
+  BSW 2025-01-19 16:00:00+00:00 -10.1 stop
+   BZ 2026-04-06 16:00:00+00:00 -10.1 stop
+   BZ 2026-04-06 12:00:00+00:00 -10.1 stop
+  RVV 2025-12-11 16:00:00+00:00 -10.1 stop
+  RVV 2025-11-21 00:00:00+00:00 -10.1 stop
+ RNDR 2024-01-03 20:00:00+00:00 -10.1 stop
+  RLS 2026-04-04 08:00:00+00:00 -10.1 stop
+ LINA 2022-01-22 16:00:00+00:00 -10.1 stop
+LEVER 2025-08-18 12:00:00+00:00 -10.1 stop
+
+Por año, deslistados vs sobrevivientes (media, n):
+  2022: sobrevivientes +0.83% (n=253) | deslistados +0.29% (n=282)
+  2023: sobrevivientes +0.82% (n=351) | deslistados +1.93% (n=443)
+  2024: sobrevivientes +2.66% (n=386) | deslistados +2.23% (n=790)
+  2025: sobrevivientes +2.42% (n=357) | deslistados +0.15% (n=937)
+  2026: sobrevivientes +0.59% (n=263) | deslistados -1.04% (n=442)
+POR LIQUIDEZ (volumen en USD de las 24h previas a la senal; el bot opera el top 30 por volumen con minimo 3M):
+  < 3M      | sobre: n=0 | desli: n= 412 media=-1.21% acierto= 40% stop=26.0%
+  3M-20M    | sobre: n=  63 media=+1.32% acierto= 52% stop= 7.9% | desli: n=1290 media=+0.50% acierto= 49% stop=26.3%
+  20M-100M  | sobre: n= 403 media=+0.94% acierto= 53% stop=13.2% | desli: n= 875 media=+1.22% acierto= 52% stop=28.9%
+  >= 100M   | sobre: n=1144 media=+1.82% acierto= 57% stop=14.3% | desli: n= 317 media=+3.71% acierto= 44% stop=37.5%
+SOLO senales con >= 3M USD/24h (lo que el bot podria ver):
+  sobrevivientes  n=1610 media= +1.58% acierto= 56% stop=13.8% peor= -10.10%
+      IS  n= 990 media= +1.54% acierto= 56% stop=15.3% peor= -10.10%
+      OOS n= 620 media= +1.64% acierto= 57% stop=11.5% peor= -10.10%
+  deslistados     n=2482 media= +1.16% acierto= 49% stop=28.6% peor= -10.10%
+      IS  n=1492 media= +1.81% acierto= 56% stop=23.7% peor= -10.10%
+      OOS n= 990 media= +0.18% acierto= 39% stop=36.2% peor= -10.10%
+  AMBOS           n=4092 media= +1.33% acierto= 52% stop=22.8% peor= -10.10%
+      IS  n=2482 media= +1.70% acierto= 56% stop=20.3% peor= -10.10%
+      OOS n=1610 media= +0.74% acierto= 46% stop=26.6% peor= -10.10%
+  deslistados - sobrevivientes (IS, >=3M): +0.27 pp  IC95 por dia [-0.63, +1.23]
+  deslistados - sobrevivientes (OOS, >=3M): -1.47 pp  IC95 por dia [-3.62, +0.94]

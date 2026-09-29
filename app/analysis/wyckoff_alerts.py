@@ -41,6 +41,8 @@ CANDLE_SECONDS = 4 * 3600
 # laboratorio (specs/039): cada 4h de demora cuesta ~0.5 pp; a 12h el promedio sigue positivo pero el acierto
 # baja a ~47-52%. Mas viejo que eso ya no se avisa.
 MAX_LATE_CANDLES = 3
+# Spec 043 (sesgo de supervivencia): con perpetuos deslistados el edge se debilita en monedas poco liquidas.
+LOW_LIQUIDITY_USD = 20_000_000
 WEEKDAYS_ES = ('lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom')
 
 VALIDATED_CANDLE_PERIOD = '4h'
@@ -278,7 +280,7 @@ class WyckoffAlerter:
 
             delivered = self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp,
                                          change_24h=self._change_24h(sub), sweep_depth=sweep_depth,
-                                         concurrent=concurrent)
+                                         concurrent=concurrent, dvol24h=self._dollar_volume_24h(sub))
             if delivered is False:
                 # Telegram no respondio: NO se da por enviada, se reintenta en el ciclo siguiente.
                 failures = self._send_failures.get(signature, 0) + 1
@@ -388,6 +390,22 @@ class WyckoffAlerter:
                 self.logger.error(f"[WYCKOFF] No se pudo corregir el reloj: {e}")
         return now
 
+    @staticmethod
+    def _dollar_volume_24h(df) -> Optional[float]:
+        """Volumen en USD de las ultimas 6 velas de 4h (24h) cerradas."""
+        if len(df) < 6:
+            return None
+        recent = df.iloc[-6:]
+        value = float((recent['volume'].astype(float) * recent['close'].astype(float)).sum())
+        return value if value == value else None  # descarta NaN
+
+    @staticmethod
+    def _liquidity_notice(dvol24h: Optional[float]) -> str:
+        if dvol24h is None or dvol24h >= LOW_LIQUIDITY_USD:
+            return ""
+        return (f"⚠️ <b>Liquidez baja</b>: {dvol24h / 1e6:.1f}M USD en 24h (menos de 20M). Con perpetuos deslistados el "
+                f"backtest rindio menos en estas monedas (~+0.5% por trade y 26% de stops).\n")
+
     def _candle_label(self, timestamp) -> str:
         """Linea con el cierre de la vela en UTC y en la hora del operador (con dia de la semana)."""
         if timestamp is None:
@@ -458,7 +476,7 @@ class WyckoffAlerter:
     def _send_alert(self, exchange: str, market_pair: str, direction: str,
                      break_relative_volume: float, timestamp=None,
                      change_24h: Optional[float] = None, sweep_depth: Optional[float] = None,
-                     concurrent: Optional[int] = None) -> bool:
+                     concurrent: Optional[int] = None, dvol24h: Optional[float] = None) -> bool:
         if direction == 'hot':
             headline = "🟢 <b>ALCISTA — posible subida</b>"
             label = "Wyckoff Spring: rompio el soporte y volvio a entrar (trampa bajista)"
@@ -473,6 +491,7 @@ class WyckoffAlerter:
             f"{self._stale_notice(timestamp)}"
             f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
             f"{self._candle_label(timestamp)}"
+            f"{self._liquidity_notice(dvol24h)}"
             f"{label}\n"
             f"Volumen en la ruptura: {break_relative_volume:.1f}x el promedio\n"
             f"{self._quality_lines(direction, sweep_depth, concurrent, self._is_weekend_close(timestamp))}\n"
@@ -501,6 +520,7 @@ class WyckoffAlerter:
             'sweep_depth_pct': None if sweep_depth is None else round(float(sweep_depth), 3),
             'concurrent_pairs': concurrent,
             'weekend_close': self._is_weekend_close(timestamp),
+            'dvol24h_usd': None if dvol24h is None else round(dvol24h, 0),
             'change_24h_pct': None if change_24h is None else round(float(change_24h), 2),
             'mentions_now': (twitter_result or {}).get('current'),
             'mentions_7d_ago': (twitter_result or {}).get('baseline'),

@@ -945,3 +945,27 @@ class TestClockAndCandleLabel:
                         WyckoffAlerter(RecordingNotifier(), enabled=True, clock_offset_fn=boom)):
             alerter._current_exchange = None if alerter._clock_offset_fn is not boom else 'binance'
             assert abs((alerter._now_utc() - datetime.now(timezone.utc)).total_seconds()) < 5
+
+
+class TestLiquidityNotice:
+    def test_dollar_volume_is_the_sum_of_the_last_six_candles(self):
+        df = pd.DataFrame({'volume': [1.0] * 4 + [10.0] * 6, 'close': [1.0] * 4 + [2.0] * 6})
+        assert WyckoffAlerter._dollar_volume_24h(df) == pytest.approx(120.0)
+
+    def test_dollar_volume_needs_six_candles(self):
+        assert WyckoffAlerter._dollar_volume_24h(pd.DataFrame({'volume': [1.0] * 5, 'close': [1.0] * 5})) is None
+
+    def test_low_liquidity_shows_a_warning_and_high_liquidity_does_not(self):
+        assert 'Liquidez baja' in WyckoffAlerter._liquidity_notice(5_000_000)
+        assert '5.0M USD' in WyckoffAlerter._liquidity_notice(5_000_000)
+        assert WyckoffAlerter._liquidity_notice(20_000_000) == ''
+        assert WyckoffAlerter._liquidity_notice(500_000_000) == ''
+        assert WyckoffAlerter._liquidity_notice(None) == ''
+
+    def test_alert_message_and_record_carry_the_liquidity(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path))
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())  # volumenes de juguete: liquidez muy baja
+        assert 'Liquidez baja' in notifier.messages[0]
+        assert json.loads(path.read_text().strip())['dvol24h_usd'] is not None
