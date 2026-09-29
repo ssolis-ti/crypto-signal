@@ -103,8 +103,12 @@ class AgentStateStore:
             conn.executescript(_SCHEMA)
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA busy_timeout = 30000")
+        except sqlite3.Error:
+            pass
         return conn
 
     # ─────────────────────────────────────────
@@ -140,17 +144,20 @@ class AgentStateStore:
             signal.get('momentum_divergence', 'none'),
             1 if should_notify else 0,
         )
-        with self._lock, self._connect() as conn:
-            conn.execute(
-                """INSERT INTO signals (
-                    created_at, exchange, symbol, signal_type, indicator, quality,
-                    confidence, score, recommendation, context_note, btc_trend,
-                    btc_change_24h, relative_strength, divergence, market_sentiment,
-                    rsi_slope, macd_acceleration, vwap_distance, momentum_divergence,
-                    should_notify
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                row,
-            )
+        try:
+            with self._lock, self._connect() as conn:
+                conn.execute(
+                    """INSERT INTO signals (
+                        created_at, exchange, symbol, signal_type, indicator, quality,
+                        confidence, score, recommendation, context_note, btc_trend,
+                        btc_change_24h, relative_strength, divergence, market_sentiment,
+                        rsi_slope, macd_acceleration, vwap_distance, momentum_divergence,
+                        should_notify
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    row,
+                )
+        except sqlite3.Error:
+            pass
 
     def record_market_context(
         self, exchange: str, context: Dict[str, Any], created_at: Optional[str] = None
@@ -166,14 +173,17 @@ class AgentStateStore:
             context.get('total_losers', 0),
             context.get('dominance_ratio', 1.0),
         )
-        with self._lock, self._connect() as conn:
-            conn.execute(
-                """INSERT INTO market_context_snapshots (
-                    created_at, exchange, btc_trend, btc_change_24h, btc_change_1h,
-                    market_sentiment, total_gainers, total_losers, dominance_ratio
-                ) VALUES (?,?,?,?,?,?,?,?,?)""",
-                row,
-            )
+        try:
+            with self._lock, self._connect() as conn:
+                conn.execute(
+                    """INSERT INTO market_context_snapshots (
+                        created_at, exchange, btc_trend, btc_change_24h, btc_change_1h,
+                        market_sentiment, total_gainers, total_losers, dominance_ratio
+                    ) VALUES (?,?,?,?,?,?,?,?,?)""",
+                    row,
+                )
+        except sqlite3.Error:
+            pass
 
     def record_indicator_snapshot(
         self,
@@ -185,19 +195,22 @@ class AgentStateStore:
         values: Dict[str, Any],
         updated_at: Optional[str] = None,
     ) -> None:
-        with self._lock, self._connect() as conn:
-            conn.execute(
-                """INSERT INTO indicator_snapshots (
-                    exchange, symbol, candle_period, indicator_type, indicator_name,
-                    values_json, updated_at
-                ) VALUES (?,?,?,?,?,?,?)
-                ON CONFLICT(exchange, symbol, candle_period, indicator_type, indicator_name)
-                DO UPDATE SET values_json=excluded.values_json, updated_at=excluded.updated_at""",
-                (
-                    exchange, symbol, candle_period, indicator_type, indicator_name,
-                    json.dumps(values), updated_at or _utc_now_iso(),
-                ),
-            )
+        try:
+            with self._lock, self._connect() as conn:
+                conn.execute(
+                    """INSERT INTO indicator_snapshots (
+                        exchange, symbol, candle_period, indicator_type, indicator_name,
+                        values_json, updated_at
+                    ) VALUES (?,?,?,?,?,?,?)
+                    ON CONFLICT(exchange, symbol, candle_period, indicator_type, indicator_name)
+                    DO UPDATE SET values_json=excluded.values_json, updated_at=excluded.updated_at""",
+                    (
+                        exchange, symbol, candle_period, indicator_type, indicator_name,
+                        json.dumps(values), updated_at or _utc_now_iso(),
+                    ),
+                )
+        except sqlite3.Error:
+            pass
 
     def record_worker_heartbeat(
         self,
@@ -208,19 +221,22 @@ class AgentStateStore:
         last_cycle_at: Optional[str] = None,
     ) -> None:
         now = _utc_now_iso()
-        with self._lock, self._connect() as conn:
-            conn.execute(
-                """INSERT INTO worker_status (
-                    worker_name, pairs_json, cycle_count, last_cycle_at, last_error, updated_at
-                ) VALUES (?,?,?,?,?,?)
-                ON CONFLICT(worker_name) DO UPDATE SET
-                    pairs_json=excluded.pairs_json,
-                    cycle_count=excluded.cycle_count,
-                    last_cycle_at=excluded.last_cycle_at,
-                    last_error=excluded.last_error,
-                    updated_at=excluded.updated_at""",
-                (worker_name, json.dumps(pairs), cycle_count, last_cycle_at or now, last_error, now),
-            )
+        try:
+            with self._lock, self._connect() as conn:
+                conn.execute(
+                    """INSERT INTO worker_status (
+                        worker_name, pairs_json, cycle_count, last_cycle_at, last_error, updated_at
+                    ) VALUES (?,?,?,?,?,?)
+                    ON CONFLICT(worker_name) DO UPDATE SET
+                        pairs_json=excluded.pairs_json,
+                        cycle_count=excluded.cycle_count,
+                        last_cycle_at=excluded.last_cycle_at,
+                        last_error=excluded.last_error,
+                        updated_at=excluded.updated_at""",
+                    (worker_name, json.dumps(pairs), cycle_count, last_cycle_at or now, last_error, now),
+                )
+        except sqlite3.Error:
+            pass
 
     # ─────────────────────────────────────────
     # Lectura
@@ -233,6 +249,7 @@ class AgentStateStore:
         quality: Optional[str] = None,
         signal_type: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
+        limit = max(1, min(limit, 1000))
         query = "SELECT * FROM signals WHERE 1=1"
         params: List[Any] = []
         if symbol:
@@ -247,13 +264,17 @@ class AgentStateStore:
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
 
-        with self._connect() as conn:
-            rows = conn.execute(query, params).fetchall()
-        return [dict(r) | {'should_notify': bool(r['should_notify'])} for r in rows]
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(query, params).fetchall()
+            return [dict(r) | {'should_notify': bool(r['should_notify'])} for r in rows]
+        except sqlite3.Error:
+            return []
 
     def get_market_context(
         self, exchange: Optional[str] = None, limit: int = 1
     ) -> List[Dict[str, Any]]:
+        limit = max(1, min(limit, 500))
         query = "SELECT * FROM market_context_snapshots WHERE 1=1"
         params: List[Any] = []
         if exchange:
@@ -262,9 +283,12 @@ class AgentStateStore:
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
 
-        with self._connect() as conn:
-            rows = conn.execute(query, params).fetchall()
-        return [dict(r) for r in rows]
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(query, params).fetchall()
+            return [dict(r) for r in rows]
+        except sqlite3.Error:
+            return []
 
     def get_indicator_snapshots(
         self, symbol: Optional[str] = None, exchange: Optional[str] = None
@@ -279,21 +303,27 @@ class AgentStateStore:
             params.append(exchange)
         query += " ORDER BY symbol, indicator_type, indicator_name"
 
-        with self._connect() as conn:
-            rows = conn.execute(query, params).fetchall()
-        results = []
-        for r in rows:
-            d = dict(r)
-            d['values'] = json.loads(d.pop('values_json'))
-            results.append(d)
-        return results
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(query, params).fetchall()
+            results = []
+            for r in rows:
+                d = dict(r)
+                d['values'] = json.loads(d.pop('values_json'))
+                results.append(d)
+            return results
+        except sqlite3.Error:
+            return []
 
     def get_worker_status(self) -> List[Dict[str, Any]]:
-        with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM worker_status ORDER BY worker_name").fetchall()
-        results = []
-        for r in rows:
-            d = dict(r)
-            d['pairs'] = json.loads(d.pop('pairs_json'))
-            results.append(d)
-        return results
+        try:
+            with self._connect() as conn:
+                rows = conn.execute("SELECT * FROM worker_status ORDER BY worker_name").fetchall()
+            results = []
+            for r in rows:
+                d = dict(r)
+                d['pairs'] = json.loads(d.pop('pairs_json'))
+                results.append(d)
+            return results
+        except sqlite3.Error:
+            return []
