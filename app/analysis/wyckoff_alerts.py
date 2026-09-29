@@ -25,6 +25,7 @@ import structlog
 
 from analyzers.utils import IndicatorUtils
 from analyzers.indicators.wyckoff import WyckoffPrimitives
+from analysis.market_microstructure import MarketMicrostructure
 from analysis.twitter_sentiment import TwitterSentimentAnalyzer
 
 DEFAULT_RECORD_PATH = 'agent_state/rumor_radar.jsonl'
@@ -81,7 +82,8 @@ class WyckoffAlerter:
     def __init__(self, notifier, enabled: bool = False, twitter_sentiment_enabled: bool = False,
                  rumor_radar_enabled: bool = False,
                  radar_min_ratio: float = DEFAULT_RADAR_MIN_RATIO,
-                 record_path: Optional[str] = None):
+                 record_path: Optional[str] = None,
+                 microstructure_enabled: bool = False):
         self.logger = structlog.get_logger()
         self.notifier = notifier
         self.enabled = enabled
@@ -94,6 +96,7 @@ class WyckoffAlerter:
         self.rumor_radar_enabled = rumor_radar_enabled and twitter_sentiment_enabled
         self.radar_min_ratio = radar_min_ratio
         self.record_path = record_path
+        self.microstructure = MarketMicrostructure(enabled=microstructure_enabled)
         self._load_signatures_from_record()
 
     def _load_signatures_from_record(self) -> None:
@@ -419,6 +422,7 @@ class WyckoffAlerter:
             f"[WYCKOFF] Alert sent: {market_pair} {direction} "
             f"(break_relative_volume={break_relative_volume:.2f}x)"
         )
+        micro = self._safe_microstructure(exchange, market_pair)
         self._record({
             'type': 'wyckoff', 'direction': direction, 'exchange': exchange, 'pair': market_pair,
             'candle': timestamp.isoformat() if timestamp is not None else None,
@@ -431,7 +435,16 @@ class WyckoffAlerter:
             'mentions_7d_ago': (twitter_result or {}).get('baseline'),
             'ratio': (twitter_result or {}).get('ratio'),
             'sentiment': (twitter_result or {}).get('sentiment_extreme'),
+            'micro': micro,
         })
+
+    def _safe_microstructure(self, exchange: str, market_pair: str) -> Optional[dict]:
+        """Foto de funding/OI/libro para validar hacia adelante; jamas afecta la alerta ya enviada."""
+        try:
+            return self.microstructure.snapshot(exchange, market_pair)
+        except Exception as e:
+            self.logger.error(f"[MICRO] Error inesperado en {market_pair}: {e}")
+            return None
 
     def _remember(self, signature: str) -> None:
         self._alerted_signatures[signature] = None

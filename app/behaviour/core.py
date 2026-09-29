@@ -124,6 +124,7 @@ class Behaviour():
             rumor_radar_enabled=rumor_radar_config.get('enabled', False),
             radar_min_ratio=rumor_radar_config.get('min_mention_ratio', 2.0),
             record_path=DEFAULT_RECORD_PATH,
+            microstructure_enabled=wyckoff_config.get('microstructure', {}).get('enabled', False),
         )
 
     def run(self, market_data, output_mode):

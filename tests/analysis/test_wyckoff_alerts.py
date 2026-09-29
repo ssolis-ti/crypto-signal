@@ -374,6 +374,29 @@ class TestSignalQualityContext:
         assert record['sweep_depth_pct'] == pytest.approx(4.04, abs=0.01)
         assert 'change_24h_pct' in record
 
+    def test_microstructure_snapshot_is_recorded_not_shown(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path), microstructure_enabled=True)
+        alerter.microstructure.snapshot = lambda exchange, pair: {'funding_rate_pct': 0.01}
+        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})
+
+        assert json.loads(path.read_text().strip())['micro'] == {'funding_rate_pct': 0.01}
+        assert '0.01' not in notifier.messages[0] and 'micro' not in notifier.messages[0].lower()
+
+    def test_microstructure_failure_never_breaks_the_alert(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path), microstructure_enabled=True)
+
+        def boom(exchange, pair):
+            raise RuntimeError('binance caido')
+        alerter.microstructure.snapshot = boom
+        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})
+
+        assert len(notifier.messages) == 1
+        assert json.loads(path.read_text().strip())['micro'] is None
+
     def test_shallow_sweep_gets_the_warning(self):
         text = WyckoffAlerter._quality_lines('hot', 0.4, 3)
         assert 'superficial' in text

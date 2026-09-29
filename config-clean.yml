@@ -37,6 +37,11 @@ settings:
       enabled: false
       min_mention_ratio: 2.0
 
+    # specs/037-microestructura-funding/: foto de funding, open interest, ratio long/short y libro de
+    # ordenes de Binance al salir cada alerta. Solo se REGISTRA (no filtra ni cambia el mensaje).
+    microstructure:
+      enabled: false
+
   # ═══════════════════════════════════════════
   # CONFIGURACIÓN DE PARES DINÁMICOS
   # ═══════════════════════════════════════════
