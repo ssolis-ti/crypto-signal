@@ -35,6 +35,10 @@ SHALLOW_SWEEP_PCT = 1.0
 CLUSTER_STRONG = 5
 STALE_ALERT_SECONDS = 2 * 3600
 CANDLE_SECONDS = 4 * 3600
+# Springs confirmados mientras el bot estuvo apagado: se avisan hasta 3 velas (12h) despues. Medido en el
+# laboratorio (specs/039): cada 4h de demora cuesta ~0.5 pp; a 12h el promedio sigue positivo pero el acierto
+# baja a ~47-52%. Mas viejo que eso ya no se avisa.
+MAX_LATE_CANDLES = 3
 
 VALIDATED_CANDLE_PERIOD = '4h'
 LOOKBACK = 20
@@ -131,8 +135,7 @@ class WyckoffAlerter:
         if not self.enabled or candle_period != VALIDATED_CANDLE_PERIOD:
             return
 
-        min_history = LOOKBACK + CONFIRM_WINDOW + 5
-        if not historical_data or len(historical_data) < min_history:
+        if not historical_data or len(historical_data) < self._min_history():
             return
 
         try:
@@ -158,20 +161,40 @@ class WyckoffAlerter:
 
     def _count_concurrent(self, exchange: str, pairs_data: Dict[str, list]) -> Dict[tuple, int]:
         counts: Dict[tuple, int] = {}
-        min_history = LOOKBACK + CONFIRM_WINDOW + 5
         for market_pair, historical_data in pairs_data.items():
-            if not historical_data or len(historical_data) < min_history:
+            if not historical_data or len(historical_data) < self._min_history():
                 continue
             try:
                 df = IndicatorUtils().convert_to_dataframe(historical_data)
-                event = self._detect_event(df)
+                events = [event for event, _ in self._recent_events(df)]
             except Exception as e:
                 self.logger.error(f"[WYCKOFF] No se pudo contar eventos de {market_pair}: {e}")
                 continue
-            if event is not None:
+            for event in events:
                 key = (exchange, event[0], event[2].isoformat())
                 counts[key] = counts.get(key, 0) + 1
         return counts
+
+    @staticmethod
+    def _min_history() -> int:
+        return LOOKBACK + CONFIRM_WINDOW + 5
+
+    def _recent_events(self, df):
+        """
+        Eventos de la ultima vela cerrada y de las MAX_LATE_CANDLES anteriores, del mas viejo al mas nuevo:
+        [(evento, df_hasta_esa_vela)]. Cada evento se detecta con el df truncado en su vela, asi que es
+        exactamente lo que el bot habria visto entonces (sin mirar el futuro). Sirve para no perder un
+        spring confirmado mientras el bot estaba apagado.
+        """
+        found = []
+        for offset in range(MAX_LATE_CANDLES, -1, -1):
+            sub = df.iloc[:len(df) - offset]
+            if len(sub) < self._min_history():
+                continue
+            event = self._detect_event(sub)
+            if event is not None:
+                found.append((event, sub))
+        return found
 
     @staticmethod
     def _detect_event(df):
@@ -225,30 +248,28 @@ class WyckoffAlerter:
 
     def _check_and_alert_unsafe(self, exchange: str, market_pair: str, historical_data) -> None:
         df = IndicatorUtils().convert_to_dataframe(historical_data)
-        event = self._detect_event(df)
-        timestamp = df.index[len(df) - 1]
+        events = self._recent_events(df)
 
-        if event is None:
-            if self.rumor_radar_enabled:
-                self._check_rumor_radar(exchange, market_pair, df, timestamp)
-            return
+        last_timestamp = df.index[len(df) - 1]
+        if self.rumor_radar_enabled and not any(event[2] == last_timestamp for event, _ in events):
+            self._check_rumor_radar(exchange, market_pair, df, last_timestamp)
 
-        direction, break_relative_volume, timestamp = event
-        signature = f"{exchange}:{market_pair}:{direction}:{timestamp.isoformat()}"
-        if signature in self._alerted_signatures:
-            return
+        for (direction, break_relative_volume, timestamp), sub in events:
+            signature = f"{exchange}:{market_pair}:{direction}:{timestamp.isoformat()}"
+            if signature in self._alerted_signatures:
+                continue
 
-        try:
-            sweep_depth = self._sweep_depth(df, direction)
-        except Exception as e:
-            self.logger.error(f"[WYCKOFF] No se pudo medir la barrida de {market_pair}: {e}")
-            sweep_depth = None
-        concurrent = self._concurrent.get((exchange, direction, timestamp.isoformat()))
+            try:
+                sweep_depth = self._sweep_depth(sub, direction)
+            except Exception as e:
+                self.logger.error(f"[WYCKOFF] No se pudo medir la barrida de {market_pair}: {e}")
+                sweep_depth = None
+            concurrent = self._concurrent.get((exchange, direction, timestamp.isoformat()))
 
-        self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp,
-                         change_24h=self._change_24h(df), sweep_depth=sweep_depth,
-                         concurrent=concurrent)
-        self._remember(signature)
+            self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp,
+                             change_24h=self._change_24h(sub), sweep_depth=sweep_depth,
+                             concurrent=concurrent)
+            self._remember(signature)
 
     def _check_rumor_radar(self, exchange: str, market_pair: str, df, timestamp) -> None:
         """
@@ -348,7 +369,10 @@ class WyckoffAlerter:
         elapsed = (self._now_utc() - (timestamp + pd.Timedelta(seconds=CANDLE_SECONDS))).total_seconds()
         if elapsed <= STALE_ALERT_SECONDS:
             return ""
-        return f"⏱️ <b>ALERTA RETARDADA</b>: la vela cerró hace {elapsed / 3600:.1f} h; revisá si el precio ya se movió\n"
+        return (f"⏱️ <b>ALERTA RETARDADA</b>: la vela cerró hace {elapsed / 3600:.1f} h (el bot estuvo sin "
+                f"revisar); revisá si el precio ya se movió.\n"
+                f"Medido: cada 4 h de demora cuesta ~0.5 pp; a 12 h el acierto baja a ~47-52% "
+                f"(ganancia media ~+0.4% a +0.9%).\n")
 
     @staticmethod
     def _is_weekend_close(timestamp) -> bool:

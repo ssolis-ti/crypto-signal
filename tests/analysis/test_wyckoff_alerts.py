@@ -625,25 +625,66 @@ class TestDetectionDegenerateInputs:
 
         assert notifier.messages == []
 
-    def test_multi_candle_break_only_alerts_on_first_confirmation(self):
-        """
-        Documenta el comportamiento actual (no se cambia): el evento se marca en la
-        PRIMERA vela que cierra de vuelta dentro del rango. Si el bot ve una vela
-        posterior, el evento ya quedo atras y no se alerta -- una alerta real puede
-        perderse si la confirmacion ocurrio mientras la PC estaba apagada.
-        """
+    @staticmethod
+    def _late_fixture(extra_candles):
+        """Spring confirmado y despues `extra_candles` velas tranquilas (el bot estaba apagado)."""
         closes, lows, highs, volumes = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
-        closes += [97.0, 100.0, 100.5]        # ruptura, confirmacion, vela posterior
-        lows += [95.0, 98.0, 99.5]
-        highs += [98.0, 101.0, 101.0]
-        volumes += [1000.0, 100.0, 100.0]
+        closes += [97.0, 100.0] + [100.5] * extra_candles
+        lows += [95.0, 98.0] + [99.5] * extra_candles
+        highs += [98.0, 101.0] + [101.0] * extra_candles
+        volumes += [1000.0, 100.0] + [100.0] * extra_candles
+        return _to_ohlcv_list(closes, lows, highs, volumes)
+
+    def test_spring_confirmed_while_bot_was_off_is_alerted_late(self):
+        """Antes se perdia en silencio (solo se miraba la ultima vela); ahora se avisa hasta 12h despues."""
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
 
-        alerter.check_and_alert('binance', 'BTC/USDT', '4h',
-                                _to_ohlcv_list(closes, lows, highs, volumes))
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h', self._late_fixture(2))
+
+        assert len(notifier.messages) == 1
+        assert 'ALERTA RETARDADA' in notifier.messages[0]
+        assert 'Spring' in notifier.messages[0]
+
+    def test_late_spring_is_not_repeated_on_later_cycles(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        data = self._late_fixture(1)
+
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h', data)
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h', data)
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h', self._late_fixture(2))  # una vela mas
+
+        assert len(notifier.messages) == 1
+
+    def test_spring_older_than_the_limit_is_not_alerted(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h', self._late_fixture(4))  # 16h: ya no vale la pena
 
         assert notifier.messages == []
+
+    def test_already_alerted_spring_is_not_repeated_after_restart(self, tmp_path):
+        path = str(tmp_path / 'record.jsonl')
+        first = WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=path)
+        first.check_and_alert('binance', 'BTC/USDT', '4h', self._late_fixture(0))  # a tiempo
+        restarted_notifier = RecordingNotifier()
+        restarted = WyckoffAlerter(restarted_notifier, enabled=True, record_path=path)
+
+        restarted.check_and_alert('binance', 'BTC/USDT', '4h', self._late_fixture(2))  # PC apagada un rato
+
+        assert restarted_notifier.messages == []
+
+    def test_late_events_count_as_concurrent_pairs(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        pairs = {f'P{i}/USDT': self._late_fixture(1) for i in range(5)}
+
+        alerter.check_cycle('binance', pairs)
+
+        assert len(notifier.messages) == 5
+        assert all('Pares con evento en esta misma vela: 5' in m for m in notifier.messages)
 
 
 class TestChange24h:
