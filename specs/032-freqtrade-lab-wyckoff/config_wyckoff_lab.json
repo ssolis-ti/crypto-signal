@@ -1,0 +1,16 @@
+{
+    "max_open_trades": 100,
+    "stake_amount": 100,
+    "pairlists": [{ "method": "StaticPairList" }],
+    "exchange": {
+        "pair_whitelist": [
+            "BTC/USDT:USDT",
+            "ETH/USDT:USDT", "SOL/USDT:USDT", "XRP/USDT:USDT", "ADA/USDT:USDT",
+            "DOGE/USDT:USDT", "AVAX/USDT:USDT", "DOT/USDT:USDT", "LINK/USDT:USDT", "LTC/USDT:USDT",
+            "ATOM/USDT:USDT", "NEAR/USDT:USDT", "UNI/USDT:USDT", "AAVE/USDT:USDT", "FIL/USDT:USDT",
+            "ETC/USDT:USDT", "TRX/USDT:USDT", "XLM/USDT:USDT", "ALGO/USDT:USDT", "SAND/USDT:USDT",
+            "MANA/USDT:USDT", "AXS/USDT:USDT", "GALA/USDT:USDT", "EOS/USDT:USDT", "BCH/USDT:USDT",
+            "ICP/USDT:USDT", "CRV/USDT:USDT", "CHZ/USDT:USDT", "DYDX/USDT:USDT", "APE/USDT:USDT"
+        ]
+    }
+}

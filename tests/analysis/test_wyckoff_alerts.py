@@ -54,7 +54,7 @@ def _no_event_fixture():
 
 
 class TestWyckoffAlerterSpring:
-    def test_confirmed_spring_sends_dual_framed_alert(self):
+    def test_confirmed_spring_sends_validated_plan(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
 
@@ -64,12 +64,11 @@ class TestWyckoffAlerterSpring:
         msg = notifier.messages[0]
         assert 'SPRING' in msg
         assert 'BTC/USDT' in msg
-        assert 'Rapida' in msg
-        assert 'Sostenida' in msg
-        assert '72-78%' in msg
-        assert '64%' in msg
-        assert '+2.84%' in msg
-        assert '10%' in msg
+        assert '72h' in msg
+        assert '56-58%' in msg
+        assert '-10%' in msg
+        assert '1-2h NO funciona' in msg
+        assert '72-78%' not in msg  # encuadre rapido refutado en specs/032
 
     def test_no_alert_without_extreme_volume(self):
         notifier = RecordingNotifier()
@@ -104,6 +103,7 @@ class TestWyckoffAlerterUpthrust:
 
         assert len(notifier.messages) == 1
         assert 'UPTHRUST' in notifier.messages[0]
+        assert 'sin edge confiable' in notifier.messages[0]
 
 
 class TestWyckoffAlerterDedup:
