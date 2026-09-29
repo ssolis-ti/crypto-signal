@@ -397,6 +397,54 @@ class TestSignalQualityContext:
         assert len(notifier.messages) == 1
 
 
+class TestExecutionGuidanceAndWeekend:
+    """Guia de ejecucion medida con velas de 1 minuto (specs/036-minutos-criticos/)."""
+
+    def test_spring_message_has_execution_guidance(self):
+        notifier = RecordingNotifier()
+        WyckoffAlerter(notifier, enabled=True).check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
+
+        msg = notifier.messages[0]
+        assert 'Ejecucion' in msg
+        assert 'break-even' in msg
+        assert 'primeros ~15 min' in msg
+        assert 'Orden limite' in msg
+
+    def test_upthrust_message_does_not_carry_spring_execution_claims(self):
+        closes, lows, highs, volumes = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
+        closes += [103.0, 100.0]
+        lows += [102.0, 99.0]
+        highs += [105.0, 102.0]
+        volumes += [1000.0, 100.0]
+        notifier = RecordingNotifier()
+        WyckoffAlerter(notifier, enabled=True).check_and_alert(
+            'binance', 'ETH/USDT', '4h', _to_ohlcv_list(closes, lows, highs, volumes))
+
+        assert 'Ejecucion' not in notifier.messages[0]
+        assert 'break-even' not in notifier.messages[0]
+
+    def test_weekend_is_decided_by_the_closing_time_of_the_candle(self):
+        # vela 4h que abre viernes 20:00 UTC cierra sabado 00:00 -> cuenta como fin de semana
+        assert WyckoffAlerter._is_weekend_close(pd.Timestamp('2026-09-25 20:00', tz='UTC')) is True
+        # vela que abre sabado 20:00 cierra domingo 00:00 -> fin de semana
+        assert WyckoffAlerter._is_weekend_close(pd.Timestamp('2026-09-26 20:00', tz='UTC')) is True
+        # vela que abre domingo 20:00 cierra lunes 00:00 -> no
+        assert WyckoffAlerter._is_weekend_close(pd.Timestamp('2026-09-27 20:00', tz='UTC')) is False
+        assert WyckoffAlerter._is_weekend_close(pd.Timestamp('2026-09-29 12:00', tz='UTC')) is False
+        assert WyckoffAlerter._is_weekend_close(None) is False
+
+    def test_weekend_warning_only_for_springs(self):
+        assert 'fin de semana' in WyckoffAlerter._quality_lines('hot', None, None, weekend=True)
+        assert 'fin de semana' not in WyckoffAlerter._quality_lines('cold', None, None, weekend=True)
+        assert WyckoffAlerter._quality_lines('hot', None, None, weekend=False) == ''
+
+    def test_weekend_flag_is_recorded(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=str(path)).check_cycle(
+            'binance', {'BTC/USDT': _spring_fixture()})
+        assert 'weekend_close' in json.loads(path.read_text().strip())
+
+
 class TestMessageHonestyAndRadarStale:
     def test_spring_message_separates_all_signals_from_three_positions(self):
         notifier = RecordingNotifier()

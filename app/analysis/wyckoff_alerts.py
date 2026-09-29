@@ -56,7 +56,12 @@ SPRING_PLAN = (
     "Caida maxima vista del capital 19-27% (en una mala racha puede ser mayor); "
     "44-50% de los trades pierde y hubo rachas de 6 a 10 perdidas seguidas.\n"
     "⚠️ Con 3x la caida maxima del capital llego a 46%: no es prudente.\n"
-    "⚠️ Operar de 1-2h NO funciona: 44-49% de acierto y pierde con comisiones"
+    "⚠️ Operar de 1-2h NO funciona: 44-49% de acierto y pierde con comisiones\n\n"
+    "🕐 <b>Ejecucion</b> (medido en ~1.270 springs con velas de 1 minuto):\n"
+    "• Entrar en los primeros ~15 min da lo mismo que a la apertura; esperar 1-2 h cuesta ~0.3-0.4%.\n"
+    "• Orden limite o esperar confirmacion no mejora: te perdes los que despegan.\n"
+    "• No muevas el stop a break-even ni cortes por retrocesos chicos: 3 de cada 10 trades "
+    "retroceden 0.5% en 15 min y se recuperan; con break-even el acierto cae de ~58% a ~13%."
 )
 UPTHRUST_PLAN = (
     "⚠️ <b>Short con edge debil</b>\n"
@@ -343,7 +348,15 @@ class WyckoffAlerter:
         return f"⏱️ <b>ALERTA RETARDADA</b>: la vela cerró hace {elapsed / 3600:.1f} h; revisá si el precio ya se movió\n"
 
     @staticmethod
-    def _quality_lines(direction: str, sweep_depth: Optional[float], concurrent: Optional[int]) -> str:
+    def _is_weekend_close(timestamp) -> bool:
+        """El backtest clasifica por el dia UTC en que CIERRA la vela de confirmacion (= apertura del trade)."""
+        if timestamp is None:
+            return False
+        return (timestamp + pd.Timedelta(seconds=CANDLE_SECONDS)).dayofweek >= 5
+
+    @staticmethod
+    def _quality_lines(direction: str, sweep_depth: Optional[float], concurrent: Optional[int],
+                       weekend: bool = False) -> str:
         """
         Contexto de la senal. Son HIPOTESIS del backtest (auditoria de resultados, 2026-09-29),
         aun sin confirmar en vivo: se muestran, no filtran ninguna alerta (Principio III). Las
@@ -363,6 +376,9 @@ class WyckoffAlerter:
                 elif concurrent >= CLUSTER_STRONG:
                     line += " (backtest con 5+ pares: media ~+2.5%)"
             lines.append(line)
+        if weekend and direction == 'hot':
+            lines.append("Cierre en fin de semana ⚠️ en el backtest los springs de sab/dom rindieron "
+                         "-0.5% de media (solo 38 fines de semana, muestra chica)")
         if not lines:
             return ""
         return "\n".join(lines) + "\n<i>Hipotesis del backtest, aun sin confirmar en vivo.</i>\n"
@@ -386,7 +402,7 @@ class WyckoffAlerter:
             f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
             f"{label}\n"
             f"Volumen en la ruptura: {break_relative_volume:.1f}x el promedio\n"
-            f"{self._quality_lines(direction, sweep_depth, concurrent)}\n"
+            f"{self._quality_lines(direction, sweep_depth, concurrent, self._is_weekend_close(timestamp))}\n"
             f"{plan}\n\n"
             f"<i>Backtest Freqtrade 2022-2026 (specs/032-freqtrade-lab-wyckoff/). "
             f"No es asesoria financiera.</i>"
@@ -409,6 +425,7 @@ class WyckoffAlerter:
             'relative_volume': round(float(break_relative_volume), 2),
             'sweep_depth_pct': None if sweep_depth is None else round(float(sweep_depth), 3),
             'concurrent_pairs': concurrent,
+            'weekend_close': self._is_weekend_close(timestamp),
             'change_24h_pct': None if change_24h is None else round(float(change_24h), 2),
             'mentions_now': (twitter_result or {}).get('current'),
             'mentions_7d_ago': (twitter_result or {}).get('baseline'),

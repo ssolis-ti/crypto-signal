@@ -1,0 +1,38 @@
+==========================================================================================
+SPRING
+==========================================================================================
+--- IS n=780 base (mantener 72h): media  +1.50 acierto 57%
+  BREAK-EVEN tras +X% a favor (72h completas, velas 1h):
+    X=1.0%: se activa en  87% | de esos, vuelve a P0 y sale en  87% | media  -0.07 vs  +1.50 | dif  -1.57 [ -2.91,  -0.08] | acierto 11%
+    X=2.0%: se activa en  78% | de esos, vuelve a P0 y sale en  72% | media  +0.34 vs  +1.50 | dif  -1.15 [ -2.22,  +0.14] | acierto 23%
+    X=3.0%: se activa en  69% | de esos, vuelve a P0 y sale en  61% | media  +0.50 vs  +1.50 | dif  -0.99 [ -2.03,  +0.27] | acierto 30%
+  TOMA PARCIAL 50% al +3.5% dentro de 60 min: se activa en 5.3% | media  +1.49 vs  +1.50 | dif  -0.00 [ -0.12,  +0.12]
+  FIN DE SEMANA (sab-dom UTC): n= 78 media  -0.27 acierto 59% | lun-vie n=702 media  +1.69 acierto 56%
+  por dia de la semana: lun n=182  +4.27 | mar n=186  -1.50 | mie n=141  +2.53 | jue n=107  +3.01 | vie n= 86  +0.11 | sab n= 33  -1.68 | dom n= 45  +0.77
+--- OOS n=492 base (mantener 72h): media  +1.91 acierto 59%
+  BREAK-EVEN tras +X% a favor (72h completas, velas 1h):
+    X=1.0%: se activa en  91% | de esos, vuelve a P0 y sale en  84% | media  +0.89 vs  +1.91 | dif  -1.02 [ -2.28,  +0.24] | acierto 15%
+    X=2.0%: se activa en  80% | de esos, vuelve a P0 y sale en  69% | media  +1.15 vs  +1.91 | dif  -0.75 [ -1.89,  +0.21] | acierto 27%
+    X=3.0%: se activa en  71% | de esos, vuelve a P0 y sale en  57% | media  +1.34 vs  +1.91 | dif  -0.57 [ -1.54,  +0.36] | acierto 35%
+  TOMA PARCIAL 50% al +3.5% dentro de 60 min: se activa en 2.4% | media  +1.78 vs  +1.91 | dif  -0.12 [ -0.39,  +0.03]
+  FIN DE SEMANA (sab-dom UTC): n= 47 media  -0.83 acierto 49% | lun-vie n=445 media  +2.19 acierto 60%
+  por dia de la semana: lun n=157  +2.95 | mar n= 69  +2.05 | mie n= 42  +7.84 | jue n= 67  -0.31 | vie n=110  +0.58 | sab n= 13  -1.31 | dom n= 34  -0.64
+==========================================================================================
+UPTHRUST
+==========================================================================================
+--- IS n=972 base (mantener 72h): media  -0.14 acierto 57%
+  BREAK-EVEN tras +X% a favor (72h completas, velas 1h):
+    X=1.0%: se activa en  90% | de esos, vuelve a P0 y sale en  83% | media  -0.04 vs  -0.14 | dif  +0.10 [ -0.55,  +0.84] | acierto 15%
+    X=2.0%: se activa en  82% | de esos, vuelve a P0 y sale en  70% | media  +0.07 vs  -0.14 | dif  +0.21 [ -0.37,  +0.86] | acierto 25%
+    X=3.0%: se activa en  73% | de esos, vuelve a P0 y sale en  57% | media  +0.16 vs  -0.14 | dif  +0.30 [ -0.21,  +0.83] | acierto 34%
+  TOMA PARCIAL 50% al +3.5% dentro de 60 min: se activa en 2.7% | media  -0.10 vs  -0.14 | dif  +0.05 [ -0.03,  +0.13]
+  FIN DE SEMANA (sab-dom UTC): n=217 media  -0.28 acierto 60% | lun-vie n=755 media  -0.10 acierto 56%
+  por dia de la semana: lun n=196  +0.26 | mar n=212  +1.81 | mie n=134  -1.40 | jue n=109  -1.62 | vie n=104  -1.39 | sab n=103  -0.61 | dom n=114  +0.01
+--- OOS n=472 base (mantener 72h): media  +0.76 acierto 61%
+  BREAK-EVEN tras +X% a favor (72h completas, velas 1h):
+    X=1.0%: se activa en  89% | de esos, vuelve a P0 y sale en  82% | media  -0.04 vs  +0.76 | dif  -0.80 [ -1.70,  +0.10] | acierto 16%
+    X=2.0%: se activa en  80% | de esos, vuelve a P0 y sale en  62% | media  +0.45 vs  +0.76 | dif  -0.31 [ -0.90,  +0.27] | acierto 31%
+    X=3.0%: se activa en  70% | de esos, vuelve a P0 y sale en  48% | media  +0.59 vs  +0.76 | dif  -0.17 [ -0.65,  +0.36] | acierto 40%
+  TOMA PARCIAL 50% al +3.5% dentro de 60 min: se activa en 2.5% | media  +0.74 vs  +0.76 | dif  -0.03 [ -0.19,  +0.16]
+  FIN DE SEMANA (sab-dom UTC): n= 93 media  +2.66 acierto 73% | lun-vie n=379 media  +0.29 acierto 58%
+  por dia de la semana: lun n= 99  +0.86 | mar n= 84  +1.06 | mie n= 64  -0.70 | jue n= 54  +0.19 | vie n= 78  -0.37 | sab n= 53  +2.53 | dom n= 40  +2.84

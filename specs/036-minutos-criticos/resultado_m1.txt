@@ -1,0 +1,209 @@
+eventos analizados: {('spring', 'IS'): 780, ('spring', 'OOS'): 492, ('upthrust', 'IS'): 972, ('upthrust', 'OOS'): 472}
+====================================================================================================
+SPRING  (long)
+====================================================================================================
+--- IS  n=780  (retorno final de referencia a 72h, entrando en P0: media +1.50%, acierto 57%)
+1) RECORRIDO del precio tras el cierre (a favor de la direccion). ret = deriva; mae/mfe = peor/mejor excursion acumulada
+   min |  ret media | ret mediana | % a favor | mae mediana | mae p10 | mfe mediana
+     1 |    -0.03   |    -0.01   |     41%   |    -0.09   |  -0.38 |    +0.07
+     3 |    -0.01   |    -0.00   |     46%   |    -0.15   |  -0.55 |    +0.14
+     5 |    -0.01   |    +0.00   |     49%   |    -0.19   |  -0.66 |    +0.18
+    10 |    +0.06   |    +0.00   |     49%   |    -0.26   |  -0.80 |    +0.24
+    15 |    +0.10   |    +0.03   |     52%   |    -0.31   |  -0.93 |    +0.31
+    30 |    +0.24   |    +0.06   |     55%   |    -0.40   |  -1.15 |    +0.44
+    60 |    +0.14   |    +0.02   |     51%   |    -0.52   |  -1.55 |    +0.58
+   120 |    +0.31   |    +0.12   |     55%   |    -0.72   |  -2.26 |    +0.82
+2) COSTO/BENEFICIO de entrar a mercado k minutos despues del cierre (retorno final a 72h desde ese precio; dif vs entrar en P0)
+   min |  media fin | dif vs P0 [IC95 por dia]
+     1 |    +1.52  |  +0.03 [ -0.01,  +0.07]
+     3 |    +1.51  |  +0.01 [ -0.03,  +0.06]
+     5 |    +1.50  |  +0.01 [ -0.06,  +0.08]
+    10 |    +1.44  |  -0.05 [ -0.15,  +0.04]
+    15 |    +1.40  |  -0.10 [ -0.23,  +0.04]
+    30 |    +1.26  |  -0.24 [ -0.42,  -0.07]
+    60 |    +1.35  |  -0.14 [ -0.35,  +0.06]
+   120 |    +1.16  |  -0.34 [ -0.64,  -0.03]
+3) ESPERAR CONFIRMACION: entrar a los k min SOLO si la deriva ya es a favor (ret_k > 0). Compara contra entrar siempre en P0
+   k=  5 | deriva a favor: n= 380 fin desde k= +1.27 (fin0 de esos= +1.56) | deriva en contra: n= 400 fin desde k= +1.73 (fin0 de esos= +1.44)
+   k= 15 | deriva a favor: n= 404 fin desde k= +1.29 (fin0 de esos= +1.84) | deriva en contra: n= 376 fin desde k= +1.52 (fin0 de esos= +1.12)
+   k= 30 | deriva a favor: n= 426 fin desde k= +1.71 (fin0 de esos= +2.54) | deriva en contra: n= 354 fin desde k= +0.71 (fin0 de esos= +0.24)
+   k= 60 | deriva a favor: n= 394 fin desde k= +0.84 (fin0 de esos= +1.78) | deriva en contra: n= 386 fin desde k= +1.88 (fin0 de esos= +1.20)
+4) ORDEN LIMITE retrocediendo x% desde P0 (2h de ventana). EV por senal: si no llena = 0 (te la perdes) o entrar a mercado a los 120 min
+   x%  | %llena | media si llena (limite) | esas mismas entrando en P0 | EV/senal limite (no llena=0) | EV/senal limite+mercado120 | EV/senal baseline P0
+   0.3 |    78% |         +1.58        |         +1.28        |            +1.23            |           +1.56           |       +1.50
+   0.5 |    66% |         +1.71        |         +1.21        |            +1.13            |           +1.55           |       +1.50
+   1.0 |    35% |         +1.59        |         +0.58        |            +0.56            |           +1.38           |       +1.50
+   2.0 |    12% |         +3.14        |         +1.07        |            +0.37            |           +1.31           |       +1.50
+5) INVALIDACION TEMPRANA: salir si la excursion en contra llega a x% dentro de los primeros W min (asume salida al -x%)
+   x%  ventana | % dispara | media con regla | baseline (mantener 72h) | acierto regla / base
+   0.5    15m |     30% |      +0.64      |         +1.50          | 38% / 57%
+   0.5    30m |     40% |      +0.60      |         +1.50          | 33% / 57%
+   0.5   120m |     66% |      +0.37      |         +1.50          | 21% / 57%
+   1.0    15m |      8% |      +1.05      |         +1.50          | 51% / 57%
+   1.0    30m |     14% |      +0.84      |         +1.50          | 48% / 57%
+   1.0   120m |     35% |      +0.94      |         +1.50          | 39% / 57%
+   2.0    15m |      1% |      +1.37      |         +1.50          | 56% / 57%
+   2.0    30m |      4% |      +1.13      |         +1.50          | 54% / 57%
+   2.0   120m |     12% |      +1.13      |         +1.50          | 51% / 57%
+6) FLUJO TAKER en los primeros 5 min (proporcion de volumen comprador) por terciles vs retorno final entrando a los 5 min
+   taker-buy bajo  (rango 0.09-0.44) n= 260 | fin5= +1.26 acierto=55% | ret5= -0.21
+   taker-buy medio (rango 0.44-0.52) n= 260 | fin5= +2.21 acierto=61% | ret5= -0.03
+   taker-buy alto  (rango 0.52-0.79) n= 260 | fin5= +1.04 acierto=55% | ret5= +0.22
+--- OOS  n=492  (retorno final de referencia a 72h, entrando en P0: media +1.91%, acierto 59%)
+1) RECORRIDO del precio tras el cierre (a favor de la direccion). ret = deriva; mae/mfe = peor/mejor excursion acumulada
+   min |  ret media | ret mediana | % a favor | mae mediana | mae p10 | mfe mediana
+     1 |    -0.01   |    +0.00   |     42%   |    -0.10   |  -0.33 |    +0.07
+     3 |    +0.01   |    +0.00   |     48%   |    -0.15   |  -0.50 |    +0.13
+     5 |    -0.04   |    +0.00   |     45%   |    -0.18   |  -0.60 |    +0.17
+    10 |    -0.01   |    +0.00   |     46%   |    -0.27   |  -0.77 |    +0.27
+    15 |    +0.05   |    +0.01   |     51%   |    -0.30   |  -0.89 |    +0.30
+    30 |    +0.06   |    +0.02   |     51%   |    -0.40   |  -1.06 |    +0.40
+    60 |    +0.21   |    +0.16   |     61%   |    -0.50   |  -1.48 |    +0.63
+   120 |    +0.42   |    +0.24   |     60%   |    -0.66   |  -2.09 |    +1.04
+2) COSTO/BENEFICIO de entrar a mercado k minutos despues del cierre (retorno final a 72h desde ese precio; dif vs entrar en P0)
+   min |  media fin | dif vs P0 [IC95 por dia]
+     1 |    +1.91  |  +0.01 [ -0.03,  +0.04]
+     3 |    +1.90  |  -0.01 [ -0.06,  +0.05]
+     5 |    +1.95  |  +0.04 [ -0.03,  +0.12]
+    10 |    +1.92  |  +0.01 [ -0.13,  +0.16]
+    15 |    +1.86  |  -0.05 [ -0.15,  +0.06]
+    30 |    +1.85  |  -0.05 [ -0.16,  +0.05]
+    60 |    +1.69  |  -0.22 [ -0.55,  +0.02]
+   120 |    +1.46  |  -0.44 [ -0.93,  +0.02]
+3) ESPERAR CONFIRMACION: entrar a los k min SOLO si la deriva ya es a favor (ret_k > 0). Compara contra entrar siempre en P0
+   k=  5 | deriva a favor: n= 219 fin desde k= +0.27 (fin0 de esos= +0.49) | deriva en contra: n= 273 fin desde k= +3.30 (fin0 de esos= +3.04)
+   k= 15 | deriva a favor: n= 251 fin desde k= +0.95 (fin0 de esos= +1.32) | deriva en contra: n= 241 fin desde k= +2.81 (fin0 de esos= +2.52)
+   k= 30 | deriva a favor: n= 253 fin desde k= +1.35 (fin0 de esos= +1.87) | deriva en contra: n= 239 fin desde k= +2.39 (fin0 de esos= +1.95)
+   k= 60 | deriva a favor: n= 302 fin desde k= +1.08 (fin0 de esos= +1.85) | deriva en contra: n= 190 fin desde k= +2.66 (fin0 de esos= +1.99)
+4) ORDEN LIMITE retrocediendo x% desde P0 (2h de ventana). EV por senal: si no llena = 0 (te la perdes) o entrar a mercado a los 120 min
+   x%  | %llena | media si llena (limite) | esas mismas entrando en P0 | EV/senal limite (no llena=0) | EV/senal limite+mercado120 | EV/senal baseline P0
+   0.3 |    79% |         +2.36        |         +2.06        |            +1.86            |           +1.97           |       +1.91
+   0.5 |    63% |         +2.57        |         +2.05        |            +1.62            |           +1.92           |       +1.91
+   1.0 |    30% |         +1.32        |         +0.30        |            +0.39            |           +1.59           |       +1.91
+   2.0 |    11% |         +2.41        |         +0.36        |            +0.27            |           +1.50           |       +1.91
+5) INVALIDACION TEMPRANA: salir si la excursion en contra llega a x% dentro de los primeros W min (asume salida al -x%)
+   x%  ventana | % dispara | media con regla | baseline (mantener 72h) | acierto regla / base
+   0.5    15m |     30% |      +1.04      |         +1.91          | 42% / 59%
+   0.5    30m |     41% |      +0.36      |         +1.91          | 34% / 59%
+   0.5   120m |     63% |      +0.29      |         +1.91          | 23% / 59%
+   1.0    15m |      6% |      +1.99      |         +1.91          | 56% / 59%
+   1.0    30m |     12% |      +1.88      |         +1.91          | 53% / 59%
+   1.0   120m |     30% |      +1.52      |         +1.91          | 43% / 59%
+   2.0    15m |      1% |      +1.87      |         +1.91          | 58% / 59%
+   2.0    30m |      2% |      +1.87      |         +1.91          | 57% / 59%
+   2.0   120m |     11% |      +1.64      |         +1.91          | 51% / 59%
+6) FLUJO TAKER en los primeros 5 min (proporcion de volumen comprador) por terciles vs retorno final entrando a los 5 min
+   taker-buy bajo  (rango 0.16-0.45) n= 164 | fin5= +2.36 acierto=62% | ret5= -0.22
+   taker-buy medio (rango 0.45-0.54) n= 164 | fin5= +2.61 acierto=57% | ret5= -0.01
+   taker-buy alto  (rango 0.54-0.92) n= 164 | fin5= +0.87 acierto=57% | ret5= +0.13
+7) HORA UTC del cierre (retorno final entrando en P0 / deriva a 15 min) — IS y OOS lado a lado
+   00h UTC | IS n=209 fin0= +2.12 ret15= +0.03 | OOS n=102 fin0= +1.15 ret15= +0.15
+   04h UTC | IS n= 99 fin0= +1.22 ret15= -0.05 | OOS n= 82 fin0= +3.29 ret15= -0.06
+   08h UTC | IS n=128 fin0= -0.98 ret15= +0.08 | OOS n= 86 fin0= +3.61 ret15= +0.06
+   12h UTC | IS n= 52 fin0= +5.51 ret15= -0.01 | OOS n= 50 fin0= +1.27 ret15= +0.33
+   16h UTC | IS n=108 fin0= +3.11 ret15= +0.62 | OOS n= 62 fin0= -1.83 ret15= -0.13
+   20h UTC | IS n=184 fin0= +0.57 ret15= -0.00 | OOS n=110 fin0= +2.64 ret15= +0.01
+====================================================================================================
+UPTHRUST  (short)
+====================================================================================================
+--- IS  n=972  (retorno final de referencia a 72h, entrando en P0: media -0.14%, acierto 57%)
+1) RECORRIDO del precio tras el cierre (a favor de la direccion). ret = deriva; mae/mfe = peor/mejor excursion acumulada
+   min |  ret media | ret mediana | % a favor | mae mediana | mae p10 | mfe mediana
+     1 |    -0.01   |    -0.00   |     45%   |    -0.09   |  -0.34 |    +0.09
+     3 |    +0.01   |    -0.00   |     50%   |    -0.16   |  -0.55 |    +0.16
+     5 |    +0.01   |    +0.02   |     51%   |    -0.20   |  -0.65 |    +0.21
+    10 |    -0.03   |    -0.00   |     48%   |    -0.27   |  -0.93 |    +0.27
+    15 |    -0.00   |    -0.02   |     47%   |    -0.32   |  -1.08 |    +0.32
+    30 |    -0.06   |    -0.07   |     45%   |    -0.46   |  -1.44 |    +0.46
+    60 |    -0.10   |    -0.05   |     46%   |    -0.66   |  -2.03 |    +0.60
+   120 |    -0.15   |    -0.09   |     46%   |    -0.84   |  -2.86 |    +0.83
+2) COSTO/BENEFICIO de entrar a mercado k minutos despues del cierre (retorno final a 72h desde ese precio; dif vs entrar en P0)
+   min |  media fin | dif vs P0 [IC95 por dia]
+     1 |    -0.13  |  +0.01 [ -0.01,  +0.04]
+     3 |    -0.15  |  -0.01 [ -0.04,  +0.03]
+     5 |    -0.15  |  -0.00 [ -0.04,  +0.04]
+    10 |    -0.11  |  +0.03 [ -0.03,  +0.09]
+    15 |    -0.13  |  +0.01 [ -0.06,  +0.09]
+    30 |    -0.08  |  +0.07 [ -0.03,  +0.17]
+    60 |    -0.04  |  +0.11 [ -0.01,  +0.22]
+   120 |    +0.02  |  +0.16 [ +0.02,  +0.29]
+3) ESPERAR CONFIRMACION: entrar a los k min SOLO si la deriva ya es a favor (ret_k > 0). Compara contra entrar siempre en P0
+   k=  5 | deriva a favor: n= 496 fin desde k= -0.03 (fin0 de esos= +0.28) | deriva en contra: n= 476 fin desde k= -0.27 (fin0 de esos= -0.58)
+   k= 15 | deriva a favor: n= 461 fin desde k= +0.06 (fin0 de esos= +0.60) | deriva en contra: n= 511 fin desde k= -0.30 (fin0 de esos= -0.81)
+   k= 30 | deriva a favor: n= 442 fin desde k= +0.22 (fin0 de esos= +0.92) | deriva en contra: n= 530 fin desde k= -0.32 (fin0 de esos= -1.03)
+   k= 60 | deriva a favor: n= 445 fin desde k= +0.70 (fin0 de esos= +1.58) | deriva en contra: n= 527 fin desde k= -0.66 (fin0 de esos= -1.60)
+4) ORDEN LIMITE retrocediendo x% desde P0 (2h de ventana). EV por senal: si no llena = 0 (te la perdes) o entrar a mercado a los 120 min
+   x%  | %llena | media si llena (limite) | esas mismas entrando en P0 | EV/senal limite (no llena=0) | EV/senal limite+mercado120 | EV/senal baseline P0
+   0.3 |    81% |         -0.53        |         -0.83        |            -0.43            |           -0.08           |       -0.14
+   0.5 |    68% |         -0.82        |         -1.33        |            -0.56            |           -0.07           |       -0.14
+   1.0 |    43% |         -1.03        |         -2.04        |            -0.44            |           -0.05           |       -0.14
+   2.0 |    19% |         -2.09        |         -4.13        |            -0.40            |           -0.00           |       -0.14
+5) INVALIDACION TEMPRANA: salir si la excursion en contra llega a x% dentro de los primeros W min (asume salida al -x%)
+   x%  ventana | % dispara | media con regla | baseline (mantener 72h) | acierto regla / base
+   0.5    15m |     34% |      +0.14      |         -0.14          | 40% / 57%
+   0.5    30m |     47% |      +0.13      |         -0.14          | 34% / 57%
+   0.5   120m |     68% |      +0.43      |         -0.14          | 22% / 57%
+   1.0    15m |     11% |      -0.02      |         -0.14          | 52% / 57%
+   1.0    30m |     20% |      +0.09      |         -0.14          | 47% / 57%
+   1.0   120m |     43% |      +0.31      |         -0.14          | 36% / 57%
+   2.0    15m |      2% |      -0.03      |         -0.14          | 56% / 57%
+   2.0    30m |      5% |      +0.17      |         -0.14          | 55% / 57%
+   2.0   120m |     19% |      +0.26      |         -0.14          | 49% / 57%
+6) FLUJO TAKER en los primeros 5 min (proporcion de volumen comprador) por terciles vs retorno final entrando a los 5 min
+   taker-buy bajo  (rango 0.02-0.46) n= 324 | fin5= -0.45 acierto=56% | ret5= +0.26
+   taker-buy medio (rango 0.46-0.53) n= 324 | fin5= -0.02 acierto=57% | ret5= +0.05
+   taker-buy alto  (rango 0.53-0.91) n= 324 | fin5= +0.04 acierto=58% | ret5= -0.29
+--- OOS  n=472  (retorno final de referencia a 72h, entrando en P0: media +0.76%, acierto 61%)
+1) RECORRIDO del precio tras el cierre (a favor de la direccion). ret = deriva; mae/mfe = peor/mejor excursion acumulada
+   min |  ret media | ret mediana | % a favor | mae mediana | mae p10 | mfe mediana
+     1 |    -0.02   |    -0.00   |     42%   |    -0.08   |  -0.29 |    +0.08
+     3 |    -0.02   |    -0.03   |     41%   |    -0.14   |  -0.49 |    +0.14
+     5 |    -0.02   |    -0.03   |     46%   |    -0.20   |  -0.60 |    +0.18
+    10 |    -0.02   |    -0.02   |     44%   |    -0.26   |  -0.82 |    +0.24
+    15 |    -0.07   |    -0.04   |     44%   |    -0.31   |  -0.98 |    +0.27
+    30 |    -0.05   |    -0.00   |     49%   |    -0.39   |  -1.44 |    +0.40
+    60 |    -0.02   |    -0.11   |     46%   |    -0.59   |  -1.90 |    +0.52
+   120 |    +0.04   |    -0.07   |     46%   |    -0.81   |  -2.77 |    +0.75
+2) COSTO/BENEFICIO de entrar a mercado k minutos despues del cierre (retorno final a 72h desde ese precio; dif vs entrar en P0)
+   min |  media fin | dif vs P0 [IC95 por dia]
+     1 |    +0.78  |  +0.02 [ -0.01,  +0.05]
+     3 |    +0.78  |  +0.02 [ -0.03,  +0.07]
+     5 |    +0.78  |  +0.02 [ -0.04,  +0.07]
+    10 |    +0.78  |  +0.02 [ -0.07,  +0.10]
+    15 |    +0.83  |  +0.07 [ -0.01,  +0.15]
+    30 |    +0.80  |  +0.04 [ -0.06,  +0.15]
+    60 |    +0.78  |  +0.02 [ -0.13,  +0.17]
+   120 |    +0.69  |  -0.07 [ -0.53,  +0.26]
+3) ESPERAR CONFIRMACION: entrar a los k min SOLO si la deriva ya es a favor (ret_k > 0). Compara contra entrar siempre en P0
+   k=  5 | deriva a favor: n= 216 fin desde k= +0.75 (fin0 de esos= +1.04) | deriva en contra: n= 256 fin desde k= +0.80 (fin0 de esos= +0.52)
+   k= 15 | deriva a favor: n= 209 fin desde k= +0.67 (fin0 de esos= +1.06) | deriva en contra: n= 263 fin desde k= +0.95 (fin0 de esos= +0.52)
+   k= 30 | deriva a favor: n= 233 fin desde k= +0.72 (fin0 de esos= +1.26) | deriva en contra: n= 239 fin desde k= +0.88 (fin0 de esos= +0.27)
+   k= 60 | deriva a favor: n= 215 fin desde k= +0.59 (fin0 de esos= +1.45) | deriva en contra: n= 257 fin desde k= +0.93 (fin0 de esos= +0.18)
+4) ORDEN LIMITE retrocediendo x% desde P0 (2h de ventana). EV por senal: si no llena = 0 (te la perdes) o entrar a mercado a los 120 min
+   x%  | %llena | media si llena (limite) | esas mismas entrando en P0 | EV/senal limite (no llena=0) | EV/senal limite+mercado120 | EV/senal baseline P0
+   0.3 |    81% |         +0.64        |         +0.34        |            +0.52            |           +0.78           |       +0.76
+   0.5 |    71% |         +0.89        |         +0.39        |            +0.63            |           +0.82           |       +0.76
+   1.0 |    42% |         +1.08        |         +0.09        |            +0.46            |           +0.67           |       +0.76
+   2.0 |    19% |         +0.87        |         -1.11        |            +0.17            |           +0.73           |       +0.76
+5) INVALIDACION TEMPRANA: salir si la excursion en contra llega a x% dentro de los primeros W min (asume salida al -x%)
+   x%  ventana | % dispara | media con regla | baseline (mantener 72h) | acierto regla / base
+   0.5    15m |     30% |      +0.36      |         +0.76          | 42% / 61%
+   0.5    30m |     42% |      +0.07      |         +0.76          | 35% / 61%
+   0.5   120m |     71% |      +0.13      |         +0.76          | 19% / 61%
+   1.0    15m |      9% |      +0.74      |         +0.76          | 55% / 61%
+   1.0    30m |     18% |      +0.42      |         +0.76          | 49% / 61%
+   1.0   120m |     42% |      +0.30      |         +0.76          | 35% / 61%
+   2.0    15m |      2% |      +0.71      |         +0.76          | 60% / 61%
+   2.0    30m |      5% |      +0.67      |         +0.76          | 58% / 61%
+   2.0   120m |     19% |      +0.59      |         +0.76          | 51% / 61%
+6) FLUJO TAKER en los primeros 5 min (proporcion de volumen comprador) por terciles vs retorno final entrando a los 5 min
+   taker-buy bajo  (rango 0.17-0.44) n= 158 | fin5= +0.90 acierto=65% | ret5= +0.24
+   taker-buy medio (rango 0.44-0.55) n= 157 | fin5= +1.14 acierto=64% | ret5= -0.07
+   taker-buy alto  (rango 0.55-0.88) n= 157 | fin5= +0.29 acierto=55% | ret5= -0.24
+7) HORA UTC del cierre (retorno final entrando en P0 / deriva a 15 min) — IS y OOS lado a lado
+   00h UTC | IS n=168 fin0= -1.71 ret15= -0.04 | OOS n= 95 fin0= +2.25 ret15= -0.22
+   04h UTC | IS n=100 fin0= +1.20 ret15= -0.03 | OOS n= 64 fin0= +1.81 ret15= -0.02
+   08h UTC | IS n=123 fin0= +0.34 ret15= +0.01 | OOS n= 69 fin0= +2.30 ret15= -0.03
+   12h UTC | IS n= 91 fin0= -3.63 ret15= +0.03 | OOS n= 57 fin0= +1.61 ret15= -0.07
+   16h UTC | IS n=177 fin0= +1.17 ret15= +0.03 | OOS n= 58 fin0= -4.00 ret15= -0.06
+   20h UTC | IS n=313 fin0= +0.35 ret15= -0.01 | OOS n=129 fin0= +0.08 ret15= -0.01

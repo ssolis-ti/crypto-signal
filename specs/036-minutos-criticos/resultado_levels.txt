@@ -1,0 +1,81 @@
+velas distintas: 1431
+BTC 1m ok: 1423
+eventos con nivel: {('spring', 'IS'): 780, ('spring', 'OOS'): 492, ('upthrust', 'IS'): 972, ('upthrust', 'OOS'): 472}
+================================================================================================
+SPRING
+================================================================================================
+--- IS n=780 | referencia (entrar en P0 y mantener 72h): media  +1.50% acierto 57%
+   distancia P0 -> extremo barrido: mediana 4.75% (p25 3.09%, p75 7.52%) | P0 -> nivel: mediana 1.44%
+ I07) SEGUNDO BARRIDO: el precio vuelve a tocar / pierde el extremo barrido dentro de W minutos
+   W min | vuelve a tocar | pierde el extremo | media final si LO PIERDE | media final si NO | acierto pierde/no
+     15  |        1%     |          1%       |    +1.72 (n=  7)    |    +1.49 (n=773)   | 57% / 57%
+     30  |        1%     |          1%       |    +2.90 (n= 11)    |    +1.48 (n=769)   | 55% / 57%
+     60  |        2%     |          2%       |    +2.48 (n= 15)    |    +1.48 (n=765)   | 53% / 57%
+    120  |        5%     |          4%       |    -0.77 (n= 35)    |    +1.60 (n=745)   | 31% / 58%
+ I02) INVALIDACION: salir en el extremo barrido si lo pierde en W min (sale al precio del extremo) vs mantener 72h
+   W= 15 | media con regla  +1.47 vs  +1.50 | dif  -0.03 [ -0.11,  +0.03] | acierto 56% vs 57%
+   W= 30 | media con regla  +1.44 vs  +1.50 | dif  -0.06 [ -0.17,  +0.03] | acierto 56% vs 57%
+   W= 60 | media con regla  +1.42 vs  +1.50 | dif  -0.08 [ -0.20,  +0.01] | acierto 56% vs 57%
+   W=120 | media con regla  +1.43 vs  +1.50 | dif  -0.06 [ -0.29,  +0.12] | acierto 55% vs 57%
+ I03) ORDEN LIMITE en el nivel de soporte/resistencia barrido (2 h de ventana)
+   se llena 31% | media si llena  +1.49 vs esas mismas entrando en P0  +0.82 | EV/senal (no llena = 0)  +0.46 vs baseline  +1.50
+ I05) BTC en los primeros 15 min (con entrada a los 15 min: fin15)
+   BTC a favor    n= 439 | fin15  +1.27 acierto 59% | fin0  +1.72
+   BTC en contra  n= 340 | fin15  +1.53 acierto 53% | fin0  +1.18
+--- OOS n=492 | referencia (entrar en P0 y mantener 72h): media  +1.91% acierto 59%
+   distancia P0 -> extremo barrido: mediana 4.62% (p25 3.03%, p75 8.48%) | P0 -> nivel: mediana 1.57%
+ I07) SEGUNDO BARRIDO: el precio vuelve a tocar / pierde el extremo barrido dentro de W minutos
+   W min | vuelve a tocar | pierde el extremo | media final si LO PIERDE | media final si NO | acierto pierde/no
+     15  |        0%     |          0%       |   +14.12 (n=  1)    |    +1.88 (n=491)   | 100% / 59%
+     30  |        1%     |          1%       |    +2.42 (n=  3)    |    +1.90 (n=489)   | 67% / 59%
+     60  |        1%     |          1%       |    +5.25 (n=  5)    |    +1.87 (n=487)   | 80% / 59%
+    120  |        5%     |          4%       |    +0.08 (n= 22)    |    +1.99 (n=470)   | 59% / 59%
+ I02) INVALIDACION: salir en el extremo barrido si lo pierde en W min (sale al precio del extremo) vs mantener 72h
+   W= 15 | media con regla  +1.88 vs  +1.91 | dif  -0.03 [ -0.11,  +0.00] | acierto 59% vs 59%
+   W= 30 | media con regla  +1.88 vs  +1.91 | dif  -0.02 [ -0.10,  +0.03] | acierto 58% vs 59%
+   W= 60 | media con regla  +1.84 vs  +1.91 | dif  -0.07 [ -0.18,  +0.01] | acierto 58% vs 59%
+   W=120 | media con regla  +1.80 vs  +1.91 | dif  -0.10 [ -0.53,  +0.33] | acierto 56% vs 59%
+ I03) ORDEN LIMITE en el nivel de soporte/resistencia barrido (2 h de ventana)
+   se llena 28% | media si llena  +1.61 vs esas mismas entrando en P0  +0.89 | EV/senal (no llena = 0)  +0.45 vs baseline  +1.91
+ I05) BTC en los primeros 15 min (con entrada a los 15 min: fin15)
+   BTC a favor    n= 270 | fin15  +1.19 acierto 61% | fin0  +1.41
+   BTC en contra  n= 218 | fin15  +2.80 acierto 57% | fin0  +2.64
+================================================================================================
+UPTHRUST
+================================================================================================
+--- IS n=972 | referencia (entrar en P0 y mantener 72h): media  -0.14% acierto 57%
+   distancia P0 -> extremo barrido: mediana 4.07% (p25 2.74%, p75 6.00%) | P0 -> nivel: mediana 1.69%
+ I07) SEGUNDO BARRIDO: el precio vuelve a tocar / pierde el extremo barrido dentro de W minutos
+   W min | vuelve a tocar | pierde el extremo | media final si LO PIERDE | media final si NO | acierto pierde/no
+     15  |        1%     |          1%       |    -0.39 (n=  6)    |    -0.14 (n=966)   | 33% / 57%
+     30  |        1%     |          1%       |    -5.48 (n= 12)    |    -0.07 (n=960)   | 42% / 57%
+     60  |        3%     |          2%       |    -4.20 (n= 24)    |    -0.04 (n=948)   | 33% / 58%
+    120  |        6%     |          6%       |    -5.36 (n= 54)    |    +0.17 (n=918)   | 31% / 58%
+ I02) INVALIDACION: salir en el extremo barrido si lo pierde en W min (sale al precio del extremo) vs mantener 72h
+   W= 15 | media con regla  -0.15 vs  -0.14 | dif  -0.00 [ -0.03,  +0.01] | acierto 57% vs 57%
+   W= 30 | media con regla  -0.11 vs  -0.14 | dif  +0.04 [ -0.05,  +0.17] | acierto 56% vs 57%
+   W= 60 | media con regla  -0.10 vs  -0.14 | dif  +0.04 [ -0.06,  +0.18] | acierto 56% vs 57%
+   W=120 | media con regla  +0.01 vs  -0.14 | dif  +0.15 [ -0.05,  +0.42] | acierto 55% vs 57%
+ I03) ORDEN LIMITE en el nivel de soporte/resistencia barrido (2 h de ventana)
+   se llena 31% | media si llena  -0.74 vs esas mismas entrando en P0  -1.70 | EV/senal (no llena = 0)  -0.23 vs baseline  -0.14
+ I05) BTC en los primeros 15 min (con entrada a los 15 min: fin15)
+   BTC a favor    n= 466 | fin15  -0.56 acierto 56% | fin0  -0.26
+   BTC en contra  n= 497 | fin15  +0.20 acierto 59% | fin0  -0.10
+--- OOS n=472 | referencia (entrar en P0 y mantener 72h): media  +0.76% acierto 61%
+   distancia P0 -> extremo barrido: mediana 3.91% (p25 2.51%, p75 6.26%) | P0 -> nivel: mediana 1.48%
+ I07) SEGUNDO BARRIDO: el precio vuelve a tocar / pierde el extremo barrido dentro de W minutos
+   W min | vuelve a tocar | pierde el extremo | media final si LO PIERDE | media final si NO | acierto pierde/no
+     15  |        2%     |          2%       |    +1.47 (n=  8)    |    +0.75 (n=464)   | 50% / 61%
+     30  |        3%     |          3%       |    -3.38 (n= 14)    |    +0.89 (n=458)   | 50% / 62%
+     60  |        4%     |          4%       |    -2.42 (n= 18)    |    +0.89 (n=454)   | 50% / 62%
+    120  |        8%     |          8%       |    -2.15 (n= 37)    |    +1.01 (n=435)   | 51% / 62%
+ I02) INVALIDACION: salir en el extremo barrido si lo pierde en W min (sale al precio del extremo) vs mantener 72h
+   W= 15 | media con regla  +0.69 vs  +0.76 | dif  -0.07 [ -0.24,  +0.06] | acierto 60% vs 61%
+   W= 30 | media con regla  +0.79 vs  +0.76 | dif  +0.03 [ -0.20,  +0.30] | acierto 60% vs 61%
+   W= 60 | media con regla  +0.77 vs  +0.76 | dif  +0.01 [ -0.24,  +0.27] | acierto 59% vs 61%
+   W=120 | media con regla  +0.69 vs  +0.76 | dif  -0.07 [ -0.42,  +0.33] | acierto 57% vs 61%
+ I03) ORDEN LIMITE en el nivel de soporte/resistencia barrido (2 h de ventana)
+   se llena 33% | media si llena  +0.82 vs esas mismas entrando en P0  -0.07 | EV/senal (no llena = 0)  +0.27 vs baseline  +0.76
+ I05) BTC en los primeros 15 min (con entrada a los 15 min: fin15)
+   BTC a favor    n= 205 | fin15  +1.13 acierto 60% | fin0  +1.32
+   BTC en contra  n= 267 | fin15  +0.59 acierto 63% | fin0  +0.33
