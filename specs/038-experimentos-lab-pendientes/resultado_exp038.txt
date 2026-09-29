@@ -1,0 +1,30 @@
+trades base: {'IS': 861, 'OOS': 525} | control E0: {'IS': 861, 'OOS': 525}
+  IS: media base +1.69  control +1.69
+  OOS: media base +1.69  control +1.69
+
+exp              per   variante                                         | dif vs (excluidos / base pareada)
+Exp_E1_Sweep10   IS    n= 733 media= +1.91% acierto=  56% peor= -10.25% | +1.53 pp | excluidos: n= 138 media= +0.38% acierto=  51% peor= -10.21%
+Exp_E1_Sweep10   OOS   n= 435 media= +2.14% acierto=  59% peor= -10.17% | +2.50 pp | excluidos: n=  99 media= -0.35% acierto=  47% peor= -10.14%
+                 unido IC99.2% por dia [-0.29, +3.92] -> NO aprueba
+
+Exp_E2_Sweep15   IS    n= 657 media= +2.04% acierto=  57% peor= -10.25% | +1.49 pp | excluidos: n= 218 media= +0.55% acierto=  51% peor= -10.21%
+Exp_E2_Sweep15   OOS   n= 387 media= +2.18% acierto=  60% peor= -10.17% | +1.61 pp | excluidos: n= 155 media= +0.57% acierto=  50% peor= -10.14%
+                 unido IC99.2% por dia [-0.33, +3.45] -> NO aprueba
+
+Exp_E3_Drop24h   IS    n= 139 media= +3.08% acierto=  64% peor= -10.16% | +1.66 pp | excluidos: n= 722 media= +1.42% acierto=  53% peor= -10.25%
+Exp_E3_Drop24h   OOS   n= 118 media= +2.74% acierto=  62% peor= -10.11% | +1.36 pp | excluidos: n= 407 media= +1.38% acierto=  56% peor= -10.17%
+                 unido IC99.2% por dia [-2.63, +5.50] -> NO aprueba
+
+Exp_E4_Trailing  IS    n= 936 media= +0.21% acierto=  71% peor= -10.25% | -1.55 pp | base pareada: media=+1.70% peor=-10.25% (n pareados 860)
+Exp_E4_Trailing  OOS   n= 544 media= +0.32% acierto=  70% peor= -10.17% | -1.42 pp | base pareada: media=+1.69% peor=-10.17% (n pareados 525)
+                 unido IC99.2% por dia [-2.84, -0.27] -> NO aprueba
+
+Exp_E5_TP48h     IS    n= 895 media= +0.88% acierto=  61% peor= -10.25% | -0.85 pp | base pareada: media=+1.69% peor=-10.25% (n pareados 861)
+Exp_E5_TP48h     OOS   n= 533 media= +1.10% acierto=  63% peor= -10.13% | -0.52 pp | base pareada: media=+1.69% peor=-10.17% (n pareados 525)
+                 unido IC99.2% por dia [-1.92, +0.49] -> NO aprueba
+
+Exp_E6_H48       IS    n= 867 media= +0.93% acierto=  54% peor= -10.25% | -0.75 pp | base pareada: media=+1.69% peor=-10.25% (n pareados 861)
+Exp_E6_H48       OOS   n= 528 media= +1.50% acierto=  59% peor= -10.13% | -0.15 pp | base pareada: media=+1.69% peor=-10.17% (n pareados 525)
+                 unido IC99.2% por dia [-1.46, +0.31] -> NO aprueba
+
+VEREDICTO: {'Exp_E1_Sweep10': 'NO aprueba', 'Exp_E2_Sweep15': 'NO aprueba', 'Exp_E3_Drop24h': 'NO aprueba', 'Exp_E4_Trailing': 'NO aprueba', 'Exp_E5_TP48h': 'NO aprueba', 'Exp_E6_H48': 'NO aprueba'}
