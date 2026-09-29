@@ -1,0 +1,13 @@
+eventos con toques: {'IS': 860, 'OOS': 525}
+toques medianos (H1 tol 0.3%): 1.0 | distribucion: {1: 1079, 2: 224, 3: 49, 4: 21, 5: 12}
+toques medianos (H2 tol 0.6%): 1.0 | distribucion: {1: 847, 2: 297, 3: 112, 4: 54, 5: 75}
+
+hipotesis      periodo  n EQL   media acierto | n resto   media acierto | dif
+H1 tol 0.3%    IS        192   +1.07     51% |     668   +1.85     56% | -0.78
+H1 tol 0.3%    OOS       114   -0.72     44% |     411   +2.35     61% | -3.07
+H1 tol 0.3%    AMBOS     306   +0.40     48% |    1079   +2.04     58% | -1.64 IC97.5% por dia [-3.43, +0.09]
+H2 tol 0.6%    IS        329   +1.48     55% |     531   +1.79     55% | -0.31
+H2 tol 0.6%    OOS       209   -0.64     45% |     316   +3.22     65% | -3.86
+H2 tol 0.6%    AMBOS     538   +0.66     51% |     847   +2.33     59% | -1.67 IC97.5% por dia [-3.82, +0.46]
+
+VEREDICTO: {'H1 tol 0.3%': 'NO aprueba', 'H2 tol 0.6%': 'NO aprueba'}
