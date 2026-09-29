@@ -1,6 +1,7 @@
 """
 Tests para WyckoffAlerter (specs/023-wyckoff-live-alerts/).
 """
+import json
 from unittest.mock import patch
 
 import pytest
@@ -162,6 +163,78 @@ class TestWyckoffAlerterTwitterSentiment:
 
         assert len(notifier.messages) == 1
         assert 'Twitter' not in notifier.messages[0]
+
+
+def _volume_spike_no_event_fixture():
+    closes, lows, highs, volumes = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
+    closes += [100.5]
+    lows += [99.5]
+    highs += [100.8]
+    volumes += [1000.0]  # 10x el promedio, sin romper el rango
+    return _to_ohlcv_list(closes, lows, highs, volumes)
+
+
+def _velocity(ratio):
+    return {'current': 3.0 * ratio, 'baseline': 3.0, 'ratio': ratio, 'max_views': 0,
+            'tweets': [{'text': 'x'}]}
+
+
+class TestRumorRadar:
+    def _alerter(self, tmp_path, radar=True, twitter=True):
+        return WyckoffAlerter(RecordingNotifier(), enabled=True, twitter_sentiment_enabled=twitter,
+                              rumor_radar_enabled=radar, record_path=str(tmp_path / 'radar.jsonl'))
+
+    def test_radar_disabled_by_default(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True, twitter_sentiment_enabled=True)
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity') as mock_vel:
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
+        mock_vel.assert_not_called()
+        assert notifier.messages == []
+
+    def test_radar_requires_twitter(self, tmp_path):
+        alerter = self._alerter(tmp_path, radar=True, twitter=False)
+        assert alerter.rumor_radar_enabled is False
+
+    def test_accelerating_mentions_send_radar_alert_and_record(self, tmp_path):
+        alerter = self._alerter(tmp_path)
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity', return_value=_velocity(3.0)), \
+             patch.object(alerter.twitter_sentiment, 'analyze', return_value={
+                 'current': 9.0, 'baseline': 3.0, 'ratio': 3.0, 'max_views': 0,
+                 'sentiment_extreme': 'euphoria', 'social_spike_confirmed': False,
+                 'catalyst_present': True, 'summary': 'Rumor de listing.'}):
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
+
+        assert len(alerter.notifier.messages) == 1
+        msg = alerter.notifier.messages[0]
+        assert 'RADAR VOLUMEN + RUMOR' in msg
+        assert 'NO validada' in msg
+        assert 'Rumor de listing.' in msg
+        record = json.loads((tmp_path / 'radar.jsonl').read_text().strip())
+        assert record['type'] == 'radar' and record['alert_sent'] is True
+
+    def test_quiet_mentions_record_without_alert(self, tmp_path):
+        alerter = self._alerter(tmp_path)
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity', return_value=_velocity(1.2)):
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
+
+        assert alerter.notifier.messages == []
+        record = json.loads((tmp_path / 'radar.jsonl').read_text().strip())
+        assert record['alert_sent'] is False
+
+    def test_same_candle_queries_twitter_once(self, tmp_path):
+        alerter = self._alerter(tmp_path)
+        ohlcv = _volume_spike_no_event_fixture()
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity', return_value=_velocity(1.2)) as mock_vel:
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+        assert mock_vel.call_count == 1
+
+    def test_normal_volume_does_not_query_twitter(self, tmp_path):
+        alerter = self._alerter(tmp_path)
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity') as mock_vel:
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', _no_event_fixture())
+        mock_vel.assert_not_called()
 
 
 class TestWyckoffAlerterGuards:

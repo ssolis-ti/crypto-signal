@@ -15,7 +15,10 @@ scoring ya se probo, dos veces, que no predice nada -- specs/007, specs/011): es
 alerta se envia directo via Notifier.send_direct_text, nunca sujeta al filtro
 detail_min_quality ni al score 0-100.
 """
-from typing import Set
+import json
+import os
+from datetime import datetime, timezone
+from typing import Optional, Set
 
 import pandas as pd
 import structlog
@@ -23,6 +26,9 @@ import structlog
 from analyzers.utils import IndicatorUtils
 from analyzers.indicators.wyckoff import WyckoffPrimitives
 from analysis.twitter_sentiment import TwitterSentimentAnalyzer
+
+DEFAULT_RECORD_PATH = 'agent_state/rumor_radar.jsonl'
+DEFAULT_RADAR_MIN_RATIO = 2.0
 
 VALIDATED_CANDLE_PERIOD = '4h'
 LOOKBACK = 20
@@ -54,12 +60,19 @@ class WyckoffAlerter:
     pedir datos nuevos al exchange (Principio I: solo lectura).
     """
 
-    def __init__(self, notifier, enabled: bool = False, twitter_sentiment_enabled: bool = False):
+    def __init__(self, notifier, enabled: bool = False, twitter_sentiment_enabled: bool = False,
+                 rumor_radar_enabled: bool = False,
+                 radar_min_ratio: float = DEFAULT_RADAR_MIN_RATIO,
+                 record_path: Optional[str] = None):
         self.logger = structlog.get_logger()
         self.notifier = notifier
         self.enabled = enabled
         self._alerted_signatures: Set[str] = set()
         self.twitter_sentiment = TwitterSentimentAnalyzer(enabled=twitter_sentiment_enabled)
+        # El radar necesita Twitter: sin el no hay nada que cruzar con el volumen.
+        self.rumor_radar_enabled = rumor_radar_enabled and twitter_sentiment_enabled
+        self.radar_min_ratio = radar_min_ratio
+        self.record_path = record_path
 
     def check_and_alert(self, exchange: str, market_pair: str, candle_period: str,
                          historical_data) -> None:
@@ -104,18 +117,89 @@ class WyckoffAlerter:
             break_relative_volume = upthrust_rv
 
         if direction is None:
+            if self.rumor_radar_enabled:
+                self._check_rumor_radar(exchange, market_pair, df, timestamp)
             return
 
         signature = f"{exchange}:{market_pair}:{direction}:{timestamp.isoformat()}"
         if signature in self._alerted_signatures:
             return
 
-        self._send_alert(exchange, market_pair, direction, break_relative_volume)
+        self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp)
         self._alerted_signatures.add(signature)
         self._prune_signatures()
 
+    def _check_rumor_radar(self, exchange: str, market_pair: str, df, timestamp) -> None:
+        """
+        Radar volumen + rumor (specs/033-rumor-radar/): vela de 4h cerrada con volumen
+        extremo SIN evento Wyckoff -> se mira si las menciones en Twitter se aceleran.
+        No validado: aviso para mirar el grafico, no una entrada.
+        """
+        rel_vol = WyckoffPrimitives.relative_volume(df).iloc[-1]
+        if pd.isna(rel_vol) or rel_vol < EXTREME_VOLUME_THRESHOLD:
+            return
+
+        # Se marca antes de consultar: el ciclo corre cada 5 min y ve la misma vela ~48 veces.
+        signature = f"{exchange}:{market_pair}:radar:{timestamp.isoformat()}"
+        if signature in self._alerted_signatures:
+            return
+        self._alerted_signatures.add(signature)
+        self._prune_signatures()
+
+        ticker = market_pair.split('/')[0]
+        velocity = self.twitter_sentiment.mention_velocity(ticker)
+        if velocity is None:
+            return
+
+        last = df.iloc[-1]
+        candle_change = (last['close'] - last['open']) / last['open'] * 100 if last['open'] else 0.0
+        ratio = velocity.get('ratio')
+        triggered = ratio is not None and ratio >= self.radar_min_ratio
+
+        twitter_result = None
+        if triggered:
+            twitter_result = self.twitter_sentiment.analyze(ticker, 'radar', velocity=velocity)
+            self._send_radar_alert(exchange, market_pair, rel_vol, candle_change, twitter_result)
+
+        self._record({
+            'type': 'radar', 'exchange': exchange, 'pair': market_pair,
+            'candle': timestamp.isoformat(), 'relative_volume': round(float(rel_vol), 2),
+            'candle_change_pct': round(float(candle_change), 2),
+            'mentions_now': velocity.get('current'), 'mentions_7d_ago': velocity.get('baseline'),
+            'ratio': ratio, 'max_views': velocity.get('max_views'), 'alert_sent': triggered,
+            'sentiment': (twitter_result or {}).get('sentiment_extreme'),
+        })
+
+    def _send_radar_alert(self, exchange: str, market_pair: str, rel_vol: float,
+                          candle_change: float, twitter_result) -> None:
+        color = "verde" if candle_change >= 0 else "roja"
+        message = (
+            f"🛰️ <b>RADAR VOLUMEN + RUMOR</b>\n"
+            f"{market_pair} | {exchange} | 4h\n"
+            f"Volumen: {rel_vol:.1f}x el promedio | vela {color} {candle_change:+.1f}%\n\n"
+            f"{TwitterSentimentAnalyzer.format_section(twitter_result)}\n\n"
+            f"⚠️ <i>Señal NO validada (specs/033): no es el edge Wyckoff. "
+            f"Aviso para mirar el gráfico, no una entrada automática.</i>"
+        )
+        self.notifier.send_direct_text(message)
+        self.logger.info(f"[RADAR] Alert sent: {market_pair} (rel_vol={rel_vol:.2f}x)")
+
+    def _record(self, event: dict) -> None:
+        """Registro para validar despues con datos reales hacia adelante. Nunca rompe el ciclo."""
+        if not self.record_path:
+            return
+        try:
+            event = {'recorded_at': datetime.now(timezone.utc).isoformat(), **event}
+            directory = os.path.dirname(self.record_path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            with open(self.record_path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(event, default=str) + '\n')
+        except Exception as e:
+            self.logger.error(f"[RADAR] No se pudo registrar el evento: {e}")
+
     def _send_alert(self, exchange: str, market_pair: str, direction: str,
-                     break_relative_volume: float) -> None:
+                     break_relative_volume: float, timestamp=None) -> None:
         if direction == 'hot':
             label, emoji = "SPRING (posible acumulacion)", "🟢"
         else:
@@ -142,6 +226,15 @@ class WyckoffAlerter:
             f"[WYCKOFF] Alert sent: {market_pair} {direction} "
             f"(break_relative_volume={break_relative_volume:.2f}x)"
         )
+        self._record({
+            'type': 'wyckoff', 'direction': direction, 'exchange': exchange, 'pair': market_pair,
+            'candle': timestamp.isoformat() if timestamp is not None else None,
+            'relative_volume': round(float(break_relative_volume), 2),
+            'mentions_now': (twitter_result or {}).get('current'),
+            'mentions_7d_ago': (twitter_result or {}).get('baseline'),
+            'ratio': (twitter_result or {}).get('ratio'),
+            'sentiment': (twitter_result or {}).get('sentiment_extreme'),
+        })
 
     def _prune_signatures(self, max_size: int = MAX_DEDUP_SIGNATURES) -> None:
         if len(self._alerted_signatures) > max_size:

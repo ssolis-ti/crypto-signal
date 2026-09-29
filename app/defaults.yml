@@ -25,6 +25,11 @@ settings:
     # no forma parte del edge validado. Requiere GETXAPI_API_KEY y GEMINI_API_KEY en .env.
     twitter_sentiment:
       enabled: false
+    # specs/033-rumor-radar/: vela de 4h con volumen >= 2.5x SIN evento Wyckoff + menciones
+    # en Twitter acelerando (ahora vs hace 7 dias) -> aviso. NO validado. Requiere twitter_sentiment.
+    rumor_radar:
+      enabled: false
+      min_mention_ratio: 2.0
 
   # ─────────────────────────────────────────
   # Dynamic Pairs - Filtrado automático de mercados

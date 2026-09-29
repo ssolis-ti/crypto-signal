@@ -179,6 +179,7 @@ dependencias pinneadas).
 | [030](specs/030-twitter-sentiment-classifier/) | Corrección de specs 022/028 (leer **contenido**, no contar tweets): piloto cualitativo de 6 eventos muestra capitulación genuina en springs ganadores vs. euforia sostenida en upthrusts perdedores — patrón coherente con Wyckoff, **no validado estadísticamente** (n=5), esquema de clasificación diseñado, decisión de escalado (manual vs. LLM en vivo) pendiente del operador |
 | [031](specs/031-wyckoff-twitter-sentiment/) | **En producción (opcional)**: `WyckoffAlerter` enriquece el mensaje con contenido de Twitter/X (GetXAPI) clasificado por Gemini, etiquetado como informativo/no validado — nunca decide si la alerta se envía; degrada segura sin credenciales; deshabilitado por defecto |
 | [032](specs/032-freqtrade-lab-wyckoff/) | **Freqtrade como laboratorio** (futuros 2022-2026, comisiones y funding, sin lookahead): el encuadre "rápido 1-2h" era falso (44-49%), 14d no es robusto; lo que funciona es **spring long ~72h con stop −10%** (56-58%, +1,5-1,8%/trade, positivo en IS y OOS). Upthrust sin edge confiable. Mensaje de la alerta actualizado |
+| [033](specs/033-rumor-radar/) | **En producción, NO validado**: radar volumen + rumor — vela 4h con volumen ≥2.5x sin evento Wyckoff + velocidad de menciones en Twitter ≥2x vs hace 7 días → aviso. Cada caso se registra en `agent_state/rumor_radar.jsonl` para validarlo después |
 
 ---
 

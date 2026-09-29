@@ -28,6 +28,14 @@ settings:
     # (la alerta base se envia igual, sin esta seccion).
     twitter_sentiment:
       enabled: false
+    # specs/033-rumor-radar/: cruce volumen + rumor. Si una vela de 4h cierra con volumen
+    # >= 2.5x el promedio SIN evento Wyckoff, mide la velocidad de menciones en Twitter
+    # (ahora vs hace 7 dias); si se acelera >= min_mention_ratio, avisa por Telegram.
+    # NO validado: cada caso queda en app/agent_state/rumor_radar.jsonl para validarlo luego.
+    # Requiere twitter_sentiment.enabled y GETXAPI_API_KEY.
+    rumor_radar:
+      enabled: false
+      min_mention_ratio: 2.0
 
   # ═══════════════════════════════════════════
   # CONFIGURACIÓN DE PARES DINÁMICOS

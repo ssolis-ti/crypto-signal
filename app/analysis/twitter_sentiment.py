@@ -1,24 +1,24 @@
 """
-Clasificador de sentimiento de Twitter/X para alertas Wyckoff en vivo
-(specs/031-wyckoff-twitter-sentiment/), continuacion del piloto cualitativo de
-specs/030-twitter-sentiment-classifier/.
+Twitter/X en vivo para crypto-signal (specs/031-wyckoff-twitter-sentiment/ y
+specs/033-rumor-radar/).
 
-Por cada evento Wyckoff que ya califica (volumen extremo, specs/023), consulta
-tweets recientes del ticker via GetXAPI (docs.getxapi.com) y le pide a Gemini que
-los clasifique segun el esquema definido en specs/030 (sentiment_extreme,
-social_spike_confirmed, catalyst_present). Es puramente informativo -- se agrega
-como seccion extra al mensaje de Telegram, NUNCA decide si se envia o no la
-alerta (Principio III de la constitucion: el volumen extremo es el unico edge
-validado con holdout; este modulo es un hallazgo cualitativo de n=5, no
-estadisticamente probado -- ver specs/030/tasks.md).
+Dos mediciones sobre los tweets recientes de un ticker (GetXAPI, docs.getxapi.com):
 
-Degrada seguro: cualquier error (credenciales faltantes, API caida, respuesta
-invalida) se loguea y el metodo retorna None -- la alerta base se envia igual,
-sin la seccion de Twitter.
+1. Velocidad de menciones: la busqueda devuelve una pagina fija de ~20 tweets, asi que
+   en vez de contar se mide cuanto tiempo abarcan (20 tweets en 10 min = ticker
+   hirviendo; en 12 h = quieto). Se compara contra la misma medicion de hace 7 dias
+   usando `until_time:` (corte exacto en el pasado, verificado en vivo).
+2. Clasificacion del contenido con Gemini (esquema de specs/030): capitulacion /
+   euforia / mixto / nada, pico social confirmado por terceros, catalizador presente.
+
+Todo es informativo y NO validado estadisticamente (Principio III): nunca decide si
+una alerta Wyckoff se envia. Degrada seguro: cualquier error se loguea y el metodo
+retorna None o un resultado parcial (p. ej. velocidad sin clasificacion si Gemini cae).
 """
 import json
 import os
 import re
+from datetime import datetime, timedelta, timezone
 
 import requests
 import structlog
@@ -30,6 +30,10 @@ DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest"
 REQUEST_TIMEOUT_SECONDS = 25
 MAX_TWEETS_FOR_PROMPT = 15
 MAX_TWEET_TEXT_CHARS = 240
+BASELINE_DAYS = 7
+ACCELERATING_RATIO = 2.0
+VIRAL_VIEWS = 50_000
+TWITTER_DATE_FORMAT = "%a %b %d %H:%M:%S %z %Y"
 
 CLASSIFICATION_PROMPT_TEMPLATE = """Sos un analista de sentimiento de mercados cripto. A continuacion hay hasta {n} tweets recientes sobre {ticker}, recolectados porque el precio tuvo un pico de volumen inusual.
 
@@ -63,11 +67,7 @@ SENTIMENT_LABELS = {
 
 
 class TwitterSentimentAnalyzer:
-    """
-    Enriquecimiento OPCIONAL e informativo de las alertas Wyckoff con contenido de
-    Twitter/X, clasificado por un LLM. No forma parte del edge validado
-    (specs/017/018) y nunca decide si una alerta se envia o no.
-    """
+    """Velocidad de menciones + clasificacion de contenido. Informativo, nunca un gate."""
 
     def __init__(self, enabled: bool = False):
         self.logger = structlog.get_logger()
@@ -76,38 +76,80 @@ class TwitterSentimentAnalyzer:
         self.gemini_key = os.environ.get('GEMINI_API_KEY', '').strip()
         self.gemini_model = os.environ.get('GEMINI_MODEL', DEFAULT_GEMINI_MODEL).strip()
 
-    def analyze(self, ticker: str, direction: str):
+    def mention_velocity(self, ticker: str, now: datetime = None):
         """
-        Retorna un dict {sentiment_extreme, social_spike_confirmed, catalyst_present,
-        summary} o None si esta deshabilitado, faltan credenciales, no hay tweets, o
-        algo falla. Nunca lanza -- ver docstring del modulo.
+        Retorna {'current', 'baseline', 'ratio', 'max_views', 'tweets'} (menciones/hora
+        ahora vs. hace BASELINE_DAYS) o None si esta deshabilitado, falta la key o falla.
         """
         if not self.enabled:
             return None
-        if not self.getxapi_key or not self.gemini_key:
-            self.logger.error(
-                "[TWITTER_SENTIMENT] habilitado pero faltan GETXAPI_API_KEY/GEMINI_API_KEY"
-            )
+        if not self.getxapi_key:
+            self.logger.error("[TWITTER] habilitado pero falta GETXAPI_API_KEY")
             return None
         try:
-            tweets = self._fetch_tweets(ticker)
-            if not tweets:
-                return None
-            return self._classify(ticker, tweets)
+            now = now or datetime.now(timezone.utc)
+            baseline_cut = int((now - timedelta(days=BASELINE_DAYS)).timestamp())
+            current_tweets = self._search(f"${ticker}")
+            baseline_tweets = self._search(f"${ticker} until_time:{baseline_cut}")
+            current = self._mentions_per_hour(current_tweets)
+            baseline = self._mentions_per_hour(baseline_tweets)
+            ratio = current / baseline if current and baseline else None
+            max_views = max((t.get('viewCount') or 0 for t in current_tweets), default=0)
+            return {'current': current, 'baseline': baseline, 'ratio': ratio,
+                    'max_views': max_views, 'tweets': current_tweets}
         except Exception as e:
-            self.logger.error(f"[TWITTER_SENTIMENT] Error analizando {ticker}: {e}")
+            self.logger.error(f"[TWITTER] Error midiendo velocidad de {ticker}: {e}")
             return None
 
-    def _fetch_tweets(self, ticker: str):
+    def analyze(self, ticker: str, direction: str, velocity: dict = None):
+        """
+        Velocidad + clasificacion. Retorna None si no hay datos de Twitter; si Gemini
+        falla o no hay key, retorna solo la velocidad (sentiment_extreme = None).
+        """
+        velocity = velocity or self.mention_velocity(ticker)
+        if not velocity or not velocity.get('tweets'):
+            return None
+
+        result = {k: v for k, v in velocity.items() if k != 'tweets'}
+        result.update({'sentiment_extreme': None, 'social_spike_confirmed': False,
+                       'catalyst_present': False, 'summary': ''})
+        if not self.gemini_key:
+            return result
+        try:
+            classification = self._classify(ticker, self._texts(velocity['tweets']))
+            if classification:
+                result.update(classification)
+        except Exception as e:
+            self.logger.error(f"[TWITTER] Error clasificando {ticker}: {e}")
+        return result
+
+    def _search(self, query: str):
         response = requests.get(
             f"{GETXAPI_BASE_URL}{GETXAPI_SEARCH_PATH}",
             headers={"Authorization": f"Bearer {self.getxapi_key}"},
-            params={"q": f"${ticker}", "product": "Latest"},
+            params={"q": query, "product": "Latest"},
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
-        data = response.json()
-        tweets = data.get('tweets') or []
+        return response.json().get('tweets') or []
+
+    @staticmethod
+    def _mentions_per_hour(tweets):
+        times = []
+        for t in tweets:
+            try:
+                times.append(datetime.strptime(t['createdAt'], TWITTER_DATE_FORMAT))
+            except (KeyError, TypeError, ValueError):
+                continue
+        if len(times) < 2:
+            return None
+        span_hours = (max(times) - min(times)).total_seconds() / 3600
+        if span_hours <= 0:
+            return None
+        return (len(times) - 1) / span_hours
+
+    @staticmethod
+    def _texts(tweets):
         texts = [t.get('text', '').strip()[:MAX_TWEET_TEXT_CHARS] for t in tweets if t.get('text')]
         return texts[:MAX_TWEETS_FOR_PROMPT]
 
@@ -128,7 +170,7 @@ class TwitterSentimentAnalyzer:
         raw_text = data['candidates'][0]['content']['parts'][0]['text']
         parsed = self._parse_json_response(raw_text)
         if parsed is None:
-            self.logger.error("[TWITTER_SENTIMENT] Respuesta de Gemini no parseable como JSON")
+            self.logger.error("[TWITTER] Respuesta de Gemini no parseable como JSON")
             return None
         return {
             'sentiment_extreme': parsed.get('sentiment_extreme', 'none'),
@@ -147,18 +189,29 @@ class TwitterSentimentAnalyzer:
 
     @staticmethod
     def format_section(result) -> str:
-        """Arma la seccion opcional de Twitter para el mensaje de Telegram, o '' si no hay resultado."""
+        """Seccion de Twitter para el mensaje de Telegram, o '' si no hay resultado."""
         if result is None:
             return ''
-        label = SENTIMENT_LABELS.get(result['sentiment_extreme'], SENTIMENT_LABELS['none'])
-        lines = [
-            "🐦 <b>Twitter</b> (informativo, sin validar estadísticamente -- specs/030)",
-            f"Sentimiento: {label}",
-        ]
-        if result['social_spike_confirmed']:
+        lines = ["🐦 <b>Twitter</b> (informativo, sin validar estadísticamente)"]
+
+        current, baseline, ratio = result.get('current'), result.get('baseline'), result.get('ratio')
+        if ratio is not None:
+            trend = " 🔥 acelerando" if ratio >= ACCELERATING_RATIO else ""
+            lines.append(f"Menciones: {current:.1f}/h ahora vs {baseline:.1f}/h hace "
+                         f"{BASELINE_DAYS} días ({ratio:.1f}x){trend}")
+        elif current is not None:
+            lines.append(f"Menciones: {current:.1f}/h ahora")
+        if (result.get('max_views') or 0) >= VIRAL_VIEWS:
+            lines.append(f"📣 Tweet viral: {result['max_views']:,} vistas")
+
+        if result.get('sentiment_extreme'):
+            label = SENTIMENT_LABELS.get(result['sentiment_extreme'], SENTIMENT_LABELS['none'])
+            lines.append(f"Sentimiento: {label}")
+        if result.get('social_spike_confirmed'):
             lines.append("📡 Pico de actividad social confirmado por terceros")
-        if result['catalyst_present']:
+        if result.get('catalyst_present'):
             lines.append("📰 Hay un catalizador/noticia concreta circulando")
         if result.get('summary'):
             lines.append(f"<i>{result['summary']}</i>")
-        return "\n".join(lines)
+
+        return "\n".join(lines) if len(lines) > 1 else ''

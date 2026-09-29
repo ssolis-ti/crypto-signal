@@ -21,7 +21,7 @@ import structlog
 from analysis import StrategyAnalyzer
 from analysis.market_context import MarketContext
 from analysis.signal_enhancer import SignalEnhancer
-from analysis.wyckoff_alerts import WyckoffAlerter
+from analysis.wyckoff_alerts import WyckoffAlerter, DEFAULT_RECORD_PATH
 
 from behaviour.data import DataCollector
 from behaviour.strategies import StrategyExecutor
@@ -112,10 +112,14 @@ class Behaviour():
         # ─────────────────────────────────────────
         wyckoff_config = config.settings.get('wyckoff_alerts', {})
         twitter_sentiment_config = wyckoff_config.get('twitter_sentiment', {})
+        rumor_radar_config = wyckoff_config.get('rumor_radar', {})
         self.wyckoff_alerter = WyckoffAlerter(
             notifier,
             enabled=wyckoff_config.get('enabled', False),
             twitter_sentiment_enabled=twitter_sentiment_config.get('enabled', False),
+            rumor_radar_enabled=rumor_radar_config.get('enabled', False),
+            radar_min_ratio=rumor_radar_config.get('min_mention_ratio', 2.0),
+            record_path=DEFAULT_RECORD_PATH,
         )
 
     def run(self, market_data, output_mode):
