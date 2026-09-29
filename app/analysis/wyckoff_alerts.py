@@ -30,6 +30,8 @@ from analysis.twitter_sentiment import TwitterSentimentAnalyzer
 DEFAULT_RECORD_PATH = 'agent_state/rumor_radar.jsonl'
 DEFAULT_RADAR_MIN_RATIO = 2.0
 RADAR_MAX_FAILURES = 3
+SHALLOW_SWEEP_PCT = 1.0
+CLUSTER_STRONG = 5
 STALE_ALERT_SECONDS = 2 * 3600
 CANDLE_SECONDS = 4 * 3600
 
@@ -79,6 +81,7 @@ class WyckoffAlerter:
         # dict (no set): conserva el orden de insercion, asi el prune descarta lo mas viejo.
         self._alerted_signatures: Dict[str, None] = {}
         self._radar_failures: Dict[str, int] = {}
+        self._concurrent: Dict[tuple, int] = {}
         self.twitter_sentiment = TwitterSentimentAnalyzer(enabled=twitter_sentiment_enabled)
         # El radar necesita Twitter: sin el no hay nada que cruzar con el volumen.
         self.rumor_radar_enabled = rumor_radar_enabled and twitter_sentiment_enabled
@@ -127,39 +130,114 @@ class WyckoffAlerter:
         except Exception as e:
             self.logger.error(f"[WYCKOFF] Error checking {market_pair} on {exchange}: {e}")
 
-    def _check_and_alert_unsafe(self, exchange: str, market_pair: str, historical_data) -> None:
-        df = IndicatorUtils().convert_to_dataframe(historical_data)
+    def check_cycle(self, exchange: str, pairs_data: Dict[str, list]) -> None:
+        """
+        Revisa todos los pares de un exchange en un ciclo. Primero cuenta cuantos pares tienen
+        evento en la MISMA vela: el edge viene de capitulaciones de todo el mercado (backtest:
+        springs aislados sin ventaja clara; 5+ pares a la vez, +2.5% medio), y ese dato solo se
+        conoce mirando todos los pares antes de avisar.
+        """
+        if not self.enabled:
+            return
+        self._concurrent = self._count_concurrent(exchange, pairs_data)
+        for market_pair, historical_data in pairs_data.items():
+            try:
+                self.check_and_alert(exchange, market_pair, VALIDATED_CANDLE_PERIOD, historical_data)
+            except Exception as e:  # un par que falla nunca debe impedir revisar los demas
+                self.logger.error(f"[WYCKOFF] Exception checking pair {market_pair} on {exchange}: {e}")
 
+    def _count_concurrent(self, exchange: str, pairs_data: Dict[str, list]) -> Dict[tuple, int]:
+        counts: Dict[tuple, int] = {}
+        min_history = LOOKBACK + CONFIRM_WINDOW + 5
+        for market_pair, historical_data in pairs_data.items():
+            if not historical_data or len(historical_data) < min_history:
+                continue
+            try:
+                df = IndicatorUtils().convert_to_dataframe(historical_data)
+                event = self._detect_event(df)
+            except Exception as e:
+                self.logger.error(f"[WYCKOFF] No se pudo contar eventos de {market_pair}: {e}")
+                continue
+            if event is not None:
+                key = (exchange, event[0], event[2].isoformat())
+                counts[key] = counts.get(key, 0) + 1
+        return counts
+
+    @staticmethod
+    def _detect_event(df):
+        """(direccion, volumen_ruptura, timestamp) de la ultima vela cerrada, o None si no hay evento."""
         springs = WyckoffPrimitives.detect_springs(df, lookback=LOOKBACK, confirm_window=CONFIRM_WINDOW)
         upthrusts = WyckoffPrimitives.detect_upthrusts(df, lookback=LOOKBACK, confirm_window=CONFIRM_WINDOW)
 
         i = len(df) - 1  # ultima vela -- ya cerrada, DataManager.get_ohlcv garantiza no-repaint
         timestamp = df.index[i]
 
-        direction = None
-        break_relative_volume = None
-
         spring_rv = springs['break_relative_volume'].iloc[i]
         upthrust_rv = upthrusts['break_relative_volume'].iloc[i]
 
         if bool(springs['is_spring'].iloc[i]) and not pd.isna(spring_rv) and spring_rv >= EXTREME_VOLUME_THRESHOLD:
-            direction = 'hot'
-            break_relative_volume = spring_rv
-        elif bool(upthrusts['is_upthrust'].iloc[i]) and not pd.isna(upthrust_rv) and upthrust_rv >= EXTREME_VOLUME_THRESHOLD:
-            direction = 'cold'
-            break_relative_volume = upthrust_rv
+            return 'hot', spring_rv, timestamp
+        if bool(upthrusts['is_upthrust'].iloc[i]) and not pd.isna(upthrust_rv) and upthrust_rv >= EXTREME_VOLUME_THRESHOLD:
+            return 'cold', upthrust_rv, timestamp
+        return None
 
-        if direction is None:
+    @staticmethod
+    def _sweep_depth(df, direction: str) -> Optional[float]:
+        """
+        % que la vela de ruptura penetro el soporte (spring) o la resistencia (upthrust). Misma
+        semantica que la deteccion: la ultima vela de ruptura cuyo primer regreso al rango es la
+        vela de confirmacion.
+        """
+        n = len(df)
+        i = n - 1
+        ranges = WyckoffPrimitives.detect_trading_range(df, lookback=LOOKBACK)
+        level_col = 'support' if direction == 'hot' else 'resistance'
+        levels = ranges[level_col].values
+        lows = df['low'].astype(float).values
+        highs = df['high'].astype(float).values
+        closes = df['close'].astype(float).values
+        depth = None
+        for i0 in range(max(0, i - CONFIRM_WINDOW), i):
+            level = levels[i0]
+            if pd.isna(level) or level == 0:
+                continue
+            broke = lows[i0] < level if direction == 'hot' else highs[i0] > level
+            if not broke:
+                continue
+            first_return = None
+            for j in range(i0 + 1, min(i0 + 1 + CONFIRM_WINDOW, n)):
+                if (closes[j] > level) if direction == 'hot' else (closes[j] < level):
+                    first_return = j
+                    break
+            if first_return == i:
+                depth = abs(level - (lows[i0] if direction == 'hot' else highs[i0])) / level * 100
+        return depth
+
+    def _check_and_alert_unsafe(self, exchange: str, market_pair: str, historical_data) -> None:
+        df = IndicatorUtils().convert_to_dataframe(historical_data)
+        event = self._detect_event(df)
+        timestamp = df.index[len(df) - 1]
+
+        if event is None:
             if self.rumor_radar_enabled:
                 self._check_rumor_radar(exchange, market_pair, df, timestamp)
             return
 
+        direction, break_relative_volume, timestamp = event
         signature = f"{exchange}:{market_pair}:{direction}:{timestamp.isoformat()}"
         if signature in self._alerted_signatures:
             return
 
+        try:
+            sweep_depth = self._sweep_depth(df, direction)
+        except Exception as e:
+            self.logger.error(f"[WYCKOFF] No se pudo medir la barrida de {market_pair}: {e}")
+            sweep_depth = None
+        concurrent = self._concurrent.get((exchange, direction, timestamp.isoformat()))
+
         self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp,
-                         change_24h=self._change_24h(df))
+                         change_24h=self._change_24h(df), sweep_depth=sweep_depth,
+                         concurrent=concurrent)
         self._remember(signature)
 
     def _check_rumor_radar(self, exchange: str, market_pair: str, df, timestamp) -> None:
@@ -262,9 +340,35 @@ class WyckoffAlerter:
             return ""
         return f"⏱️ <b>ALERTA RETARDADA</b>: la vela cerró hace {elapsed / 3600:.1f} h; revisá si el precio ya se movió\n"
 
+    @staticmethod
+    def _quality_lines(direction: str, sweep_depth: Optional[float], concurrent: Optional[int]) -> str:
+        """
+        Contexto de la senal. Son HIPOTESIS del backtest (auditoria de resultados, 2026-09-29),
+        aun sin confirmar en vivo: se muestran, no filtran ninguna alerta (Principio III). Las
+        cifras historicas solo existen para el spring; el upthrust muestra el dato sin cifras.
+        """
+        lines = []
+        if sweep_depth is not None:
+            line = f"Barrida bajo el nivel: {sweep_depth:.1f}%"
+            if direction == 'hot' and sweep_depth < SHALLOW_SWEEP_PCT:
+                line += " ⚠️ superficial: en el backtest las de menos de 1% no rindieron (media -0.1%)"
+            lines.append(line)
+        if concurrent is not None:
+            line = f"Pares con evento en esta misma vela: {concurrent}"
+            if direction == 'hot':
+                if concurrent <= 1:
+                    line += " ⚠️ aislado: en el backtest sin ventaja clara (media ~+0.3%)"
+                elif concurrent >= CLUSTER_STRONG:
+                    line += " (backtest con 5+ pares: media ~+2.5%)"
+            lines.append(line)
+        if not lines:
+            return ""
+        return "\n".join(lines) + "\n<i>Hipotesis del backtest, aun sin confirmar en vivo.</i>\n"
+
     def _send_alert(self, exchange: str, market_pair: str, direction: str,
                      break_relative_volume: float, timestamp=None,
-                     change_24h: Optional[float] = None) -> None:
+                     change_24h: Optional[float] = None, sweep_depth: Optional[float] = None,
+                     concurrent: Optional[int] = None) -> None:
         if direction == 'hot':
             headline = "🟢 <b>ALCISTA — posible subida</b>"
             label = "Wyckoff Spring: rompio el soporte y volvio a entrar (trampa bajista)"
@@ -279,7 +383,8 @@ class WyckoffAlerter:
             f"{self._stale_notice(timestamp)}"
             f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
             f"{label}\n"
-            f"Volumen en la ruptura: {break_relative_volume:.1f}x el promedio\n\n"
+            f"Volumen en la ruptura: {break_relative_volume:.1f}x el promedio\n"
+            f"{self._quality_lines(direction, sweep_depth, concurrent)}\n"
             f"{plan}\n\n"
             f"<i>Backtest Freqtrade 2022-2026 (specs/032-freqtrade-lab-wyckoff/). "
             f"No es asesoria financiera.</i>"
@@ -300,6 +405,9 @@ class WyckoffAlerter:
             'type': 'wyckoff', 'direction': direction, 'exchange': exchange, 'pair': market_pair,
             'candle': timestamp.isoformat() if timestamp is not None else None,
             'relative_volume': round(float(break_relative_volume), 2),
+            'sweep_depth_pct': None if sweep_depth is None else round(float(sweep_depth), 3),
+            'concurrent_pairs': concurrent,
+            'change_24h_pct': None if change_24h is None else round(float(change_24h), 2),
             'mentions_now': (twitter_result or {}).get('current'),
             'mentions_7d_ago': (twitter_result or {}).get('baseline'),
             'ratio': (twitter_result or {}).get('ratio'),

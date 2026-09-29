@@ -326,6 +326,77 @@ class TestDedupPruneAndStale:
         assert 'hace 4.0 h' in notifier.messages[0]
 
 
+class TestSignalQualityContext:
+    """Profundidad de la barrida y springs simultaneos: se muestran y registran, NUNCA filtran."""
+
+    def test_sweep_depth_is_measured_on_the_breaking_candle(self):
+        from analyzers.utils import IndicatorUtils
+        # soporte 99.0; la vela de ruptura llega a 95.0 -> (99-95)/99 = 4.04%
+        df = IndicatorUtils().convert_to_dataframe(_spring_fixture())
+        depth = WyckoffAlerter._sweep_depth(df, 'hot')
+        assert depth == pytest.approx(4.04, abs=0.01)
+
+    def test_spring_message_shows_depth_and_concurrent_count(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})
+
+        msg = notifier.messages[0]
+        assert 'Barrida bajo el nivel: 4.0%' in msg
+        assert 'Pares con evento en esta misma vela: 1' in msg
+        assert 'aislado' in msg
+        assert 'sin confirmar en vivo' in msg
+
+    def test_concurrent_pairs_are_counted_across_the_cycle(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        pairs = {f'P{i}/USDT': _spring_fixture() for i in range(5)}
+        alerter.check_cycle('binance', pairs)
+
+        assert len(notifier.messages) == 5
+        assert all('Pares con evento en esta misma vela: 5' in m for m in notifier.messages)
+        assert all('5+ pares' in m for m in notifier.messages)
+
+    def test_context_never_suppresses_an_alert(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})  # aislado
+        assert len(notifier.messages) == 1
+
+    def test_context_is_recorded_for_forward_validation(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=str(path))
+        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})
+
+        record = json.loads(path.read_text().strip())
+        assert record['type'] == 'wyckoff'
+        assert record['concurrent_pairs'] == 1
+        assert record['sweep_depth_pct'] == pytest.approx(4.04, abs=0.01)
+        assert 'change_24h_pct' in record
+
+    def test_shallow_sweep_gets_the_warning(self):
+        text = WyckoffAlerter._quality_lines('hot', 0.4, 3)
+        assert 'superficial' in text
+        assert 'aislado' not in text
+
+    def test_upthrust_shows_the_data_without_spring_statistics(self):
+        text = WyckoffAlerter._quality_lines('cold', 0.4, 1)
+        assert 'Barrida bajo el nivel: 0.4%' in text
+        assert 'backtest' not in text.split('Hipotesis')[0]
+
+    def test_disabled_check_cycle_does_nothing(self):
+        notifier = RecordingNotifier()
+        WyckoffAlerter(notifier, enabled=False).check_cycle('binance', {'BTC/USDT': _spring_fixture()})
+        assert notifier.messages == []
+
+    def test_one_pair_failing_does_not_stop_the_cycle(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        pairs = {'BAD/USDT': [[1, 'x']] * 40, 'BTC/USDT': _spring_fixture()}
+        alerter.check_cycle('binance', pairs)
+        assert len(notifier.messages) == 1
+
+
 class TestMessageHonestyAndRadarStale:
     def test_spring_message_separates_all_signals_from_three_positions(self):
         notifier = RecordingNotifier()
