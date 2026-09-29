@@ -42,3 +42,64 @@ def test_other_bad_request_still_raises():
     with patch('notifiers.telegram_client.Bot', return_value=bot):
         with pytest.raises(BadRequest):
             notifier.notify('hola')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# QA adversarial: troceo de mensajes > 4096 sin perder contenido ni dejar
+# chunks vacios (una alerta perdida es peor que una fea).
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestChunkMessage:
+    def _notifier(self):
+        return TelegramNotifier(token='t', chat_id='c', parse_mode='HTML')
+
+    def test_short_message_is_a_single_chunk(self):
+        assert self._notifier().chunk_message('hola', 4096) == ['hola']
+
+    def test_message_exactly_at_limit_is_a_single_chunk(self):
+        message = 'a' * 4096
+        assert self._notifier().chunk_message(message, 4096) == [message]
+
+    def test_multiline_over_limit_loses_no_content(self):
+        message = '\n'.join(f'linea-{i:04d}' for i in range(1000))
+        chunks = self._notifier().chunk_message(message, 4096)
+
+        assert ''.join(chunks) == message
+        assert len(chunks) > 1
+        assert all(0 < len(chunk) <= 4096 for chunk in chunks)
+
+    def test_single_long_line_is_split_not_dropped(self):
+        message = 'A' * 10000
+        chunks = self._notifier().chunk_message(message, 4096)
+
+        assert ''.join(chunks) == message
+        assert all(len(chunk) <= 4096 for chunk in chunks)
+        assert all(chunk for chunk in chunks)
+
+    def test_no_empty_chunk_when_a_line_exceeds_the_limit(self):
+        message = 'intro\n' + 'B' * 9000 + '\nfin'
+        chunks = self._notifier().chunk_message(message, 4096)
+
+        assert ''.join(chunks) == message
+        assert all(chunk for chunk in chunks)
+
+    def test_lines_are_not_cut_across_chunks(self):
+        lines = [f'<b>fila {i}</b>' for i in range(400)]
+        message = '\n'.join(lines)
+        chunks = self._notifier().chunk_message(message, 500)
+
+        for line in lines:
+            assert any(line in chunk for chunk in chunks)
+
+    def test_notify_sends_all_chunks_without_loss(self):
+        bot = MagicMock()
+        bot.send_message = AsyncMock(return_value=None)
+        notifier = TelegramNotifier(token='t', chat_id='c', parse_mode='HTML')
+        message = '\n'.join(f'linea-{i:04d}' for i in range(1000))
+
+        with patch('notifiers.telegram_client.Bot', return_value=bot):
+            notifier.notify(message)
+
+        sent = [call.kwargs['text'] for call in bot.send_message.await_args_list]
+        assert ''.join(sent) == message
+        assert all(0 < len(text) <= 4096 for text in sent)
