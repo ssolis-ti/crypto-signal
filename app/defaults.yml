@@ -12,7 +12,16 @@ settings:
   market_data_chunk_size: 20
   market_pairs: null
   timezone: UTC
-  
+
+  # ─────────────────────────────────────────
+  # Alertas Wyckoff en vivo (specs/023-wyckoff-live-alerts/)
+  # ─────────────────────────────────────────
+  # Deshabilitado por defecto: opt-in explicito, no todos los clones de este
+  # proyecto open-source deberian empezar a recibir un tipo de alerta nuevo sin
+  # que el operador lo decida en su propio config.yml.
+  wyckoff_alerts:
+    enabled: false
+
   # ─────────────────────────────────────────
   # Dynamic Pairs - Filtrado automático de mercados
   # ─────────────────────────────────────────

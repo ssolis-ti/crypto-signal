@@ -241,6 +241,20 @@ class Notifier():
             except Exception as e:
                 self.logger.error(f"Error sending queued telegram: {e}")
     
+    def send_direct_text(self, message: str):
+        """
+        Envia un mensaje de texto pre-formateado directo por Telegram, sin pasar por
+        SignalEnhancer/SmartNotificationManager (specs/023-wyckoff-live-alerts/: el
+        heuristico de scoring ya se probo, dos veces, que no predice nada -- ver
+        specs/007 y specs/011 -- asi que la alerta Wyckoff validada por separado
+        (specs/017/018) no debe quedar sujeta a ese mismo filtro).
+        """
+        for notifier in self.telegram_clients:
+            try:
+                self.telegram_clients[notifier].send_messages([message])
+            except Exception as e:
+                self.logger.error(f"[WYCKOFF] Error sending direct text: {e}")
+
     def _send_smart_text(self, message):
         """
         Envía mensaje de texto para SmartNotificationManager.

@@ -9,7 +9,18 @@ settings:
   market_pairs: false           # false = usar dynamic_pairs
   enable_charts: true           # Generar gráficos
   timezone: America/Santiago
-  
+
+  # ═══════════════════════════════════════════
+  # ALERTAS WYCKOFF EN VIVO (specs/023-wyckoff-live-alerts/)
+  # ═══════════════════════════════════════════
+  # Unico edge validado con holdout in-sample/out-of-sample de este proyecto
+  # (specs/017-wyckoff-edge-refinement/): Spring/Upthrust con volumen extremo (>=2.5x)
+  # en la vela de ruptura, solo en 4h. Independiente del score de SignalEnhancer
+  # (ya invalidado dos veces -- specs/007, specs/011). Envia un mensaje con ambos
+  # encuadres (rapida 1-2h / sostenida 14d) y los numeros reales de la validacion.
+  wyckoff_alerts:
+    enabled: true
+
   # ═══════════════════════════════════════════
   # CONFIGURACIÓN DE PARES DINÁMICOS
   # ═══════════════════════════════════════════

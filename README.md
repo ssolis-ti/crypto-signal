@@ -169,13 +169,19 @@ dependencias pinneadas).
 | [020](specs/020-orderflow-and-social-data-research/) | Investigación (verificada en vivo): Binance ya expone taker buy/sell volume gratis; getxapi sí tiene búsqueda histórica real en Twitter/X |
 | [021](specs/021-wyckoff-taker-flow/) | Taker buy/sell flow como refinamiento: hipótesis de absorción pasa la barra mecánica pero con signo invertido in-sample/out-of-sample — **inconcluso**, no se suma como edge validado |
 | [022](specs/022-twitter-attention-pilot/) | Piloto de atención en Twitter/X: `tweet_count` de getxapi resultó capeado (~19 siempre) — método descartado, frenado a tiempo tras 10/41 consultas |
+| [023](specs/023-wyckoff-live-alerts/) | **En producción**: alerta Wyckoff Spring/Upthrust (volumen extremo ≥2.5x) a Telegram, con encuadre dual (rápida/sostenida) y números reales — independiente de `SignalEnhancer` |
 
 ---
 
 ## 📊 Estado actual y límites conocidos
 
-- ✅ Pipeline de datos sin repintado, UTC consistente en todo punto crítico, ~121 tests pasando.
+- ✅ Pipeline de datos sin repintado, UTC consistente en todo punto crítico, 155 tests pasando.
 - ✅ Corriendo en producción, ciclo real Binance → Telegram confirmado end-to-end.
+- ✅ **Alerta Wyckoff en vivo** (slice 023): Spring/Upthrust con volumen extremo (≥2.5x) — el único
+  edge de todo el proyecto que sobrevivió validación con holdout — envía un mensaje con encuadre dual
+  (⚡ rápida 1-2h / 📈 sostenida 14d) y los números reales de la validación, completamente
+  independiente del score de `SignalEnhancer`. Gateado por `settings.wyckoff_alerts.enabled` (default
+  `false`, activado en el `config.yml` del operador).
 - ⚠️ **El score de `SignalEnhancer` fue validado históricamente contra los dos indicadores
   habilitados en producción (RSI: 642 señales — slice 007; macd_cross: 1.776 señales — slice 011) y
   no mostró valor predictivo** — en macd_cross a 72h la correlación es incluso significativamente
