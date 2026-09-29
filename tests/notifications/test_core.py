@@ -235,6 +235,52 @@ class TestSendSmartChart:
         notifier._send_smart_chart('chart.png', {'market': 'BTC/USDT', 'status': 'hot'})
 
 
+class TestSendDirectText:
+    """
+    La alerta directa (Wyckoff/radar, specs/023) se manda a cada cliente Telegram
+    configurado; el fallo de uno no debe impedir la entrega a los demas.
+    """
+
+    def _two_telegram_notifier(self):
+        config = {}
+        for name in ('telegram_a', 'telegram_b'):
+            config[name] = {
+                'required': {'token': 'fake-token', 'chat_id': '12345'},
+                'optional': {'parse_mode': 'HTML', 'template': TEMPLATE},
+            }
+        return _make_notifier(config)
+
+    def test_no_clients_is_a_no_op(self):
+        notifier = _make_notifier({})
+        notifier.send_direct_text('ALERTA')  # no debe lanzar
+
+    def test_failing_first_client_does_not_block_the_second(self):
+        notifier = self._two_telegram_notifier()
+        received = []
+
+        def boom(messages):
+            raise RuntimeError('network down')
+
+        notifier.telegram_clients['telegram_a'].send_messages = boom
+        notifier.telegram_clients['telegram_b'].send_messages = (
+            lambda messages: received.append(messages))
+
+        notifier.send_direct_text('ALERTA')
+
+        assert received == [['ALERTA']]
+
+    def test_all_clients_failing_is_contained(self):
+        notifier = self._two_telegram_notifier()
+
+        def boom(messages):
+            raise RuntimeError('network down')
+
+        for client in notifier.telegram_clients.values():
+            client.send_messages = boom
+
+        notifier.send_direct_text('ALERTA')  # no debe propagar la excepcion
+
+
 class TestNotifyAll:
     def _messages_by_pair(self, msgs):
         return {'binance': {'BTC/USDT': {'4h': msgs}}}

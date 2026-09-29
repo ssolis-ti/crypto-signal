@@ -103,3 +103,35 @@ class TestFinalizeCycleGating:
         assert manager.summaries == []
         assert manager.current_cycle == []
         assert manager.btc_context == {}
+
+
+class TestMissingDataDefaults:
+    """Datos faltantes no deben romper el resumen ni ocultar señales."""
+
+    def test_signal_with_no_fields_still_appears_as_unknown(self):
+        manager = SmartNotificationManager(_zero_delay_config())
+        manager.add_signal({})
+
+        message = manager.build_summary_message()
+
+        assert 'UNKNOWN' in message
+
+    def test_non_dict_values_does_not_crash(self):
+        manager = SmartNotificationManager(_zero_delay_config())
+        manager.add_signal({'market': 'BTC/USDT', 'quality': 'C', 'score': 10,
+                            'status': 'hot', 'indicator': 'rsi', 'values': 'no-dict'})
+
+        assert 'BTC/USDT' in manager.build_summary_message()
+
+    def test_non_numeric_rsi_falls_back_to_indicator_name(self):
+        manager = SmartNotificationManager(_zero_delay_config())
+        manager.add_signal({'market': 'BTC/USDT', 'quality': 'C', 'score': 10,
+                            'status': 'hot', 'indicator': 'rsi', 'values': {'rsi': 'abc'}})
+
+        message = manager.build_summary_message()
+        assert 'RSI 0' not in message
+        assert 'rsi' in message
+
+    def test_get_cycle_stats_with_no_summaries(self):
+        manager = SmartNotificationManager(_zero_delay_config())
+        assert manager.get_cycle_stats() == {'count': 0}

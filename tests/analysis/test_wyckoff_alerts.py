@@ -5,9 +5,15 @@ import json
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
+import pandas as pd
 import pytest
 
-from analysis.wyckoff_alerts import WyckoffAlerter, EXTREME_VOLUME_THRESHOLD, LOOKBACK
+from analyzers.utils import IndicatorUtils
+from analyzers.indicators.wyckoff import WyckoffPrimitives
+from analysis.wyckoff_alerts import (
+    WyckoffAlerter, EXTREME_VOLUME_THRESHOLD, LOOKBACK,
+    CANDLE_SECONDS, STALE_ALERT_SECONDS, MAX_DEDUP_SIGNATURES,
+)
 
 
 class RecordingNotifier:
@@ -364,3 +370,276 @@ class TestWyckoffAlerterGuards:
         alerter.check_and_alert('binance', 'BTC/USDT', '4h', malformed)  # no debe lanzar
 
         assert notifier.messages == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# QA adversarial: bordes de umbral, degenerados y comportamiento documentado.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _fake_detection(df, spring=False, upthrust=False,
+                    spring_rv=float('nan'), upthrust_rv=float('nan')):
+    """DataFrames de deteccion con el flag y el volumen de ruptura solo en la ultima vela."""
+    springs = pd.DataFrame({
+        'is_spring': [False] * (len(df) - 1) + [spring],
+        'break_relative_volume': [float('nan')] * (len(df) - 1) + [spring_rv],
+    }, index=df.index)
+    upthrusts = pd.DataFrame({
+        'is_upthrust': [False] * (len(df) - 1) + [upthrust],
+        'break_relative_volume': [float('nan')] * (len(df) - 1) + [upthrust_rv],
+    }, index=df.index)
+    return springs, upthrusts
+
+
+class TestVolumeThresholdBoundary:
+    """El edge se valido con `>= 2.5x`; el borde exacto debe disparar."""
+
+    def _run(self, spring=True, upthrust=False,
+             spring_rv=float('nan'), upthrust_rv=float('nan')):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        ohlcv = _no_event_fixture()
+        df = IndicatorUtils().convert_to_dataframe(ohlcv)
+        springs, upthrusts = _fake_detection(
+            df, spring=spring, upthrust=upthrust,
+            spring_rv=spring_rv, upthrust_rv=upthrust_rv)
+        with patch.object(WyckoffPrimitives, 'detect_springs', return_value=springs), \
+             patch.object(WyckoffPrimitives, 'detect_upthrusts', return_value=upthrusts):
+            alerter.check_and_alert('binance', 'BTC/USDT', '4h', ohlcv)
+        return notifier.messages
+
+    def test_exactly_25x_relative_volume_alerts(self):
+        messages = self._run(spring_rv=2.5)
+        assert len(messages) == 1
+        assert messages[0].startswith('🟢')
+
+    def test_just_below_25x_does_not_alert(self):
+        assert self._run(spring_rv=2.4999) == []
+
+    def test_nan_break_volume_never_alerts(self):
+        # Volumen relativo NaN (p. ej. promedio 0) no debe tomarse como extremo.
+        assert self._run(spring_rv=float('nan')) == []
+
+    def test_spring_wins_over_upthrust_on_same_candle(self):
+        # Documenta la precedencia actual: si una misma vela cierra ambos eventos,
+        # solo se envia el Spring (la rama `elif` del upthrust no se evalua).
+        messages = self._run(spring=True, upthrust=True, spring_rv=3.0, upthrust_rv=3.0)
+        assert len(messages) == 1
+        assert messages[0].startswith('🟢')
+        assert 'Spring' in messages[0]
+        assert 'Upthrust' not in messages[0]
+
+
+class TestDetectionDegenerateInputs:
+    def test_all_zero_volume_does_not_alert_or_crash(self):
+        closes, lows, highs, _ = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
+        closes += [97.0, 100.0]
+        lows += [95.0, 98.0]
+        highs += [98.0, 101.0]
+        volumes = [0.0] * (FIXTURE_FLAT_CANDLES + 2)
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h',
+                                _to_ohlcv_list(closes, lows, highs, volumes))
+
+        assert notifier.messages == []
+
+    def test_flat_range_never_breaks(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        ohlcv = _to_ohlcv_list(*_flat_range_df(n_flat=FIXTURE_FLAT_CANDLES + 5))
+
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h', ohlcv)
+
+        assert notifier.messages == []
+
+    def test_multi_candle_break_only_alerts_on_first_confirmation(self):
+        """
+        Documenta el comportamiento actual (no se cambia): el evento se marca en la
+        PRIMERA vela que cierra de vuelta dentro del rango. Si el bot ve una vela
+        posterior, el evento ya quedo atras y no se alerta -- una alerta real puede
+        perderse si la confirmacion ocurrio mientras la PC estaba apagada.
+        """
+        closes, lows, highs, volumes = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
+        closes += [97.0, 100.0, 100.5]        # ruptura, confirmacion, vela posterior
+        lows += [95.0, 98.0, 99.5]
+        highs += [98.0, 101.0, 101.0]
+        volumes += [1000.0, 100.0, 100.0]
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h',
+                                _to_ohlcv_list(closes, lows, highs, volumes))
+
+        assert notifier.messages == []
+
+
+class TestChange24h:
+    def test_fewer_than_seven_candles_returns_none(self):
+        assert WyckoffAlerter._change_24h(pd.DataFrame({'close': [1.0] * 6})) is None
+
+    def test_seven_candles_uses_the_close_seven_back(self):
+        df = pd.DataFrame({'close': [100.0] * 6 + [110.0]})
+        assert WyckoffAlerter._change_24h(df) == pytest.approx(10.0)
+
+    def test_zero_price_seven_candles_back_returns_none(self):
+        df = pd.DataFrame({'close': [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0]})
+        assert WyckoffAlerter._change_24h(df) is None
+
+
+class TestStaleNoticeBoundaries:
+    def _alerter(self):
+        return WyckoffAlerter(RecordingNotifier(), enabled=True)
+
+    def _closed_at(self):
+        # timestamp = apertura de la vela; cierra CANDLE_SECONDS despues.
+        return datetime(2026, 9, 29, 8, 0, tzinfo=timezone.utc)
+
+    def test_exactly_two_hours_after_close_has_no_notice(self):
+        ts = self._closed_at()
+        now = ts + timedelta(seconds=CANDLE_SECONDS + STALE_ALERT_SECONDS)
+        with patch.object(WyckoffAlerter, '_now_utc', return_value=now):
+            assert self._alerter()._stale_notice(ts) == ''
+
+    def test_one_second_over_two_hours_has_notice(self):
+        ts = self._closed_at()
+        now = ts + timedelta(seconds=CANDLE_SECONDS + STALE_ALERT_SECONDS + 1)
+        with patch.object(WyckoffAlerter, '_now_utc', return_value=now):
+            assert 'ALERTA RETARDADA' in self._alerter()._stale_notice(ts)
+
+    def test_future_timestamp_has_no_notice(self):
+        ts = self._closed_at()
+        with patch.object(WyckoffAlerter, '_now_utc', return_value=ts + timedelta(hours=1)):
+            assert self._alerter()._stale_notice(ts) == ''
+
+    def test_naive_timestamp_raises_type_error(self):
+        # Caracterizacion: la ruta de produccion siempre entrega index UTC-aware
+        # (convert_to_dataframe(..., utc=True)); un timestamp naive rompe la resta.
+        with pytest.raises(TypeError):
+            self._alerter()._stale_notice(datetime(2026, 9, 29, 8, 0))
+
+
+class TestDedupRecordLoading:
+    def _load(self, tmp_path, content):
+        path = tmp_path / 'record.jsonl'
+        path.write_text(content, encoding='utf-8')
+        return WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=str(path))
+
+    def test_empty_file_loads_nothing(self, tmp_path):
+        alerter = self._load(tmp_path, '')
+        assert alerter._alerted_signatures == {}
+
+    def test_truncated_last_line_keeps_previous_valid_signatures(self, tmp_path):
+        valid = json.dumps({'type': 'wyckoff', 'direction': 'hot', 'exchange': 'binance',
+                            'pair': 'BTC/USDT', 'candle': '2026-01-01T00:00:00+00:00'})
+        alerter = self._load(tmp_path, valid + '\n{"type": "wyckoff", "direction": "col')
+        assert list(alerter._alerted_signatures) == [
+            'binance:BTC/USDT:hot:2026-01-01T00:00:00+00:00']
+
+    def test_line_missing_candle_or_pair_is_ignored(self, tmp_path):
+        alerter = self._load(
+            tmp_path,
+            json.dumps({'type': 'wyckoff', 'direction': 'hot'}) + '\n')
+        assert alerter._alerted_signatures == {}
+
+    def test_radar_and_wyckoff_signatures_are_both_loaded(self, tmp_path):
+        lines = [
+            json.dumps({'type': 'radar', 'exchange': 'binance', 'pair': 'SOL/USDT',
+                        'candle': '2026-01-01T00:00:00+00:00'}),
+            json.dumps({'type': 'wyckoff', 'direction': 'cold', 'exchange': 'binance',
+                        'pair': 'ETH/USDT', 'candle': '2026-01-01T04:00:00+00:00'}),
+        ]
+        alerter = self._load(tmp_path, '\n'.join(lines) + '\n')
+        assert set(alerter._alerted_signatures) == {
+            'binance:SOL/USDT:radar:2026-01-01T00:00:00+00:00',
+            'binance:ETH/USDT:cold:2026-01-01T04:00:00+00:00',
+        }
+
+    def test_more_than_max_lines_keeps_only_the_last_window(self, tmp_path):
+        lines = [
+            json.dumps({'type': 'wyckoff', 'direction': 'hot', 'exchange': 'binance',
+                        'pair': 'BTC/USDT', 'candle': f'2026-01-01T00:{i:02d}:00+00:00'})
+            for i in range(MAX_DEDUP_SIGNATURES + 100)
+        ]
+        alerter = self._load(tmp_path, '\n'.join(lines) + '\n')
+        assert len(alerter._alerted_signatures) == MAX_DEDUP_SIGNATURES
+
+
+class TestRadarEdges:
+    def _alerter(self, tmp_path, radar_min_ratio=2.0):
+        return WyckoffAlerter(RecordingNotifier(), enabled=True, twitter_sentiment_enabled=True,
+                              rumor_radar_enabled=True, radar_min_ratio=radar_min_ratio,
+                              record_path=str(tmp_path / 'radar.jsonl'))
+
+    def _analyze_result(self):
+        return {'current': 6.0, 'baseline': 3.0, 'ratio': 3.0, 'max_views': 0,
+                'sentiment_extreme': 'none', 'social_spike_confirmed': False,
+                'catalyst_present': False, 'summary': ''}
+
+    def test_ratio_exactly_at_threshold_alerts(self, tmp_path):
+        alerter = self._alerter(tmp_path)
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity',
+                          return_value=_velocity(2.0)), \
+             patch.object(alerter.twitter_sentiment, 'analyze',
+                          return_value=self._analyze_result()):
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
+        assert len(alerter.notifier.messages) == 1
+
+    def test_ratio_just_below_threshold_records_without_alert(self, tmp_path):
+        alerter = self._alerter(tmp_path)
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity',
+                          return_value=_velocity(1.9999)), \
+             patch.object(alerter.twitter_sentiment, 'analyze') as mock_analyze:
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
+        mock_analyze.assert_not_called()
+        assert alerter.notifier.messages == []
+        record = json.loads((tmp_path / 'radar.jsonl').read_text().strip())
+        assert record['alert_sent'] is False
+
+    def test_ratio_none_records_and_dedups_without_alert(self, tmp_path):
+        # Documenta el comportamiento actual: ratio None (baseline insuficiente) NO se
+        # trata como fallo reintentable, sino como resultado ya procesado de la vela.
+        alerter = self._alerter(tmp_path)
+        velocity = {'current': 3.0, 'baseline': None, 'ratio': None, 'max_views': 0,
+                    'tweets': [{'text': 'x'}]}
+        ohlcv = _volume_spike_no_event_fixture()
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity',
+                          return_value=velocity) as mock_velocity, \
+             patch.object(alerter.twitter_sentiment, 'analyze') as mock_analyze:
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+        assert mock_velocity.call_count == 1
+        mock_analyze.assert_not_called()
+        assert alerter.notifier.messages == []
+        record = json.loads((tmp_path / 'radar.jsonl').read_text().strip())
+        assert record['alert_sent'] is False and record['ratio'] is None
+
+    def test_open_zero_candle_does_not_crash(self, tmp_path):
+        closes, lows, highs, volumes = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
+        closes += [100.5]
+        lows += [99.5]
+        highs += [100.8]
+        volumes += [1000.0]
+        ohlcv = _to_ohlcv_list(closes, lows, highs, volumes)
+        ohlcv[-1][1] = 0.0  # open == 0
+        alerter = self._alerter(tmp_path)
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity',
+                          return_value=_velocity(3.0)), \
+             patch.object(alerter.twitter_sentiment, 'analyze',
+                          return_value=self._analyze_result()):
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+        assert len(alerter.notifier.messages) == 1
+        assert '+0.0%' in alerter.notifier.messages[0]
+
+    def test_record_failure_does_not_prevent_the_alert(self, tmp_path):
+        blocker = tmp_path / 'blocker'
+        blocker.write_text('x')  # archivo, no directorio: makedirs va a fallar
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True,
+                                 twitter_sentiment_enabled=True, rumor_radar_enabled=True,
+                                 record_path=str(blocker / 'nested' / 'radar.jsonl'))
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity',
+                          return_value=_velocity(3.0)), \
+             patch.object(alerter.twitter_sentiment, 'analyze',
+                          return_value=self._analyze_result()):
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
+        assert len(alerter.notifier.messages) == 1

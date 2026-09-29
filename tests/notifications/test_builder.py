@@ -3,7 +3,49 @@ Tests para la ventana anti-spam en UTC de MessageBuilder (specs/002-utc-internal
 """
 import datetime
 
+import pandas as pd
+
 from notifications.builder import MessageBuilder
+
+
+def _indicator_analysis(market='BTC/USDT', hot=True):
+    """Estructura minima realista: un indicador 'rsi' con una fila de resultado."""
+    result = pd.DataFrame([{'rsi': 55.0, 'is_hot': hot, 'is_cold': False}])
+    return {
+        'binance': {
+            market: {
+                'indicators': {
+                    'rsi': [{
+                        'config': {'signal': ['rsi'], 'candle_period': '4h',
+                                   'alert_frequency': '1h', 'alert_enabled': True},
+                        'result': result,
+                    }],
+                },
+            },
+        },
+    }
+
+
+class TestBuildIndicatorMessagesMissingData:
+    def test_empty_analysis_returns_empty_structure(self):
+        assert MessageBuilder().build_indicator_messages({}) == {}
+
+    def test_zero_row_result_is_skipped(self):
+        analysis = _indicator_analysis()
+        analysis['binance']['BTC/USDT']['indicators']['rsi'][0]['result'] = pd.DataFrame(
+            columns=['rsi', 'is_hot', 'is_cold'])
+
+        messages = MessageBuilder().build_indicator_messages(analysis)
+
+        assert messages['binance']['BTC/USDT'].get('4h', []) == []
+
+    def test_market_pair_without_quote_currency_does_not_crash(self):
+        analysis = _indicator_analysis(market='BTCUSDT')
+
+        messages = MessageBuilder().build_indicator_messages(analysis)
+
+        entry = messages['binance']['BTCUSDT']['4h'][0]
+        assert entry['quote_currency'] == ''
 
 
 class TestAlertFrequencyIsUtc:
