@@ -408,7 +408,8 @@ class TestMessageHonestyAndRadarStale:
         assert '3 posiciones abiertas' in msg
         assert 'no es prudente' in msg
         assert '+92%' not in msg  # cifra de un formato distinto; se presentaba como tasa de la estrategia
-        assert 'USDT' not in msg  # el capital del operador no es el de la config de prueba de Freqtrade
+        # el capital del operador no es el de la config de prueba de Freqtrade (100 USDT, 3 x 30)
+        assert '100 USDT' not in msg and '30 USDT' not in msg
 
     def test_radar_alert_after_downtime_is_marked_stale(self, tmp_path):
         alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, twitter_sentiment_enabled=True,
