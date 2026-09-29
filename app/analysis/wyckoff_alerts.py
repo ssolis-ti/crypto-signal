@@ -22,6 +22,7 @@ import structlog
 
 from analyzers.utils import IndicatorUtils
 from analyzers.indicators.wyckoff import WyckoffPrimitives
+from analysis.twitter_sentiment import TwitterSentimentAnalyzer
 
 VALIDATED_CANDLE_PERIOD = '4h'
 LOOKBACK = 20
@@ -43,11 +44,12 @@ class WyckoffAlerter:
     pedir datos nuevos al exchange (Principio I: solo lectura).
     """
 
-    def __init__(self, notifier, enabled: bool = False):
+    def __init__(self, notifier, enabled: bool = False, twitter_sentiment_enabled: bool = False):
         self.logger = structlog.get_logger()
         self.notifier = notifier
         self.enabled = enabled
         self._alerted_signatures: Set[str] = set()
+        self.twitter_sentiment = TwitterSentimentAnalyzer(enabled=twitter_sentiment_enabled)
 
     def check_and_alert(self, exchange: str, market_pair: str, candle_period: str,
                          historical_data) -> None:
@@ -119,6 +121,12 @@ class WyckoffAlerter:
             f"(specs/017-wyckoff-edge-refinement/, specs/018-wyckoff-timing-and-drawdown/). "
             f"No es asesoria financiera.</i>"
         )
+
+        ticker = market_pair.split('/')[0]
+        twitter_result = self.twitter_sentiment.analyze(ticker, direction)
+        twitter_section = TwitterSentimentAnalyzer.format_section(twitter_result)
+        if twitter_section:
+            message = f"{message}\n\n{twitter_section}"
 
         self.notifier.send_direct_text(message)
         self.logger.info(

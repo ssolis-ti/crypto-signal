@@ -20,6 +20,14 @@ settings:
   # encuadres (rapida 1-2h / sostenida 14d) y los numeros reales de la validacion.
   wyckoff_alerts:
     enabled: true
+    # specs/031-wyckoff-twitter-sentiment/: seccion OPCIONAL e informativa en el mensaje,
+    # con contenido de Twitter/X clasificado por un LLM (capitulacion/euforia/mixto/nada).
+    # NO forma parte del edge validado (specs/017/018) y nunca decide si se envia la alerta
+    # -- ver specs/030 (hallazgo cualitativo de n=5, no probado estadisticamente).
+    # Requiere GETXAPI_API_KEY y GEMINI_API_KEY en .env; si faltan, se degrada sola
+    # (la alerta base se envia igual, sin esta seccion).
+    twitter_sentiment:
+      enabled: false
 
   # ═══════════════════════════════════════════
   # CONFIGURACIÓN DE PARES DINÁMICOS

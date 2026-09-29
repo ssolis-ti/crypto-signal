@@ -21,6 +21,10 @@ settings:
   # que el operador lo decida en su propio config.yml.
   wyckoff_alerts:
     enabled: false
+    # specs/031-wyckoff-twitter-sentiment/: enriquecimiento OPCIONAL e informativo,
+    # no forma parte del edge validado. Requiere GETXAPI_API_KEY y GEMINI_API_KEY en .env.
+    twitter_sentiment:
+      enabled: false
 
   # ─────────────────────────────────────────
   # Dynamic Pairs - Filtrado automático de mercados

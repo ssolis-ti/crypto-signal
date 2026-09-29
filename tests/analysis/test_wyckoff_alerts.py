@@ -1,6 +1,8 @@
 """
 Tests para WyckoffAlerter (specs/023-wyckoff-live-alerts/).
 """
+from unittest.mock import patch
+
 import pytest
 
 from analysis.wyckoff_alerts import WyckoffAlerter, EXTREME_VOLUME_THRESHOLD, LOOKBACK
@@ -124,6 +126,42 @@ class TestWyckoffAlerterDedup:
         alerter.check_and_alert('binance', 'ETH/USDT', '4h', ohlcv)
 
         assert len(notifier.messages) == 2
+
+
+class TestWyckoffAlerterTwitterSentiment:
+    def test_twitter_disabled_by_default_omits_section(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)  # twitter_sentiment_enabled defaults False
+
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
+
+        assert len(notifier.messages) == 1
+        assert 'Twitter' not in notifier.messages[0]
+
+    def test_twitter_enabled_appends_section_when_analyzer_returns_result(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True, twitter_sentiment_enabled=True)
+
+        fake_result = {
+            'sentiment_extreme': 'capitulation', 'social_spike_confirmed': True,
+            'catalyst_present': False, 'summary': 'Resumen de prueba.',
+        }
+        with patch.object(alerter.twitter_sentiment, 'analyze', return_value=fake_result):
+            alerter.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
+
+        assert len(notifier.messages) == 1
+        assert 'Twitter' in notifier.messages[0]
+        assert 'Resumen de prueba.' in notifier.messages[0]
+
+    def test_twitter_enabled_but_analyzer_returns_none_omits_section(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True, twitter_sentiment_enabled=True)
+
+        with patch.object(alerter.twitter_sentiment, 'analyze', return_value=None):
+            alerter.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
+
+        assert len(notifier.messages) == 1
+        assert 'Twitter' not in notifier.messages[0]
 
 
 class TestWyckoffAlerterGuards:

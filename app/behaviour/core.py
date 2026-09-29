@@ -111,7 +111,12 @@ class Behaviour():
         # Independiente de SignalEnhancer -- ver WyckoffAlerter.
         # ─────────────────────────────────────────
         wyckoff_config = config.settings.get('wyckoff_alerts', {})
-        self.wyckoff_alerter = WyckoffAlerter(notifier, enabled=wyckoff_config.get('enabled', False))
+        twitter_sentiment_config = wyckoff_config.get('twitter_sentiment', {})
+        self.wyckoff_alerter = WyckoffAlerter(
+            notifier,
+            enabled=wyckoff_config.get('enabled', False),
+            twitter_sentiment_enabled=twitter_sentiment_config.get('enabled', False),
+        )
 
     def run(self, market_data, output_mode):
         """
