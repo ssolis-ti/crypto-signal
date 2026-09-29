@@ -260,6 +260,38 @@ class TestRumorRadar:
         mock_vel.assert_not_called()
 
 
+class TestDedupSurvivesRestart:
+    def test_wyckoff_alert_not_repeated_after_restart(self, tmp_path):
+        path = str(tmp_path / 'record.jsonl')
+        first = WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=path)
+        first.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
+        assert len(first.notifier.messages) == 1
+
+        restarted = WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=path)
+        restarted.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
+        assert restarted.notifier.messages == []
+
+    def test_radar_candle_not_requeried_after_restart(self, tmp_path):
+        path = str(tmp_path / 'record.jsonl')
+        first = WyckoffAlerter(RecordingNotifier(), enabled=True, twitter_sentiment_enabled=True,
+                               rumor_radar_enabled=True, record_path=path)
+        ohlcv = _volume_spike_no_event_fixture()
+        with patch.object(first.twitter_sentiment, 'mention_velocity', return_value=_velocity(1.1)):
+            first.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+
+        restarted = WyckoffAlerter(RecordingNotifier(), enabled=True, twitter_sentiment_enabled=True,
+                                   rumor_radar_enabled=True, record_path=path)
+        with patch.object(restarted.twitter_sentiment, 'mention_velocity') as mock_vel:
+            restarted.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
+        mock_vel.assert_not_called()
+
+    def test_corrupt_record_lines_are_ignored(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        path.write_text('esto no es json\n{"type": "wyckoff"}\n')
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=str(path))
+        assert alerter._alerted_signatures == {}
+
+
 class TestDedupPruneAndStale:
     def test_prune_drops_oldest_and_keeps_newest(self):
         alerter = WyckoffAlerter(RecordingNotifier(), enabled=True)

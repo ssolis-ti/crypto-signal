@@ -79,6 +79,28 @@ class WyckoffAlerter:
         self.rumor_radar_enabled = rumor_radar_enabled and twitter_sentiment_enabled
         self.radar_min_ratio = radar_min_ratio
         self.record_path = record_path
+        self._load_signatures_from_record()
+
+    def _load_signatures_from_record(self) -> None:
+        """
+        La deduplicacion vive en memoria y se perdia en cada reinicio (redeploy, PC apagada de
+        noche): la misma vela volvia a alertar. Se reconstruye desde el registro persistente.
+        """
+        if not self.record_path or not os.path.exists(self.record_path):
+            return
+        try:
+            with open(self.record_path, encoding='utf-8') as f:
+                lines = f.readlines()[-MAX_DEDUP_SIGNATURES:]
+            for line in lines:
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                kind = 'radar' if event.get('type') == 'radar' else event.get('direction')
+                if kind and event.get('candle') and event.get('pair'):
+                    self._remember(f"{event.get('exchange')}:{event['pair']}:{kind}:{event['candle']}")
+        except Exception as e:
+            self.logger.error(f"[WYCKOFF] No se pudo cargar el registro de alertas: {e}")
 
     def check_and_alert(self, exchange: str, market_pair: str, candle_period: str,
                          historical_data) -> None:
