@@ -196,17 +196,26 @@ class TwitterSentimentAnalyzer:
         lines = ["🐦 <b>Twitter</b> (informativo, sin validar estadísticamente)"]
 
         current, baseline, ratio = result.get('current'), result.get('baseline'), result.get('ratio')
-        if ratio is not None:
+        # Los numeros pueden faltar o llegar con un tipo inesperado (salida de un LLM):
+        # formatearlos a la fuerza tumbaba la alerta entera. Se muestra solo lo que es numerico.
+        def _is_number(value):
+            return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+        if _is_number(ratio) and _is_number(current) and _is_number(baseline):
             trend = " 🔥 acelerando" if ratio >= ACCELERATING_RATIO else ""
             lines.append(f"Menciones: {current:.1f}/h ahora vs {baseline:.1f}/h hace "
                          f"{BASELINE_DAYS} días ({ratio:.1f}x){trend}")
-        elif current is not None:
+        elif _is_number(current):
             lines.append(f"Menciones: {current:.1f}/h ahora")
-        if (result.get('max_views') or 0) >= VIRAL_VIEWS:
-            lines.append(f"📣 Tweet viral: {result['max_views']:,} vistas")
+        max_views = result.get('max_views')
+        if _is_number(max_views) and max_views >= VIRAL_VIEWS:
+            lines.append(f"📣 Tweet viral: {max_views:,} vistas")
 
-        if result.get('sentiment_extreme'):
-            label = SENTIMENT_LABELS.get(result['sentiment_extreme'], SENTIMENT_LABELS['none'])
+        sentiment_extreme = result.get('sentiment_extreme')
+        # Solo etiquetas conocidas: un valor no-string (p. ej. una lista devuelta por Gemini)
+        # antes hacia TypeErrors sobre el dict y se perdia la alerta entera.
+        if isinstance(sentiment_extreme, str) and sentiment_extreme:
+            label = SENTIMENT_LABELS.get(sentiment_extreme, SENTIMENT_LABELS['none'])
             lines.append(f"Sentimiento: {label}")
         if result.get('social_spike_confirmed'):
             lines.append("📡 Pico de actividad social confirmado por terceros")

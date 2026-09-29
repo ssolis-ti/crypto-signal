@@ -230,3 +230,116 @@ class TestFormatSection:
         assert 'Sin señal clara' in section
         assert 'Pico de actividad social' not in section
         assert 'catalizador' not in section
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# QA adversarial: entradas mal formadas y tipos inesperados de un LLM/terceros.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestMentionsPerHourAdversarial:
+    def test_malformed_created_at_values_are_skipped(self):
+        base = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
+        tweets = [
+            {'createdAt': 'no es fecha'},
+            {'createdAt': None},
+            {},
+            {'createdAt': 1234567890},
+            {'createdAt': (base - timedelta(hours=1)).strftime(TWITTER_DATE_FORMAT)},
+            {'createdAt': base.strftime(TWITTER_DATE_FORMAT)},
+        ]
+        assert TwitterSentimentAnalyzer._mentions_per_hour(tweets) == pytest.approx(1.0)
+
+    def test_all_tweets_same_timestamp_returns_none(self):
+        ts = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc).strftime(TWITTER_DATE_FORMAT)
+        tweets = [{'createdAt': ts} for _ in range(10)]
+        assert TwitterSentimentAnalyzer._mentions_per_hour(tweets) is None
+
+    def test_tweets_without_created_at_return_none(self):
+        assert TwitterSentimentAnalyzer._mentions_per_hour([{'text': 'a'}, {'text': 'b'}]) is None
+
+    def test_equivalent_instants_with_different_offsets_have_zero_span(self):
+        tweets = [
+            {'createdAt': 'Tue Sep 29 12:00:00 +0000 2026'},
+            {'createdAt': 'Tue Sep 29 09:00:00 -0300 2026'},  # mismo instante UTC
+        ]
+        assert TwitterSentimentAnalyzer._mentions_per_hour(tweets) is None
+
+
+class TestAnalyzeMalformedResponses:
+    def _analyzer(self, monkeypatch):
+        monkeypatch.setenv('GETXAPI_API_KEY', 'k1')
+        monkeypatch.setenv('GEMINI_API_KEY', 'k2')
+        return TwitterSentimentAnalyzer(enabled=True)
+
+    def test_getxapi_json_response_is_a_list_returns_none(self, monkeypatch):
+        analyzer = self._analyzer(monkeypatch)
+        with patch('analysis.twitter_sentiment.requests.get',
+                   return_value=_mock_response([{'text': 'x'}])):
+            assert analyzer.analyze('SOL', 'hot') is None
+
+    def test_getxapi_response_without_tweets_key_returns_none(self, monkeypatch):
+        analyzer = self._analyzer(monkeypatch)
+        with patch('analysis.twitter_sentiment.requests.get',
+                   return_value=_mock_response({'other': 1})):
+            assert analyzer.analyze('SOL', 'hot') is None
+
+    def test_gemini_json_list_keeps_velocity_only(self, monkeypatch):
+        analyzer = self._analyzer(monkeypatch)
+        with patch('analysis.twitter_sentiment.requests.get',
+                   return_value=_mock_response(_tweets_spanning(n=3, minutes_apart=5))), \
+             patch('analysis.twitter_sentiment.requests.post',
+                   return_value=_mock_response([1, 2, 3])):
+            result = analyzer.analyze('SOL', 'hot')
+        assert result is not None
+        assert result['sentiment_extreme'] is None
+
+    def test_gemini_wrong_typed_fields_do_not_break_formatting(self, monkeypatch):
+        analyzer = self._analyzer(monkeypatch)
+        payload = {'sentiment_extreme': ['capitulation'], 'social_spike_confirmed': 'yes',
+                   'catalyst_present': 1, 'summary': 123}
+        with patch('analysis.twitter_sentiment.requests.get',
+                   return_value=_mock_response(_tweets_spanning(n=3, minutes_apart=5))), \
+             patch('analysis.twitter_sentiment.requests.post',
+                   return_value=_mock_response(_gemini_response(payload))):
+            result = analyzer.analyze('SOL', 'hot')
+
+        assert result['sentiment_extreme'] == ['capitulation']
+        section = TwitterSentimentAnalyzer.format_section(result)
+        assert isinstance(section, str)
+        assert '123' in section
+
+
+class TestFormatSectionAdversarial:
+    def test_unhashable_sentiment_extreme_does_not_crash(self):
+        section = TwitterSentimentAnalyzer.format_section(
+            {'sentiment_extreme': ['capitulation'], 'summary': ''})
+        assert section == ''
+
+    def test_ratio_without_current_or_baseline_does_not_crash(self):
+        section = TwitterSentimentAnalyzer.format_section(
+            {'ratio': 2.0, 'current': None, 'baseline': None, 'summary': ''})
+        assert isinstance(section, str)
+        assert '2.0x' not in section
+
+    def test_non_numeric_max_views_does_not_crash(self):
+        section = TwitterSentimentAnalyzer.format_section({'max_views': 'muchas', 'summary': ''})
+        assert isinstance(section, str)
+        assert 'viral' not in section.lower()
+
+    def test_zero_values_are_shown(self):
+        section = TwitterSentimentAnalyzer.format_section(
+            {'current': 0.0, 'baseline': 0.0, 'ratio': 0.0, 'summary': ''})
+        assert '0.0/h' in section
+
+    def test_negative_ratio_does_not_crash(self):
+        section = TwitterSentimentAnalyzer.format_section(
+            {'current': 1.0, 'baseline': 3.0, 'ratio': -0.5, 'summary': ''})
+        assert '-0.5x' in section
+
+    def test_summary_html_escape_is_complete(self):
+        section = TwitterSentimentAnalyzer.format_section(
+            {'summary': '<img src=x onerror=alert(1)>&amp; <b>negrita</b>'})
+        assert '<img' not in section
+        assert '&lt;img' in section
+        assert '&amp;amp;' in section           # '&' literal escapado (no se interpreta)
+        assert '&lt;b&gt;negrita&lt;/b&gt;' in section
