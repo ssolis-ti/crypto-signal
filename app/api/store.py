@@ -17,6 +17,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import structlog
+
+_logger = structlog.get_logger()
+
+
+def _log_db_error(operation: str, error: Exception) -> None:
+    """La API de agentes es best-effort (nunca debe romper el bot), pero un fallo no debe pasar en silencio."""
+    _logger.error(f"[STORE] Error de SQLite en {operation}: {error}")
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS signals (
@@ -107,8 +116,8 @@ class AgentStateStore:
         conn.row_factory = sqlite3.Row
         try:
             conn.execute("PRAGMA busy_timeout = 30000")
-        except sqlite3.Error:
-            pass
+        except sqlite3.Error as e:
+            _log_db_error('busy_timeout', e)
         return conn
 
     # ─────────────────────────────────────────
@@ -156,8 +165,8 @@ class AgentStateStore:
                     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     row,
                 )
-        except sqlite3.Error:
-            pass
+        except sqlite3.Error as e:
+            _log_db_error('escritura', e)
 
     def record_market_context(
         self, exchange: str, context: Dict[str, Any], created_at: Optional[str] = None
@@ -182,8 +191,8 @@ class AgentStateStore:
                     ) VALUES (?,?,?,?,?,?,?,?,?)""",
                     row,
                 )
-        except sqlite3.Error:
-            pass
+        except sqlite3.Error as e:
+            _log_db_error('escritura', e)
 
     def record_indicator_snapshot(
         self,
@@ -209,8 +218,8 @@ class AgentStateStore:
                         json.dumps(values), updated_at or _utc_now_iso(),
                     ),
                 )
-        except sqlite3.Error:
-            pass
+        except sqlite3.Error as e:
+            _log_db_error('escritura', e)
 
     def record_worker_heartbeat(
         self,
@@ -235,8 +244,8 @@ class AgentStateStore:
                         updated_at=excluded.updated_at""",
                     (worker_name, json.dumps(pairs), cycle_count, last_cycle_at or now, last_error, now),
                 )
-        except sqlite3.Error:
-            pass
+        except sqlite3.Error as e:
+            _log_db_error('escritura', e)
 
     # ─────────────────────────────────────────
     # Lectura
@@ -268,7 +277,8 @@ class AgentStateStore:
             with self._connect() as conn:
                 rows = conn.execute(query, params).fetchall()
             return [dict(r) | {'should_notify': bool(r['should_notify'])} for r in rows]
-        except sqlite3.Error:
+        except sqlite3.Error as e:
+            _log_db_error('lectura', e)
             return []
 
     def get_market_context(
@@ -287,7 +297,8 @@ class AgentStateStore:
             with self._connect() as conn:
                 rows = conn.execute(query, params).fetchall()
             return [dict(r) for r in rows]
-        except sqlite3.Error:
+        except sqlite3.Error as e:
+            _log_db_error('lectura', e)
             return []
 
     def get_indicator_snapshots(
@@ -312,7 +323,8 @@ class AgentStateStore:
                 d['values'] = json.loads(d.pop('values_json'))
                 results.append(d)
             return results
-        except sqlite3.Error:
+        except sqlite3.Error as e:
+            _log_db_error('lectura', e)
             return []
 
     def get_worker_status(self) -> List[Dict[str, Any]]:
@@ -325,5 +337,6 @@ class AgentStateStore:
                 d['pairs'] = json.loads(d.pop('pairs_json'))
                 results.append(d)
             return results
-        except sqlite3.Error:
+        except sqlite3.Error as e:
+            _log_db_error('lectura', e)
             return []

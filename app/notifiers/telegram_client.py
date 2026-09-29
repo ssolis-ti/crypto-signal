@@ -21,6 +21,7 @@ from notifiers.utils import NotifierUtils
 __connect_timeout__ = 40
 __read_timeout__ = 40
 __stop_after_attempt__ = 3
+__max_retry_after__ = 3
 __max_message_size__ = 4096
 
 
@@ -49,30 +50,38 @@ class TelegramNotifier(NotifierUtils):
         """
         asyncio.run(self._async_notify(message))
 
-    @retry(
-        # BadRequest hereda de NetworkError en python-telegram-bot, pero reintentarlo no sirve:
-        # el mensaje sera rechazado igual. Se maneja aparte dentro de _async_notify.
-        retry=retry_if_exception(lambda e: isinstance(e, (TimedOut, NetworkError))
-                                 and not isinstance(e, BadRequest)),
-        stop=stop_after_attempt(__stop_after_attempt__),
-        wait=wait_exponential(multiplier=1, min=2, max=10)
-    )
     async def _async_notify(self, message: str):
         """
-        Envía un mensaje de texto de forma asíncrona.
+        Envía un mensaje de texto de forma asíncrona. El reintento es POR FRAGMENTO: si el segundo
+        fragmento falla, no se vuelve a mandar el primero (antes se reenviaba todo y se duplicaba).
         """
         bot = Bot(token=self.token)
         message_chunks = self.chunk_message(
             message=message, max_message_size=__max_message_size__
         )
         for message_chunk in message_chunks:
+            await self._send_chunk_with_retries(bot, message_chunk)
+
+    @retry(
+        # BadRequest hereda de NetworkError en python-telegram-bot, pero reintentarlo no sirve:
+        # el mensaje sera rechazado igual. Se maneja aparte dentro de _send_chunk_with_retries.
+        retry=retry_if_exception(lambda e: isinstance(e, (TimedOut, NetworkError))
+                                 and not isinstance(e, BadRequest)),
+        stop=stop_after_attempt(__stop_after_attempt__),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True
+    )
+    async def _send_chunk_with_retries(self, bot, message_chunk: str):
+        for attempt in range(__max_retry_after__ + 1):
             try:
                 await self._send_chunk(bot, message_chunk, self.parse_mode)
+                return
             except RetryAfter as e:
-                # Flood control de Telegram: esperar lo que pide y reintentar una vez.
-                self.logger.warning('Telegram RetryAfter', seconds=e.retry_after)
+                # Flood control de Telegram: esperar lo que pide y reintentar (varias veces, no solo una).
+                self.logger.warning('Telegram RetryAfter', seconds=e.retry_after, attempt=attempt + 1)
+                if attempt == __max_retry_after__:
+                    raise
                 await asyncio.sleep(float(e.retry_after) + 1)
-                await self._send_chunk(bot, message_chunk, self.parse_mode)
             except BadRequest as e:
                 if 'parse entities' not in str(e).lower():
                     self.logger.error('Error enviando mensaje Telegram', error=str(e))
@@ -80,6 +89,7 @@ class TelegramNotifier(NotifierUtils):
                 # HTML invalido (p. ej. texto de terceros con '<'): mejor llegar sin formato que perderse.
                 self.logger.warning('Telegram rechazo el HTML, reenviando como texto plano')
                 await self._send_chunk(bot, message_chunk, None)
+                return
             except Exception as e:
                 self.logger.error('Error enviando mensaje Telegram', error=str(e))
                 raise

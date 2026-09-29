@@ -856,3 +856,47 @@ class TestRadarEdges:
                           return_value=self._analyze_result()):
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
         assert len(alerter.notifier.messages) == 1
+
+
+class FailingNotifier:
+    """Notifier cuyo Telegram falla las primeras `fail_times` veces (send_direct_text devuelve False)."""
+    def __init__(self, fail_times):
+        self.fail_times = fail_times
+        self.calls = 0
+        self.messages = []
+
+    def send_direct_text(self, message):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            return False
+        self.messages.append(message)
+        return True
+
+
+class TestTelegramFailureIsRetried:
+    def test_undelivered_alert_is_retried_next_cycle_and_not_recorded_until_sent(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        notifier = FailingNotifier(fail_times=2)
+        alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path))
+        data = {'BTC/USDT': _spring_fixture()}
+
+        alerter.check_cycle('binance', data)   # falla
+        assert not path.exists() or path.read_text().strip() == ''
+        alerter.check_cycle('binance', data)   # falla
+        alerter.check_cycle('binance', data)   # llega
+        alerter.check_cycle('binance', data)   # ya enviada: no se repite
+
+        assert len(notifier.messages) == 1
+        assert notifier.calls == 3
+        assert len(path.read_text().strip().splitlines()) == 1
+
+    def test_gives_up_after_the_limit_instead_of_retrying_forever(self):
+        from analysis.wyckoff_alerts import SEND_MAX_FAILURES
+        notifier = FailingNotifier(fail_times=10_000)
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        data = {'BTC/USDT': _spring_fixture()}
+
+        for _ in range(SEND_MAX_FAILURES + 5):
+            alerter.check_cycle('binance', data)
+
+        assert notifier.calls == SEND_MAX_FAILURES

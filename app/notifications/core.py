@@ -248,12 +248,18 @@ class Notifier():
         heuristico de scoring ya se probo, dos veces, que no predice nada -- ver
         specs/007 y specs/011 -- asi que la alerta Wyckoff validada por separado
         (specs/017/018) no debe quedar sujeta a ese mismo filtro).
+
+        Devuelve True si el mensaje llego (o no hay Telegram configurado) y False si TODOS los envios
+        fallaron: el llamador no debe dar la alerta por enviada.
         """
+        delivered = not self.telegram_clients  # sin Telegram configurado no hay nada que reintentar
         for notifier in self.telegram_clients:
             try:
                 self.telegram_clients[notifier].send_messages([message])
+                delivered = True
             except Exception as e:
                 self.logger.error(f"[WYCKOFF] Error sending direct text: {e}")
+        return delivered
 
     def _send_smart_text(self, message):
         """

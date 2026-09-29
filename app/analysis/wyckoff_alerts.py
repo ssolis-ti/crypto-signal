@@ -31,6 +31,7 @@ from analysis.twitter_sentiment import TwitterSentimentAnalyzer
 DEFAULT_RECORD_PATH = 'agent_state/rumor_radar.jsonl'
 DEFAULT_RADAR_MIN_RATIO = 2.0
 RADAR_MAX_FAILURES = 3
+SEND_MAX_FAILURES = 12  # ciclos de 5 min: ~1h reintentando si Telegram no responde
 SHALLOW_SWEEP_PCT = 1.0
 CLUSTER_STRONG = 5
 STALE_ALERT_SECONDS = 2 * 3600
@@ -94,6 +95,7 @@ class WyckoffAlerter:
         # dict (no set): conserva el orden de insercion, asi el prune descarta lo mas viejo.
         self._alerted_signatures: Dict[str, None] = {}
         self._radar_failures: Dict[str, int] = {}
+        self._send_failures: Dict[str, int] = {}
         self._concurrent: Dict[tuple, int] = {}
         self.twitter_sentiment = TwitterSentimentAnalyzer(enabled=twitter_sentiment_enabled)
         # El radar necesita Twitter: sin el no hay nada que cruzar con el volumen.
@@ -266,9 +268,18 @@ class WyckoffAlerter:
                 sweep_depth = None
             concurrent = self._concurrent.get((exchange, direction, timestamp.isoformat()))
 
-            self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp,
-                             change_24h=self._change_24h(sub), sweep_depth=sweep_depth,
-                             concurrent=concurrent)
+            delivered = self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp,
+                                         change_24h=self._change_24h(sub), sweep_depth=sweep_depth,
+                                         concurrent=concurrent)
+            if delivered is False:
+                # Telegram no respondio: NO se da por enviada, se reintenta en el ciclo siguiente.
+                failures = self._send_failures.get(signature, 0) + 1
+                self._send_failures[signature] = failures
+                if failures < SEND_MAX_FAILURES:
+                    self.logger.error(f"[WYCKOFF] Alerta de {market_pair} sin entregar (intento {failures}); se reintenta")
+                    continue
+                self.logger.error(f"[WYCKOFF] Alerta de {market_pair} descartada tras {failures} intentos fallidos")
+            self._send_failures.pop(signature, None)
             self._remember(signature)
 
     def _check_rumor_radar(self, exchange: str, market_pair: str, df, timestamp) -> None:
@@ -413,7 +424,7 @@ class WyckoffAlerter:
     def _send_alert(self, exchange: str, market_pair: str, direction: str,
                      break_relative_volume: float, timestamp=None,
                      change_24h: Optional[float] = None, sweep_depth: Optional[float] = None,
-                     concurrent: Optional[int] = None) -> None:
+                     concurrent: Optional[int] = None) -> bool:
         if direction == 'hot':
             headline = "🟢 <b>ALCISTA — posible subida</b>"
             label = "Wyckoff Spring: rompio el soporte y volvio a entrar (trampa bajista)"
@@ -441,7 +452,8 @@ class WyckoffAlerter:
         if twitter_section:
             message = f"{message}\n\n{twitter_section}"
 
-        self.notifier.send_direct_text(message)
+        if self.notifier.send_direct_text(message) is False:
+            return False
         self.logger.info(
             f"[WYCKOFF] Alert sent: {market_pair} {direction} "
             f"(break_relative_volume={break_relative_volume:.2f}x)"
@@ -461,6 +473,7 @@ class WyckoffAlerter:
             'sentiment': (twitter_result or {}).get('sentiment_extreme'),
             'micro': micro,
         })
+        return True
 
     def _safe_microstructure(self, exchange: str, market_pair: str) -> Optional[dict]:
         """Foto de funding/OI/libro para validar hacia adelante; jamas afecta la alerta ya enviada."""

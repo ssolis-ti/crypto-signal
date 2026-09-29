@@ -103,3 +103,34 @@ class TestChunkMessage:
         sent = [call.kwargs['text'] for call in bot.send_message.await_args_list]
         assert ''.join(sent) == message
         assert all(0 < len(text) <= 4096 for text in sent)
+
+
+def test_repeated_retry_after_is_waited_out_more_than_once():
+    notifier, bot = _notifier_with_bot([RetryAfter(1), RetryAfter(1), None])
+    with patch('notifiers.telegram_client.Bot', return_value=bot), \
+         patch('notifiers.telegram_client.asyncio.sleep', new=AsyncMock()) as sleep:
+        notifier.notify('hola')
+
+    assert bot.send_message.await_count == 3
+    assert sleep.await_count == 2
+
+
+def test_persistent_retry_after_eventually_raises():
+    notifier, bot = _notifier_with_bot([RetryAfter(1)] * 10)
+    with patch('notifiers.telegram_client.Bot', return_value=bot), \
+         patch('notifiers.telegram_client.asyncio.sleep', new=AsyncMock()):
+        with pytest.raises(RetryAfter):
+            notifier.notify('hola')
+
+
+def test_network_error_on_second_chunk_does_not_resend_the_first():
+    from telegram.error import NetworkError
+    message = ('linea\n' * 1000)  # > 4096: al menos 2 fragmentos
+    notifier, bot = _notifier_with_bot([None, NetworkError('cae'), None, None, None])
+    with patch('notifiers.telegram_client.Bot', return_value=bot), \
+         patch('tenacity.nap.time.sleep'), patch('asyncio.sleep', new=AsyncMock()):
+        notifier.notify(message)
+
+    sent = [c.kwargs['text'] for c in bot.send_message.await_args_list]
+    first_chunk = sent[0]
+    assert sent.count(first_chunk) == 1  # el primer fragmento no se duplica al reintentar el segundo
