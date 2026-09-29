@@ -166,6 +166,8 @@ dependencias pinneadas).
 | [017](specs/017-wyckoff-edge-refinement/) | Búsqueda de edge con split in-sample/out-of-sample: **volumen extremo en la ruptura (≥2.5x) confirma** — 62.4% win-rate fuera de muestra (n=101, 14d) — pendiente decisión de conectarlo a Telegram |
 | [018](specs/018-wyckoff-timing-and-drawdown/) | Timing y drawdown con velas de 1h: win-rate más alto (72-78%) en las primeras 1-2h con magnitud chica; sostener hasta 14d da más magnitud (+2.84% mediana) pero 26.5% de eventos ven drawdown ≥10% — pendiente decisión de cómo encuadrar la alerta |
 | [019](specs/019-wyckoff-confluence-and-ta-confirmation/) | Confluencia 1D/4h + RSI/ADX como refinamiento: **ninguno de los tres sumó nada** (los tres empeoraron fuera de muestra) — el volumen extremo en la ruptura sigue siendo el único edge validado |
+| [020](specs/020-orderflow-and-social-data-research/) | Investigación (verificada en vivo): Binance ya expone taker buy/sell volume gratis; getxapi sí tiene búsqueda histórica real en Twitter/X |
+| [021](specs/021-wyckoff-taker-flow/) | Taker buy/sell flow como refinamiento: hipótesis de absorción pasa la barra mecánica pero con signo invertido in-sample/out-of-sample — **inconcluso**, no se suma como edge validado |
 
 ---
 
