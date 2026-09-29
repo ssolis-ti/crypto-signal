@@ -1,7 +1,7 @@
 # Implementation Plan: Historical Validation of Wyckoff Spring/Upthrust Signals
 
 **Branch**: `main` | **Date**: 2026-09-28 | **Spec**: `specs/015-wyckoff-historical-validation/spec.md`
-**Blocked on**: `specs/014-wyckoff-range-spring-upthrust`
+**Depends on**: `specs/014-wyckoff-range-spring-upthrust` (landed 2026-09-28)
 
 ## Summary
 

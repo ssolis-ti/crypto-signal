@@ -1,5 +1,6 @@
 """
-Tests para WyckoffPrimitives (specs/013-wyckoff-effort-result/).
+Tests para WyckoffPrimitives (specs/013-wyckoff-effort-result/,
+specs/014-wyckoff-range-spring-upthrust/).
 """
 import numpy as np
 import pandas as pd
@@ -160,3 +161,145 @@ class TestClimaxAndThinMoveFlags:
         assert thin_flags.iloc[0] == False  # noqa: E712
         assert climax_flags.dtype == bool
         assert thin_flags.dtype == bool
+
+
+def _flat_range_df(n_flat=5, low=99.0, high=101.0, close=100.0):
+    """`n_flat` velas planas que establecen un rango: soporte=low, resistencia=high."""
+    closes = [close] * n_flat
+    lows = [low] * n_flat
+    highs = [high] * n_flat
+    volumes = [100.0] * n_flat
+    return closes, lows, highs, volumes
+
+
+class TestDetectTradingRange:
+    def test_support_resistance_match_prior_window(self):
+        closes, lows, highs, volumes = _flat_range_df(n_flat=5)
+        # una vela extra despues del rango, para leer el rango "vigente" ahi
+        closes += [100.0]
+        lows += [99.5]
+        highs += [100.5]
+        volumes += [100.0]
+        df = _ohlcv_df(closes=closes, volumes=volumes, highs=highs, lows=lows)
+
+        ranges = WyckoffPrimitives.detect_trading_range(df, lookback=5)
+
+        assert ranges['support'].iloc[5] == pytest.approx(99.0)
+        assert ranges['resistance'].iloc[5] == pytest.approx(101.0)
+        assert ranges['range_width_pct'].iloc[5] == pytest.approx(2.0)
+
+    def test_insufficient_history_is_nan(self):
+        closes, lows, highs, volumes = _flat_range_df(n_flat=3)
+        df = _ohlcv_df(closes=closes, volumes=volumes, highs=highs, lows=lows)
+
+        ranges = WyckoffPrimitives.detect_trading_range(df, lookback=5)
+
+        assert ranges['support'].isna().all()
+
+    def test_current_candle_does_not_define_its_own_range(self):
+        """Si la vela actual se incluyera en su propio rolling min/max, nunca podria
+        'romper' el rango que ella misma define -- por eso detect_trading_range usa
+        shift(1) (ver docstring)."""
+        closes, lows, highs, volumes = _flat_range_df(n_flat=5)
+        closes += [80.0]  # vela con minima muy por debajo del rango previo
+        lows += [50.0]
+        highs += [80.0]
+        volumes += [100.0]
+        df = _ohlcv_df(closes=closes, volumes=volumes, highs=highs, lows=lows)
+
+        ranges = WyckoffPrimitives.detect_trading_range(df, lookback=5)
+
+        # El soporte "vigente" en la vela de ruptura sigue siendo 99 (de las 5 previas),
+        # no 50 (que incluiria la propia vela de ruptura).
+        assert ranges['support'].iloc[5] == pytest.approx(99.0)
+
+
+class TestDetectSprings:
+    def _spring_fixture(self, confirm_close=100.0):
+        closes, lows, highs, volumes = _flat_range_df(n_flat=5)
+        closes += [97.0, confirm_close]    # [5]=ruptura, [6]=posible confirmacion
+        lows += [95.0, 98.0]
+        highs += [98.0, 101.0]
+        volumes += [100.0, 100.0]
+        return _ohlcv_df(closes=closes, volumes=volumes, highs=highs, lows=lows)
+
+    def test_flags_confirmation_candle_when_price_returns_above_support(self):
+        df = self._spring_fixture(confirm_close=100.0)  # vuelve por encima de 99
+
+        result = WyckoffPrimitives.detect_springs(df, lookback=5, confirm_window=3)
+
+        assert bool(result['is_spring'].iloc[6]) is True
+        assert bool(result['is_spring'].iloc[5]) is False
+
+    def test_no_flag_when_price_does_not_return_within_window(self):
+        closes, lows, highs, volumes = _flat_range_df(n_flat=5)
+        closes += [97.0, 95.0, 94.0, 93.0]  # nunca vuelve por encima de 99
+        lows += [95.0, 94.0, 93.0, 92.0]
+        highs += [98.0, 96.0, 95.0, 94.0]
+        volumes += [100.0] * 4
+        df = _ohlcv_df(closes=closes, volumes=volumes, highs=highs, lows=lows)
+
+        result = WyckoffPrimitives.detect_springs(df, lookback=5, confirm_window=3)
+
+        assert not result['is_spring'].any()
+
+    def test_no_breakdown_no_event(self):
+        closes, lows, highs, volumes = _flat_range_df(n_flat=5)
+        closes += [100.0, 100.0]  # dentro del rango, sin ruptura
+        lows += [99.2, 99.2]
+        highs += [100.8, 100.8]
+        volumes += [100.0, 100.0]
+        df = _ohlcv_df(closes=closes, volumes=volumes, highs=highs, lows=lows)
+
+        result = WyckoffPrimitives.detect_springs(df, lookback=5, confirm_window=3)
+
+        assert not result['is_spring'].any()
+
+    def test_confirmed_event_carries_relative_volume_context(self):
+        df = self._spring_fixture(confirm_close=100.0)
+
+        result = WyckoffPrimitives.detect_springs(df, lookback=5, confirm_window=3,
+                                                    volume_period=3)
+
+        assert not pd.isna(result['break_relative_volume'].iloc[6])
+        assert not pd.isna(result['confirm_relative_volume'].iloc[6])
+
+
+class TestDetectUpthrusts:
+    def _upthrust_fixture(self, confirm_close=100.0):
+        closes, lows, highs, volumes = _flat_range_df(n_flat=5)
+        closes += [103.0, confirm_close]   # [5]=ruptura al alza, [6]=posible confirmacion
+        lows += [102.0, 99.0]
+        highs += [105.0, 102.0]
+        volumes += [100.0, 100.0]
+        return _ohlcv_df(closes=closes, volumes=volumes, highs=highs, lows=lows)
+
+    def test_flags_confirmation_candle_when_price_returns_below_resistance(self):
+        df = self._upthrust_fixture(confirm_close=100.0)  # vuelve por debajo de 101
+
+        result = WyckoffPrimitives.detect_upthrusts(df, lookback=5, confirm_window=3)
+
+        assert bool(result['is_upthrust'].iloc[6]) is True
+        assert bool(result['is_upthrust'].iloc[5]) is False
+
+    def test_no_flag_when_price_does_not_return_within_window(self):
+        closes, lows, highs, volumes = _flat_range_df(n_flat=5)
+        closes += [103.0, 105.0, 106.0, 107.0]  # nunca vuelve por debajo de 101
+        lows += [102.0, 104.0, 105.0, 106.0]
+        highs += [105.0, 106.0, 107.0, 108.0]
+        volumes += [100.0] * 4
+        df = _ohlcv_df(closes=closes, volumes=volumes, highs=highs, lows=lows)
+
+        result = WyckoffPrimitives.detect_upthrusts(df, lookback=5, confirm_window=3)
+
+        assert not result['is_upthrust'].any()
+
+    def test_independent_from_spring_flags(self):
+        """Ambos flags pueden coexistir en el mismo DataFrame sin interferirse."""
+        df = self._upthrust_fixture(confirm_close=100.0)
+
+        springs = WyckoffPrimitives.detect_springs(df, lookback=5, confirm_window=3)
+        upthrusts = WyckoffPrimitives.detect_upthrusts(df, lookback=5, confirm_window=3)
+
+        assert not springs['is_spring'].any()
+        assert bool(upthrusts['is_upthrust'].iloc[6]) is True

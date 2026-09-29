@@ -1,6 +1,6 @@
 # Tasks: Historical Validation of Wyckoff Spring/Upthrust Signals
 
-**Status**: Not started — blocked on `specs/014-wyckoff-range-spring-upthrust` landing.
+**Status**: Ready to start — `specs/014-wyckoff-range-spring-upthrust` landed 2026-09-28.
 
 ## Phase 1: Implementation
 

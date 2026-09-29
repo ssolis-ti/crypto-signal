@@ -160,7 +160,9 @@ dependencias pinneadas).
 | [011](specs/011-macd-cross-validation/) | Validación histórica del score aplicada a `macd_cross` (1,776 señales) — confirma y refuerza el hallazgo de 007 |
 | [012](specs/012-wyckoff-fractal-research/) | Investigación (sin código): método Wyckoff + temporalidades fractales como hipótesis alternativa |
 | [013](specs/013-wyckoff-effort-result/) | `WyckoffPrimitives`: ratio esfuerzo/resultado, flags de clímax/movimiento delgado — primitivas puras, sin conectar a alertas todavía |
-| 014-016 | Roadmap Wyckoff especificado y bloqueado en cascada (detección de rango/spring/upthrust → validación histórica, incluyendo el horizonte de 1-2 semanas recordado por el operador → integración multi-timeframe condicional al resultado de la validación) |
+| [014](specs/014-wyckoff-range-spring-upthrust/) | Detección de rango de trading, Spring y Upthrust — reglas de precio explícitas, aún sin conectar a alertas |
+| [015](specs/015-wyckoff-historical-validation/) | Próximo: validación histórica (24h/72h/7d/14d — este último para chequear el recuerdo del operador de +20-30% en 1-2 semanas) |
+| [016](specs/016-wyckoff-multiframe-integration/) | Condicional: integración multi-timeframe, solo si 015 valida |
 
 ---
 

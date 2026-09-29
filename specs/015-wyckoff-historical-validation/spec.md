@@ -4,8 +4,7 @@
 
 **Created**: 2026-09-28
 
-**Status**: Draft — **blocked on `specs/014-wyckoff-range-spring-upthrust` landing** (this slice
-backtests the events that slice produces).
+**Status**: Ready — `specs/014-wyckoff-range-spring-upthrust` landed 2026-09-28, unblocking this slice.
 
 **Input**: Third slice of the Wyckoff roadmap — the "does this actually predict anything" gate, same
 discipline as `specs/007-signal-enhancer-validation/` and `specs/011-macd-cross-validation/`, applied

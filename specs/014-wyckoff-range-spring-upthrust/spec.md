@@ -4,9 +4,7 @@
 
 **Created**: 2026-09-28
 
-**Status**: Draft — **blocked on `specs/013-wyckoff-effort-result` landing** (this slice consumes
-`WyckoffPrimitives.effort_result_ratio`/`is_climax` as inputs to the test-volume confirmation logic
-below).
+**Status**: Implemented (2026-09-28) — see `tasks.md` Convergence.
 
 **Input**: Second buildable slice of the roadmap in
 `specs/012-wyckoff-fractal-research/research.md`: trading-range detection and the two most
