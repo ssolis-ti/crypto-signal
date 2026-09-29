@@ -27,14 +27,31 @@ class IndicatorUtils():
                 unlike a datetime.fromtimestamp()/strftime() round trip.
         """
 
-        dataframe = pandas.DataFrame(historical_data)
-        dataframe.transpose()
+        cols = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+        if not historical_data:
+            empty_df = pandas.DataFrame(columns=['open', 'high', 'low', 'close', 'volume'])
+            empty_df.index = pandas.DatetimeIndex([], tz='UTC', name='datetime')
+            return empty_df
 
-        dataframe.columns = ['timestamp', 'open',
-                             'high', 'low', 'close', 'volume']
+        dataframe = pandas.DataFrame(historical_data)
+
+        # Si vienen mas columnas que las esperadas, truncar a las primeras 6
+        if dataframe.shape[1] >= 6:
+            dataframe = dataframe.iloc[:, :6]
+        elif dataframe.shape[1] < 6:
+            raise ValueError(f"Historical data must have at least 6 columns, got {dataframe.shape[1]}")
+
+        dataframe.columns = cols
+
+        # Asegurar coercion numerica de timestamp para evitar overflow con strings
+        timestamps = pandas.to_numeric(dataframe['timestamp'], errors='coerce')
         dataframe['datetime'] = pandas.to_datetime(
-            dataframe['timestamp'], unit='ms', utc=True
+            timestamps, unit='ms', utc=True
         )
+
+        # Coercion numerica de columnas de precio y volumen
+        for col in ['open', 'high', 'low', 'close', 'volume']:
+            dataframe[col] = pandas.to_numeric(dataframe[col], errors='coerce')
 
         dataframe.set_index('datetime', inplace=True, drop=True)
         dataframe.drop('timestamp', axis=1, inplace=True)

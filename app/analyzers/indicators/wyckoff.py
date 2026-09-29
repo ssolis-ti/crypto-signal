@@ -36,10 +36,14 @@ class WyckoffPrimitives:
             pandas.Series: 1.0 = volumen normal, 2.0 = doble del promedio. NaN durante
             el periodo de calentamiento (no hay suficiente historia para el promedio).
         """
-        avg_volume = talib.SMA(dataframe['volume'].astype(float).values, timeperiod=period)
+        volume = pd.to_numeric(dataframe['volume'], errors='coerce').astype(float)
+        clean_volume = volume.copy()
+        clean_volume[clean_volume <= 0] = np.nan
+        clean_volume = clean_volume.replace([np.inf, -np.inf], np.nan)
+
+        avg_volume = talib.SMA(clean_volume.values, timeperiod=period)
         avg_volume = pd.Series(avg_volume, index=dataframe.index)
-        volume = dataframe['volume'].astype(float)
-        return volume / avg_volume.replace(0, np.nan)
+        return clean_volume / avg_volume.replace(0, np.nan)
 
     @staticmethod
     def relative_range(dataframe: pd.DataFrame, period: int = 14) -> pd.Series:
@@ -55,9 +59,9 @@ class WyckoffPrimitives:
             pandas.Series: 1.0 = rango normal, 2.0 = doble del ATR promedio. NaN
             durante el calentamiento o si el ATR es 0 (dato degenerado/plano).
         """
-        high = dataframe['high'].astype(float).values
-        low = dataframe['low'].astype(float).values
-        close = dataframe['close'].astype(float).values
+        high = pd.to_numeric(dataframe['high'], errors='coerce').replace([np.inf, -np.inf], np.nan).values
+        low = pd.to_numeric(dataframe['low'], errors='coerce').replace([np.inf, -np.inf], np.nan).values
+        close = pd.to_numeric(dataframe['close'], errors='coerce').replace([np.inf, -np.inf], np.nan).values
 
         atr = talib.ATR(high, low, close, timeperiod=period)
         true_range = talib.TRANGE(high, low, close)
@@ -144,8 +148,10 @@ class WyckoffPrimitives:
             (ancho del rango como % del punto medio). NaN mientras no haya `lookback`
             velas previas disponibles.
         """
-        support = dataframe['low'].astype(float).rolling(lookback).min().shift(1)
-        resistance = dataframe['high'].astype(float).rolling(lookback).max().shift(1)
+        clean_low = pd.to_numeric(dataframe['low'], errors='coerce').replace([np.inf, -np.inf], np.nan)
+        clean_high = pd.to_numeric(dataframe['high'], errors='coerce').replace([np.inf, -np.inf], np.nan)
+        support = clean_low.rolling(lookback).min().shift(1)
+        resistance = clean_high.rolling(lookback).max().shift(1)
         midpoint = (support + resistance) / 2
         range_width_pct = (resistance - support) / midpoint.replace(0, np.nan) * 100
         return pd.DataFrame({
@@ -206,21 +212,21 @@ class WyckoffPrimitives:
         break_rel_vol = pd.Series(np.nan, index=dataframe.index)
         confirm_rel_vol = pd.Series(np.nan, index=dataframe.index)
 
-        lows = dataframe['low'].astype(float).values
-        highs = dataframe['high'].astype(float).values
-        closes = dataframe['close'].astype(float).values
+        lows = pd.to_numeric(dataframe['low'], errors='coerce').replace([np.inf, -np.inf], np.nan).values
+        highs = pd.to_numeric(dataframe['high'], errors='coerce').replace([np.inf, -np.inf], np.nan).values
+        closes = pd.to_numeric(dataframe['close'], errors='coerce').replace([np.inf, -np.inf], np.nan).values
         support = ranges['support'].values
         resistance = ranges['resistance'].values
 
         for i in range(n):
             if direction == 'spring':
                 level = support[i]
-                if np.isnan(level):
+                if not (np.isfinite(level) and np.isfinite(lows[i])):
                     continue
                 broke = lows[i] < level * (1 - break_margin_pct / 100)
             else:
                 level = resistance[i]
-                if np.isnan(level):
+                if not (np.isfinite(level) and np.isfinite(highs[i])):
                     continue
                 broke = highs[i] > level * (1 + break_margin_pct / 100)
 
@@ -228,6 +234,8 @@ class WyckoffPrimitives:
                 continue
 
             for j in range(i + 1, min(i + 1 + confirm_window, n)):
+                if not np.isfinite(closes[j]):
+                    continue
                 returned = closes[j] > level if direction == 'spring' else closes[j] < level
                 if returned:
                     flag.iloc[j] = True
