@@ -1,0 +1,20 @@
+FRECUENCIA: senales por hora UTC de cierre (IS + OOS) y por bloque
+   {0: 350, 4: 193, 8: 230, 12: 114, 16: 185, 20: 313, 21: 1}
+   {'Asia': 543, 'EEUU': 498, 'Europa': 344} | dias distintos con senal por bloque: {'Asia': 150, 'EEUU': 157, 'Europa': 115}
+  (dias totales con alguna senal: 342; si fuera uniforme cada hora tendria ~231)
+
+RIESGO Y RESULTADO por bloque (IS / OOS)
+  Asia    | IS n=342 acierto= 55% stop=12.0% media=+1.71% | OOS n=201 acierto= 54% stop=10.0% media=+1.98%
+  Europa  | IS n=198 acierto= 51% stop=19.7% media=+2.16% | OOS n=146 acierto= 66% stop= 7.5% media=+2.34%
+  EEUU    | IS n=320 acierto= 57% stop=17.2% media=+1.33% | OOS n=178 acierto= 53% stop=18.5% media=+0.81%
+
+DIFERENCIA de cada bloque vs el resto (puntos porcentuales, IC95 por dia, IS+OOS unidos)
+  Asia    acierto        -2.1 pp [-14.3, +10.6]
+  Asia    tasa de stop   -5.1 pp [-12.2,  +2.4]
+  Europa  acierto        +2.4 pp [-11.9, +16.2]
+  Europa  tasa de stop   +0.2 pp [ -8.2, +11.1]
+  EEUU    acierto        +0.1 pp [-12.1, +12.5]
+  EEUU    tasa de stop   +5.2 pp [ -2.3, +12.8]
+
+PODER: con estos n, que diferencia de media se puede detectar (IC95 por dia de "Asia vs resto")
+  Asia vs resto en retorno medio: dif +0.21 pp, IC95 [-2.10, +2.54] -> ancho ~4.6 pp

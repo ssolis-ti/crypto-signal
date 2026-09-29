@@ -70,3 +70,18 @@ Corregido en el código (ver commit):
    worker cubre todos los pares.
 Sin cambio: fin de semana definido por el día UTC de cierre (coherente con el backtest); ahora el día y la hora
 aparecen en el aviso, lo que elimina la ambigüedad (una vela vie 20:00-24:00 UTC cierra sáb 00:00 UTC).
+
+## Seguimiento: ¿día/noche por continente cambia el riesgo o la frecuencia? (`sesiones_riesgo.py`)
+
+Pregunta del operador: "en algunos países es de día y en otros de noche, ¿puede haber horarios óptimos?".
+Bloques definidos antes de mirar, por hora UTC de entrada: Asia/madrugada UTC (00, 04), Europa (08, 12), EEUU/tarde (16, 20).
+Exploratorio (no cuenta como filtro).
+
+- **Frecuencia (lo único con estructura clara):** señales por hora UTC de cierre: 00:00 → 350, 04:00 → 193, 08:00 → 230,
+  12:00 → 114, 16:00 → 185, 20:00 → 313. Se concentran en el cierre de EEUU / apertura de Asia (20:00 y 00:00 UTC = 48%)
+  y son poco frecuentes en la ventana 12:00 UTC.
+- **Riesgo/resultado:** acierto 51-66% y tasa de stop 7.5-19.7% según bloque y período, pero sin patrón estable
+  (Europa: 51% acierto / 19.7% stop en IS y 66% / 7.5% en OOS). Diferencias vs el resto: acierto entre -2.1 y +2.4 pp,
+  tasa de stop entre -5.1 y +5.2 pp, todos con IC95 por día que incluyen 0.
+- **Poder:** la diferencia de retorno medio "Asia vs resto" tiene un IC95 de ancho ~4.6 pp: solo se detectarían efectos
+  de horario de ~2.5 pp o más por trade. "No se encontró efecto" significa "no hay uno grande", no "no existe".
