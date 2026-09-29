@@ -47,7 +47,17 @@ settings:
       - FDUSD/USDT
       - FRAX/USDT
       - USD1/USDT
-      - PAXG/USDT
+      - RLUSD/USDT
+      - USDE/USDT
+      - PYUSD/USDT
+      - USDD/USDT
+      - BFUSD/USDT
+      - XUSD/USDT
+      - EUR/USDT              # Fiat/stable en euros
+      - EURI/USDT
+      - AEUR/USDT
+      - PAXG/USDT             # Oro tokenizado
+      - XAUT/USDT
       - 币安人生/USDT          # Par inválido con caracteres especiales
   
   # ═══════════════════════════════════════════
