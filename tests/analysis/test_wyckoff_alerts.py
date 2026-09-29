@@ -63,7 +63,9 @@ class TestWyckoffAlerterSpring:
 
         assert len(notifier.messages) == 1
         msg = notifier.messages[0]
-        assert 'SPRING' in msg
+        assert msg.startswith('🟢 <b>ALCISTA')
+        assert 'Spring' in msg
+        assert '24h:' in msg
         assert 'BTC/USDT' in msg
         assert '72h' in msg
         assert '56-58%' in msg
@@ -103,8 +105,9 @@ class TestWyckoffAlerterUpthrust:
         alerter.check_and_alert('binance', 'ETH/USDT', '4h', ohlcv)
 
         assert len(notifier.messages) == 1
-        assert 'UPTHRUST' in notifier.messages[0]
-        assert 'sin edge confiable' in notifier.messages[0]
+        assert notifier.messages[0].startswith('🔴 <b>BAJISTA')
+        assert 'Upthrust' in notifier.messages[0]
+        assert 'edge debil' in notifier.messages[0]
 
 
 class TestWyckoffAlerterDedup:

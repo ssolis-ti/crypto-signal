@@ -47,9 +47,10 @@ SPRING_PLAN = (
     "⚠️ Operar de 1-2h NO funciona: 44-49% de acierto y pierde con comisiones"
 )
 UPTHRUST_PLAN = (
-    "⚠️ <b>Upthrust (short): sin edge confiable</b>\n"
-    "Gana seguido pero pierde en promedio en 2022-24 (squeezes alcistas); solo positivo en 2025-26.\n"
-    "Informativo: no operar short solo por esta senal."
+    "⚠️ <b>Short con edge debil</b>\n"
+    "Acierta la caida 57-61% de las veces, pero en 2022-24 los rebotes (squeezes) se comieron "
+    "la ganancia; en 2025-26 fue positivo (+0.6% por trade a 72h).\n"
+    "Si lo operas: tamaño chico y stop ajustado."
 )
 
 
@@ -125,7 +126,8 @@ class WyckoffAlerter:
         if signature in self._alerted_signatures:
             return
 
-        self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp)
+        self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp,
+                         change_24h=self._change_24h(df))
         self._alerted_signatures.add(signature)
         self._prune_signatures()
 
@@ -159,7 +161,8 @@ class WyckoffAlerter:
         twitter_result = None
         if triggered:
             twitter_result = self.twitter_sentiment.analyze(ticker, 'radar', velocity=velocity)
-            self._send_radar_alert(exchange, market_pair, rel_vol, candle_change, twitter_result)
+            self._send_radar_alert(exchange, market_pair, rel_vol, candle_change, twitter_result,
+                                   change_24h=self._change_24h(df))
 
         self._record({
             'type': 'radar', 'exchange': exchange, 'pair': market_pair,
@@ -171,11 +174,13 @@ class WyckoffAlerter:
         })
 
     def _send_radar_alert(self, exchange: str, market_pair: str, rel_vol: float,
-                          candle_change: float, twitter_result) -> None:
+                          candle_change: float, twitter_result,
+                          change_24h: Optional[float] = None) -> None:
         color = "verde" if candle_change >= 0 else "roja"
+        change_line = f" | 24h: {change_24h:+.1f}%" if change_24h is not None else ""
         message = (
-            f"🛰️ <b>RADAR VOLUMEN + RUMOR</b>\n"
-            f"{market_pair} | {exchange} | 4h\n"
+            f"🛰️ <b>RADAR VOLUMEN + RUMOR</b> (sin dirección)\n"
+            f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
             f"Volumen: {rel_vol:.1f}x el promedio | vela {color} {candle_change:+.1f}%\n\n"
             f"{TwitterSentimentAnalyzer.format_section(twitter_result)}\n\n"
             f"⚠️ <i>Señal NO validada (specs/033): no es el edge Wyckoff. "
@@ -198,17 +203,30 @@ class WyckoffAlerter:
         except Exception as e:
             self.logger.error(f"[RADAR] No se pudo registrar el evento: {e}")
 
+    @staticmethod
+    def _change_24h(df) -> Optional[float]:
+        """Cambio % de las ultimas 6 velas de 4h cerradas (24h)."""
+        if len(df) < 7:
+            return None
+        before = df['close'].iloc[-7]
+        return (df['close'].iloc[-1] - before) / before * 100 if before else None
+
     def _send_alert(self, exchange: str, market_pair: str, direction: str,
-                     break_relative_volume: float, timestamp=None) -> None:
+                     break_relative_volume: float, timestamp=None,
+                     change_24h: Optional[float] = None) -> None:
         if direction == 'hot':
-            label, emoji = "SPRING (posible acumulacion)", "🟢"
+            headline = "🟢 <b>ALCISTA — posible subida</b>"
+            label = "Wyckoff Spring: rompio el soporte y volvio a entrar (trampa bajista)"
         else:
-            label, emoji = "UPTHRUST (posible distribucion)", "🔴"
+            headline = "🔴 <b>BAJISTA — posible caida</b>"
+            label = "Wyckoff Upthrust: rompio la resistencia y volvio a caer (trampa alcista)"
 
         plan = SPRING_PLAN if direction == 'hot' else UPTHRUST_PLAN
+        change_line = f" | 24h: {change_24h:+.1f}%" if change_24h is not None else ""
         message = (
-            f"{emoji} <b>WYCKOFF {label}</b>\n"
-            f"{market_pair} | {exchange} | 4h\n"
+            f"{headline}\n"
+            f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
+            f"{label}\n"
             f"Volumen en la ruptura: {break_relative_volume:.1f}x el promedio\n\n"
             f"{plan}\n\n"
             f"<i>Backtest Freqtrade 2022-2026 (specs/032-freqtrade-lab-wyckoff/). "
