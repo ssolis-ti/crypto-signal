@@ -339,23 +339,26 @@ class TestSignalQualityContext:
     def test_spring_message_shows_depth_and_concurrent_count(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
-        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})
+        pairs = {'BTC/USDT': _spring_fixture()}
+        pairs.update({f'Q{i}/USDT': _no_event_fixture() for i in range(9)})  # 1 de 10 pares vigilados
+        alerter.check_cycle('binance', pairs)
 
         msg = notifier.messages[0]
         assert 'Barrida bajo el nivel: 4.0%' in msg
-        assert 'Pares con evento en esta misma vela: 1' in msg
-        assert 'aislado' in msg
+        assert 'Pares con evento en esta misma vela: 1 de 10 (10%)' in msg
+        assert 'poco extendido' in msg
         assert 'sin confirmar en vivo' in msg
 
     def test_concurrent_pairs_are_counted_across_the_cycle(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
         pairs = {f'P{i}/USDT': _spring_fixture() for i in range(5)}
+        pairs.update({f'Q{i}/USDT': _no_event_fixture() for i in range(5)})  # 5 de 10 = 50%
         alerter.check_cycle('binance', pairs)
 
         assert len(notifier.messages) == 5
-        assert all('Pares con evento en esta misma vela: 5' in m for m in notifier.messages)
-        assert all('5+ pares' in m for m in notifier.messages)
+        assert all('Pares con evento en esta misma vela: 5 de 10 (50%)' in m for m in notifier.messages)
+        assert all('capitulacion amplia' in m for m in notifier.messages)
 
     def test_context_never_suppresses_an_alert(self):
         notifier = RecordingNotifier()
@@ -969,3 +972,33 @@ class TestLiquidityNotice:
         alerter.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())  # volumenes de juguete: liquidez muy baja
         assert 'Liquidez baja' in notifier.messages[0]
         assert json.loads(path.read_text().strip())['dvol24h_usd'] is not None
+
+
+class TestWideClusterFraction:
+    def test_threshold_is_twenty_percent_of_the_watched_pairs(self):
+        wide = WyckoffAlerter._quality_lines('hot', None, 6, watched=30)     # 20%
+        narrow = WyckoffAlerter._quality_lines('hot', None, 5, watched=30)   # 16.7%
+        assert 'capitulacion amplia' in wide and '6 de 30 (20%)' in wide
+        assert 'poco extendido' in narrow and 'capitulacion amplia' not in narrow
+
+    def test_same_count_means_different_things_for_different_universes(self):
+        assert 'capitulacion amplia' in WyckoffAlerter._quality_lines('hot', None, 6, watched=20)
+        assert 'poco extendido' in WyckoffAlerter._quality_lines('hot', None, 6, watched=49)
+
+    def test_unknown_universe_falls_back_to_thirty_pairs(self):
+        assert '6 de 30 (20%)' in WyckoffAlerter._quality_lines('hot', None, 6)
+
+    def test_upthrust_shows_the_count_without_spring_statistics(self):
+        text = WyckoffAlerter._quality_lines('cold', None, 6, watched=30)
+        assert '6 de 30' in text and 'backtest' not in text.split('Hipotesis')[0]
+
+    def test_watched_pairs_are_recorded(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=str(path))
+        pairs = {'BTC/USDT': _spring_fixture(), 'Q/USDT': _no_event_fixture()}
+        alerter.check_cycle('binance', pairs)
+        assert json.loads(path.read_text().strip())['watched_pairs'] == 2
+
+    def test_plan_is_honest_about_survivorship(self):
+        from analysis.wyckoff_alerts import SPRING_PLAN
+        assert 'deslistaron' in SPRING_PLAN and '+0.35%' in SPRING_PLAN

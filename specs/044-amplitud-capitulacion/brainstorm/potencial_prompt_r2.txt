@@ -1,0 +1,15 @@
+Sos un investigador cuantitativo riguroso en la RONDA 2 de una sesion de apoyo mutuo (otro agente, tu par, hizo la ronda 1 con el mismo enunciado que vos). SOLO LECTURA: no modifiques nada del repo; tu salida es tu respuesta final. No leas .env ni config.yml. Todo en espanol. Se breve y concreto: maximo ~1200 palabras, sin repetir lo que ya dijeron.
+
+LEE PRIMERO estos dos archivos (estan en tu directorio de trabajo, un nivel arriba si no los ves: ../../potencial_r1_opencode.txt y ../../potencial_r1_agy.txt; tambien copiados en esta carpeta como r1_opencode.txt y r1_agy.txt). Son las respuestas de la ronda 1 de opencode (DeepSeek) y agy (Gemini). Tambien podes releer README.md y docs/ESTADO_Y_PENDIENTES.md; specs/043-sesgo-supervivencia/spec.md tiene un resultado NUEVO importante: con 177 perpetuos deslistados el edge del spring baja de +1.64% a +0.35% fuera de muestra (2025-26) y se concentra en monedas grandes.
+
+HECHOS NUEVOS QUE CLAUDE VERIFICO
+- opencode tenia razon: data.binance.vision tiene metricas diarias por simbolo (archivos diarios, filas cada 5 min) con open interest (sum_open_interest[_value]) y count_long_short_ratio desde ~2021, incluso de deslistados; los ratios de top traders y taker vienen VACIOS en 2022. Es decir: OI y long/short SI se pueden backtestear (no solo forward).
+- Convergencia: ambos pusieron primero la AMPLITUD DE CAPITULACION del mercado (medir directo cuantos pares estan en minimos con volumen anormal) como senal de regimen; ambos incluyeron funding agregado y una entrada secundaria tipo retest/LPS; ambos incluyeron event-driven (opencode: contenido de noticias; agy: anuncios de deslistado de Binance).
+- Divergencia: agy propone senales de otro tipo (SOS+LPS de tendencia, NR7, VWAP semanal, ETH/BTC, opex); opencode propone posicionamiento (OI flush, top traders, taker agregado, base spot-perp).
+
+TAREA
+1) CRITICA CRUZADA: de las 5 ideas MEJOR rankeadas del otro agente, marca para cada una el fallo mas probable (look-ahead, solapamiento de ventanas que infla n, sesgo de supervivencia del universo, umbral elegido mirando los datos, mecanismo debil, imposible con los datos reales). Se especifico; cita el numero de idea.
+2) LO QUE ADOPTARIAS del otro: 2-3 elementos concretos y por que mejoran tu propia lista.
+3) CONSENSO: ranking final de los 6 experimentos que valen la pena, en orden, con costo en horas. Para los 3 primeros escribi el PROTOCOLO PRE-REGISTRADO exacto: definicion, universo (point-in-time, incluyendo deslistados si aplica), umbrales congelados con IS (2022-24) y probados en OOS (2025-26), unidad de analisis (dias distintos, bloques de 72h no solapados), correccion por comparaciones multiples, tamano de efecto minimo, criterio de aprobacion y de rechazo, y que mediria para no enganiarse (control con dias al azar / permutacion).
+4) LO QUE NINGUNA DE LAS DOS LISTAS CUBRIO: 1-3 angulos realmente nuevos (no repitas los de arriba) que aprovechen los recursos (datos de metricas de Binance por 5 min, funding, deslistados, MCP de Twitter/Reddit, Gemini).
+5) UNA frase final: el mayor riesgo de que crypto-signal no mejore aunque probemos todo esto, y como detectarlo temprano.

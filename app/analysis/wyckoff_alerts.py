@@ -34,7 +34,10 @@ DEFAULT_RADAR_MIN_RATIO = 2.0
 RADAR_MAX_FAILURES = 3
 SEND_MAX_FAILURES = 12  # ciclos de 5 min: ~1h reintentando si Telegram no responde
 SHALLOW_SWEEP_PCT = 1.0
-CLUSTER_STRONG = 5
+# Spec 044: el efecto de "varios springs a la vez" se mide como FRACCION de los pares vigilados (el numero absoluto
+# depende del tamano del universo). >= 20% = capitulacion amplia. DEFAULT_WATCHED se usa si no se conoce el universo.
+WIDE_CLUSTER_FRACTION = 0.20
+DEFAULT_WATCHED = 30
 STALE_ALERT_SECONDS = 2 * 3600
 CANDLE_SECONDS = 4 * 3600
 # Springs confirmados mientras el bot estuvo apagado: se avisan hasta 3 velas (12h) despues. Medido en el
@@ -60,7 +63,9 @@ MAX_DEDUP_SIGNATURES = 500
 SPRING_PLAN = (
     "📈 <b>Plan: long, mantener ~3 dias (72h), stop -10% en precio (mark)</b>\n"
     "Tomando TODAS las señales a 1x (con comisiones y funding): acierto 56-58%, "
-    "ganancia media +1.5% a +1.8% por trade.\n"
+    "ganancia media +1.5% a +1.8% por trade (monedas grandes que siguen listadas).\n"
+    "⚠️ Incluyendo monedas que despues se deslistaron, en 2025-26 baja a ~+0.35% (acierto 45%): "
+    "el edge vive en las monedas grandes y liquidas.\n"
     "⚠️ Si solo podes tener 3 posiciones abiertas a la vez rinde menos: ~+1% medio y 50-56% "
     "de acierto, porque cuando saltan varias señales juntas quedan afuera las mejores. "
     "Caida maxima vista del capital 19-27% (en una mala racha puede ser mayor); "
@@ -102,6 +107,7 @@ class WyckoffAlerter:
         self._radar_failures: Dict[str, int] = {}
         self._send_failures: Dict[str, int] = {}
         self._concurrent: Dict[tuple, int] = {}
+        self._watched: Optional[int] = None  # pares revisados en el ciclo (para expresar la amplitud como fraccion)
         self.twitter_sentiment = TwitterSentimentAnalyzer(enabled=twitter_sentiment_enabled)
         # El radar necesita Twitter: sin el no hay nada que cruzar con el volumen.
         self.rumor_radar_enabled = rumor_radar_enabled and twitter_sentiment_enabled
@@ -165,6 +171,7 @@ class WyckoffAlerter:
         if not self.enabled:
             return
         self._concurrent = self._count_concurrent(exchange, pairs_data)
+        self._watched = len(pairs_data)
         for market_pair, historical_data in pairs_data.items():
             try:
                 self.check_and_alert(exchange, market_pair, VALIDATED_CANDLE_PERIOD, historical_data)
@@ -446,7 +453,7 @@ class WyckoffAlerter:
 
     @staticmethod
     def _quality_lines(direction: str, sweep_depth: Optional[float], concurrent: Optional[int],
-                       weekend: bool = False) -> str:
+                       weekend: bool = False, watched: Optional[int] = None) -> str:
         """
         Contexto de la senal. Son HIPOTESIS del backtest (auditoria de resultados, 2026-09-29),
         aun sin confirmar en vivo: se muestran, no filtran ninguna alerta (Principio III). Las
@@ -459,12 +466,16 @@ class WyckoffAlerter:
                 line += " ⚠️ superficial: en el backtest las de menos de 1% no rindieron (media -0.1%)"
             lines.append(line)
         if concurrent is not None:
-            line = f"Pares con evento en esta misma vela: {concurrent}"
+            total = watched or DEFAULT_WATCHED
+            fraction = concurrent / total if total else 0.0
+            line = f"Pares con evento en esta misma vela: {concurrent} de {total} ({fraction * 100:.0f}%)"
             if direction == 'hot':
-                if concurrent <= 1:
-                    line += " ⚠️ aislado: en el backtest sin ventaja clara (media ~+0.3%)"
-                elif concurrent >= CLUSTER_STRONG:
-                    line += " (backtest con 5+ pares: media ~+2.5%)"
+                if fraction >= WIDE_CLUSTER_FRACTION:
+                    line += (" ✅ capitulacion amplia: en el backtest (>= 20% de los pares) media +3.8% y 65% de acierto "
+                             "en 2022-24, +1.5% y 54% en 2025-26 (por trade)")
+                else:
+                    line += (" ⚠️ poco extendido (< 20% de los pares): en el backtest rindio mucho menos "
+                             "(~+0.5% a +1%, acierto 41-51%)")
             lines.append(line)
         if weekend and direction == 'hot':
             lines.append("Cierre en fin de semana ⚠️ en el backtest los springs de sab/dom rindieron "
@@ -494,7 +505,7 @@ class WyckoffAlerter:
             f"{self._liquidity_notice(dvol24h)}"
             f"{label}\n"
             f"Volumen en la ruptura: {break_relative_volume:.1f}x el promedio\n"
-            f"{self._quality_lines(direction, sweep_depth, concurrent, self._is_weekend_close(timestamp))}\n"
+            f"{self._quality_lines(direction, sweep_depth, concurrent, self._is_weekend_close(timestamp), self._watched)}\n"
             f"{plan}\n\n"
             f"<i>Backtest Freqtrade 2022-2026 (specs/032-freqtrade-lab-wyckoff/). "
             f"No es asesoria financiera.</i>"
@@ -519,6 +530,7 @@ class WyckoffAlerter:
             'relative_volume': round(float(break_relative_volume), 2),
             'sweep_depth_pct': None if sweep_depth is None else round(float(sweep_depth), 3),
             'concurrent_pairs': concurrent,
+            'watched_pairs': self._watched,
             'weekend_close': self._is_weekend_close(timestamp),
             'dvol24h_usd': None if dvol24h is None else round(dvol24h, 0),
             'change_24h_pct': None if change_24h is None else round(float(change_24h), 2),

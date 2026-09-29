@@ -1,0 +1,32 @@
+/exp/breadth.py:108: UserWarning: obj.round has no effect with datetime, timedelta, or period dtypes. Use obj.dt.round(...) instead.
+  print(ev.tail(8)[['t', 'n', 'breadth', 'caps', 'all', 'btc']].round(2).to_string(index=False))
+universo: 49 pares del laboratorio + 177 deslistados
+media incondicional (canasta de todos los elegibles, cualquier vela 2022-26): -0.39%; BTC: +0.05%
+pares elegibles por vela: mediana 54, p10 32, p90 75
+
+SENSIBILIDAD (episodios = primera vela de cada grupo dentro de 72h)
+ umbral | velas epis dias | IS n  media acierto | OOS n  media acierto | BTC med todos med
+    15% |   352  169  169 |  104  +0.29     52% |    65  -0.51     43% |   +0.11     -0.09
+    20% |   294  156  156 |   98  +0.31     50% |    58  -0.51     41% |   +0.01     -0.02
+    25% |   261  142  142 |   88  +0.41     49% |    54  -0.62     44% |   +0.12     +0.02
+    30% |   230  128  128 |   82  +0.38     46% |    46  -0.27     48% |   +0.19     +0.18
+    35% |   207  117  117 |   77  +0.67     49% |    40  -0.61     45% |   +0.33     +0.33
+
+PRIMARIO (umbral 25% fijado antes): episodios 142 | dias distintos 142
+  IS    n= 88 dias= 88 canasta capitulados  +0.41% acierto  49% | todos los elegibles  +0.38% | BTC  +0.33% | pares medios 37.6
+  OOS   n= 54 dias= 54 canasta capitulados  -0.62% acierto  44% | todos los elegibles  -0.56% | BTC  -0.21% | pares medios 21.1
+  UNIDO n=142 dias=142 canasta capitulados  +0.02% acierto  47% | todos los elegibles  +0.02% | BTC  +0.12% | pares medios 31.3
+  exceso vs media incondicional (-0.39%): +0.40 pp  IC95 por dia [-0.72, +1.59]
+  criterios: (1) media >= +1.5% en IS y OOS: False | (2) exceso IC excluye 0: False | (3) dias >= 35 y >= 15/periodo: True | (4) acierto >= 55% en ambos: False
+  VEREDICTO: NO aprueba
+
+Ultimos 8 episodios:
+                        t  n  breadth  caps   all   btc
+2026-07-06 12:00:00+00:00  7     0.27 -1.13 -3.87 -1.18
+2026-07-13 00:00:00+00:00  6     0.29  3.02  2.72  2.79
+2026-07-24 12:00:00+00:00  6     0.26 -1.52  0.59  0.61
+2026-07-27 20:00:00+00:00  9     0.31  1.77  1.51  1.52
+2026-08-11 12:00:00+00:00 11     0.44 -0.88  1.15 -1.09
+2026-08-30 20:00:00+00:00 11     0.48  3.49  3.22 -0.53
+2026-09-11 12:00:00+00:00 12     0.33 -0.42 -1.39  1.01
+2026-09-15 12:00:00+00:00 10     0.31  8.89  9.65  5.41

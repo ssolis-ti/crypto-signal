@@ -1,0 +1,17 @@
+senales con >= 20M USD/24h: 3478 | lab: 2235 | deslistados: 1243
+
+SOLO LOS 49 PARES DEL LABORATORIO (sobrevivientes), >= 20M USD/24h
+  pares simultaneos  |     n   media acierto dias |  IS n   media | OOS n   media
+  1 (aislado)        |   382   +0.07     49%  316 |   249   +0.26 |   133   -0.29
+  2-4                |   409   +0.08     47%  132 |   286   +0.73 |   123   -1.43
+  5-9                |   448   -0.21     54%   57 |   327   -0.73 |   121   +1.21
+  10+                |   996   +3.44     63%   48 |   587   +3.84 |   409   +2.87
+  5+ vs <5: +2.23 pp  IC95 por dia [+0.35, +4.13]  (5+: n=1444, media +2.31%, acierto 60%)
+
+UNIVERSO COMPLETO (laboratorio + deslistados), >= 20M USD/24h
+  pares simultaneos  |     n   media acierto dias |  IS n   media | OOS n   media
+  1 (aislado)        |   646   +1.07     42%  508 |   383   -0.29 |   263   +3.05
+  2-4                |   565   -0.44     45%  185 |   389   +0.29 |   176   -2.05
+  5-9                |   534   +0.83     54%   68 |   399   +0.97 |   135   +0.41
+  10+                |  1733   +2.71     61%   64 |  1210   +3.15 |   523   +1.69
+  5+ vs <5: +1.90 pp  IC95 por dia [-0.51, +4.17]  (5+: n=2267, media +2.27%, acierto 59%)

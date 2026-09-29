@@ -1,0 +1,35 @@
+Sos un investigador cuantitativo creativo pero riguroso, en una SESION DE APOYO MUTUO con otro agente y con Claude. SOLO LECTURA: no modifiques ningun archivo del repo; tu salida es tu respuesta final (texto). No leas .env ni config.yml. No salgas de este directorio. Todo en espanol. Se eficaz: ideas concretas y probables, no listas genericas.
+
+PARA QUE: Claude (quien te escribe) esta "cegado": lleva mucho tiempo mirando los mismos datos y NO encuentra patrones, correlaciones ni divergencias nuevas que funcionen. Necesita ojos frescos. La meta es sacar el POTENCIAL FINAL de crypto-signal: ¿que otras cosas podria avisar (o que forma completamente distinta de mirar el mercado) para dar mas frecuencia y calidad de senales?
+
+CONTEXTO (leelo en este orden, es breve): README.md (tabla de slices: TODO lo ya probado y refutado esta ahi), docs/ESTADO_Y_PENDIENTES.md, specs/042-robustez-checklist-externa/spec.md, specs/041-horarios-y-continentes/spec.md. Mira tambien app/analysis/ y app/analyzers/ para saber que ya calcula el bot.
+IMPORTANTE: crypto-signal es un bot SOLO de alertas por Telegram; el operador opera A MANO en Binance futuros (zona America/Santiago). NO asumas su capital. Freqtrade es OTRO proyecto (solo laboratorio de backtests).
+
+ESTADO HONESTO
+- UNICO edge validado: Wyckoff Spring (long) en 4h con volumen de ruptura >= 2.5x, mantener 72h, stop -10%: acierto 56-58%, +1.5..1.8% por trade (IS 2022-24 y OOS 2025-26, comisiones y funding reales). Solo ~1.400 senales en 4.7 anios sobre 29 pares => POCA FRECUENCIA (con tope de 3 posiciones ~120 trades/anio, media ~+0.8%).
+- El edge es sobre todo CAPITULACION DE TODO EL MERCADO (5+ pares con evento en la misma vela ~+2.5%; aislados ~0). Es decir: es una senal de REGIMEN/MERCADO, no de un par.
+- Robustez: positivo los 5 anios, sobrevive slippage x2; ~1 de cada 5 anios simulados termina en negativo. Pendiente: sesgo de supervivencia (se esta midiendo con perpetuos deslistados).
+- REFUTADO (no lo re-propongas tal cual): RSI/MACD solos y el score SignalEnhancer; otros timeframes (solo 4h sirve); CMF/PVT/NVI como filtro; patrones de velas TA-Lib (60+); conteo de menciones en Twitter; funding como filtro; cortes por hora UTC, sesion (Asia/Europa/EEUU), fin de semana, inicio de mes; minutos criticos (esperar, limite, break-even, trailing, TP, 48h); flujo taker, BTC en 15m; EQL/minimos iguales; BTC>EMA200; upthrust/short (sin edge); ML/FreqAI (piloto cerrado). Debil/no concluyente: profundidad de la barrida >=1%, caida 24h <=-8%.
+- Funciona senal por senal pero no con pocas posiciones: mean-reversion long tras caida >= 15% en 24h.
+
+LO QUE CLAUDE NO HA MIRADO (ejemplos; agrega los tuyos, los inesperados valen mas)
+Patrones: patrones de grafico (triangulos, cunas, hombro-cabeza-hombro, doble piso), estructura de mercado (BOS/CHoCH), niveles Fibonacci, perfil de volumen / VWAP anclado / POC, compresion de volatilidad (Bollinger squeeze, NR7, percentil de ATR), segundo spring, estructuras Wyckoff completas (fase A-E, SOS/LPS), ondas.
+Correlaciones: correlacion BTC-alts en ventana movil y sus RUPTURAS como senal de estres; lead-lag (BTC/ETH lideran k velas?); dispersion cross-sectional; sectores/narrativas (L1, DeFi, meme, IA) y rotacion; dominancia BTC; ETH/BTC; correlacion de funding entre pares.
+Divergencias: precio vs volumen/OBV, RSI/MACD clasicas, fuerza relativa vs BTC, precio vs funding, precio vs open interest, top traders vs cuentas globales (long/short), spot vs perpetuo (base), premio entre exchanges (Binance vs Coinbase / kimchi), liquidaciones.
+Otros angulos: AMPLITUD DE MERCADO (que % de los top-N pares esta en minimos de N dias con volumen anormal) como detector directo de capitulacion -en vez de spring par a par-; regimen de volatilidad; eventos de calendario conocidos de antemano (desbloqueo de tokens, listados/deslistados de Binance, anuncios); event-driven con noticias/Twitter por CONTENIDO (no conteo); estacionalidad; que pasa DESPUES de la capitulacion (deriva, segundo minimo).
+
+RECURSOS DISPONIBLES (las ideas deben poder probarse con esto)
+- Datos del laboratorio Freqtrade (desde 2021, 49 pares de futuros USDT-M de Binance): velas 4h/1h/15m (y 1m para eventos), precio MARK y funding real cada 8h. Perpetuos deslistados via archivo publico data.binance.vision. Klines crudos de Binance incluyen taker-buy volume.
+- Solo FORWARD (no hay historia): libro de ordenes, open interest (30 dias), ratio long/short (historial corto); el bot ya los registra en cada alerta (campo micro del jsonl).
+- MCP de Twitter (GetXAPI: busqueda avanzada, cuentas, timelines) y Reddit; Gemini para clasificar texto.
+- Python: pandas, numpy, scipy, scikit-learn, TA-Lib, pandas_ta, optuna (NO hay statsmodels/lightgbm en el laboratorio). Codigo Freqtrade con backtesting, lookahead-analysis y hyperopt disponible.
+- Skills de metodologia (backtest-expert, backtesting-frameworks): parametros en mesetas no picos, estres de friccion, por anio, walk-forward, tamano de muestra.
+- Estandar del proyecto: split cronologico IS 2022-24 / OOS 2025-26; bootstrap por DIA (los eventos comparten vela, ~80% en clusters); correccion por comparaciones multiples; criterio fijado ANTES de correr; >= 30 dias distintos por celda; un filtro solo cuenta si mejora en AMBOS periodos. Restricciones del bot: solo lectura, sin repintado, UTC, dependencias fijadas, nada nuevo filtra alertas sin validacion.
+
+TAREA (Ronda 1)
+A) De 12 a 18 IDEAS concretas y DISTINTAS entre si, ordenadas por (valor esperado x probabilidad de que sea real) / costo de probar. Para cada una: (1) definicion operativa exacta (que se calcula, con que datos, en que timeframe, que valores); (2) hipotesis con DIRECCION fijada de antemano; (3) por que podria ser real (mecanismo); (4) cuantos eventos esperarias y en cuantos dias distintos; (5) como probarla (con el laboratorio, en cuantas horas) y el criterio de aprobacion; (6) riesgo de falso positivo. Marca cuales son SENALES NUEVAS (mas frecuencia) y cuales MEJORAN la actual.
+B) Al menos 3 ideas de un ANGULO TOTALMENTE DISTINTO al de Claude (ej.: amplitud de mercado, event-driven por anuncios, estructura de correlacion) — no otro filtro para el spring.
+C) La VISION FINAL: ¿como seria el mejor crypto-signal posible con lo que hay? Que tipos de alerta tendria, cuantas por semana, y en que orden construirias las piezas.
+D) "Lo que yo NO haria": 3 trampas en las que Claude podria caer (sesgo, p-hacking, complejidad) al seguir tus ideas.
+E) Cierra con: "Mis 3 experimentos para correr HOY" con criterio de aprobacion concreto para cada uno.
+Se honesto: si algo es especulativo, decilo; no inventes numeros ni resultados.

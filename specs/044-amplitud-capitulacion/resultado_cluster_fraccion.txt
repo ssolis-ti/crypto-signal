@@ -1,0 +1,30 @@
+pares del laboratorio: 49, deslistados: 177; springs con >= 20M USD/24h: 3476; pares elegibles por vela: mediana 54
+fraccion de pares con spring: percentiles {0.5: 0.154, 0.75: 0.373, 0.9: 0.575, 0.95: 0.656}
+
+GRILLA (eventos = springs individuales en velas con fraccion >= umbral)
+ umbral | 2022-24                                       | 2025-26                                      
+     5% | n=1729 media= +2.52% acierto= 60% dias=109    | n= 796 media= +0.91% acierto= 52% dias= 71   
+    10% | n=1379 media= +2.73% acierto= 62% dias= 65    | n= 673 media= +1.32% acierto= 54% dias= 37   
+    15% | n=1190 media= +3.16% acierto= 63% dias= 47    | n= 583 media= +1.53% acierto= 54% dias= 24   
+    20% | n= 906 media= +3.80% acierto= 65% dias= 27    | n= 572 media= +1.48% acierto= 54% dias= 22   
+    25% | n= 780 media= +4.55% acierto= 69% dias= 19    | n= 498 media= +1.99% acierto= 56% dias= 18   
+    30% | n= 713 media= +5.11% acierto= 72% dias= 16    | n= 462 media= +1.95% acierto= 55% dias= 16   
+    40% | n= 436 media= +6.13% acierto= 76% dias=  7    | n= 310 media= +1.08% acierto= 43% dias= 10   
+   < 5% | n= 650 media= -0.19% acierto= 47% dias=360    | n= 301 media= +2.16% acierto= 37% dias=213   
+
+umbral elegido con 2022-24: 0.05
+  PRUEBA en 2025-26: n= 796 media= +0.91% acierto= 52% dias= 71
+  diferencia unida (>= umbral) - (< umbral): +1.46 pp  IC95 por dia [-1.09, +3.70]
+  resto (< umbral): n= 650 media= -0.19% acierto= 47% dias=360 | n= 301 media= +2.16% acierto= 37% dias=213
+  a nivel EPISODIO (media de la canasta por vela de senal): n=240, media +0.71%, acierto 51%, dias 180
+     IS: n=148 media +1.40% acierto 55%
+     OOS: n=92 media -0.39% acierto 45%
+TRAMOS SIN SOLAPAR (fraccion de pares elegibles con spring en la misma vela)
+  < 10%                      | 2022-24: n=1000 media= +0.47% acierto= 48% dias=382    | 2025-26: n= 424 media= +1.15% acierto= 38% dias=237   
+  10-20%                     | 2022-24: n= 473 media= +0.67% acierto= 56% dias= 42    | 2025-26: n= 101 media= +0.41% acierto= 52% dias= 18   
+  20-35%                     | 2022-24: n= 287 media= +0.36% acierto= 53% dias= 15    | 2025-26: n= 201 media= +1.49% acierto= 63% dias= 13   
+  >= 35%                     | 2022-24: n= 619 media= +5.40% acierto= 71% dias= 12    | 2025-26: n= 371 media= +1.48% acierto= 50% dias= 12   
+  < 20% (todo lo no amplio)  | 2022-24: n=1473 media= +0.53% acierto= 51% dias=398    | 2025-26: n= 525 media= +1.01% acierto= 41% dias=247   
+  >= 20% (amplia)            | 2022-24: n= 906 media= +3.80% acierto= 65% dias= 27    | 2025-26: n= 572 media= +1.48% acierto= 54% dias= 22   
+  amplia (>=20%) - no amplia, IS: +3.27 pp  IC95 por dia [+0.08, +6.31]
+  amplia (>=20%) - no amplia, OOS: +0.47 pp  IC95 por dia [-4.40, +5.58]

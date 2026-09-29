@@ -1,0 +1,409 @@
+Hola Claude y equipo. Entiendo perfectamente el estado de bloqueo mental: cuando uno pasa semanas auditando la misma serie temporal, corrigiendo comparaciones múltiples y viendo cómo caen hipótesis una tras otra (RSI, CMF, NVI, 60 patrones de velas, cortes horarios, minutos críticos), la mente se encierra en un túnel de micro-optimizaciones alrededor del único hueso que dio carne: el *Wyckoff Spring en 4h*.
+
+El diagnóstico objetivo de por qué estás bloqueado es evidente en los propios datos: **intentaste mejorar una señal que no es de un par, sino de régimen de mercado, agregándole filtros a nivel de par individual.** Cada filtro que probaste sobre el Spring (barrida, CMF, velas, horas) cortó el $n$ de eventos independientes (días de capitulación) y diluyó el poder estadístico hasta que el intervalo de confianza por día se tragó el cero.
+
+Aquí tienes la mirada fresca, cuantitativa y no sesgada.
+
+---
+
+### A) 15 IDEAS CONCRETAS Y DISTINTAS
+
+Ordenadas por el ratio de eficiencia investigativa:  
+$$\text{Score} = \frac{\mathbb{E}[\text{Valor}] \times P(\text{Efecto Real})}{\text{Costo de Implementación y Prueba}}$$
+
+---
+
+#### 1. Índice de Amplitud de Capitulación de Mercado (Systemic Breadth Panic)
+*Tipo*: **SEÑAL NUEVA (Régimen / Frecuencia Sistémica)**  
+*Score*: **9.5 / 10**
+
+1. **Definición operativa exacta**: En velas de 4h, sobre la cesta de $N=30$ pares principales USDT: calcular cuántos pares cumplen en la misma vela: (a) `low <= rolling_min(low, 20)` (mínimo de ~3.3 días), y (b) `volume >= 2.0 * sma(volume, 20)`. Si $\text{Breadth} = \frac{n_{\text{cumplen}}}{N} \ge 25\%$ (es decir, $\ge 8$ pares de 30 en la misma vela de 4h): se dispara **Alerta Sistémica de Capitulación**.
+2. **Hipótesis con dirección a priori**: LONG generalizado a 72h. Retorno medio del mercado $> +2.0\%$ por evento; acierto $> 60\%$.
+3. **Mecanismo microestructural**: En crypto futuros, las cascadas de liquidaciones cruzadas (*cross-margin margin calls*) fuerzan ventas simultáneas e indiscriminadas de colateral a precio de mercado. Cuando más de una cuarta parte del mercado está en mínimos con volumen extremo, se produce el agotamiento de liquidez de venta forzada (*forced seller depletion*) y los creadores de mercado absorben el inventario con descuento.
+4. **Eventos esperados**: ~60 a 85 velas/días en 4.7 años (aprox. 15-18 eventos por año). Son pocos días, pero cada día genera una alerta de régimen de convicción institucional máxima.
+5. **Cómo probarla en el lab**: Script Python sobre el histórico de velas 4h de los 29-49 pares. Calcular la matriz booleana $T \times N$ de eventos, sumar por fila, medir el retorno medio cross-sectional a 72h (con stop -10%). Costo: **2 a 3 horas**.  
+   *Criterio de aprobación*: Retorno medio $> +1.8\%$ en IS (2022-24) y $> +1.8\%$ en OOS (2025-26); IC99% bootstrap por día estrictamente superior a 0; media de años positivos $\ge 4/5$.
+6. **Riesgo de falso positivo**: Bajo. Es exactamente el fenómeno que ya sostiene al Wyckoff Spring, pero medido directamente en la fuente (amplitud agregada) en lugar de medirlo como la sombra proyectada en un par individual.
+
+---
+
+#### 2. Secondary Test en Fase C de Wyckoff (El "No-Supply Test")
+*Tipo*: **SEÑAL NUEVA (Entrada Táctica con Stop Ceñido)**  
+*Score*: **8.8 / 10**
+
+1. **Definición operativa exacta**:  
+   - Vela $t_0$: vela de capitulación (Spring previo o mínimo de 20 velas con volumen $\ge 2.0\times$).  
+   - En una ventana de 2 a 8 velas posteriores ($t \in [t_0 + 1, t_0 + 8]$, es decir, entre 4h y 32h después): el precio vuelve a testear la zona del mínimo ($low_t \le low_{t_0} \times 1.015$).  
+   - Condición de prueba: $volume_t \le 0.85 \times \text{sma}(volume, 20)$ (secado de volumen) y la vela cierra alcista ($close_t > open_t$).  
+2. **Hipótesis con dirección a priori**: LONG a 72h con stop ceñido en $-4.5\%$ (inmediatamente debajo del mínimo del Spring). Win-rate $\ge 52\%$, pero con ratio ganancia/pérdida $\ge 2.2$.
+3. **Mecanismo**: La teoría Wyckoff pura establece que tras el clímax de venta (Spring / Selling Climax), el dinero inteligente *no* persigue el precio al alza; espera a que el mercado vuelva a ofrecerse abajo. Si el precio vuelve al piso y el volumen desaparece, significa que los vendedores flotantes ya fueron liquidados ("falta de oferta").
+4. **Eventos esperados**: ~350 a 500 eventos en 4.7 años sobre 29 pares (~70-100 por año).
+5. **Cómo probarla**: En Freqtrade lab, codificar la máquina de estados en una estrategia (estado 1: spring detectado; estado 2: vela de testeo). Costo: **4 horas**.  
+   *Criterio de aprobación*: Expectativa matemática $E = (\text{Win\%} \times \text{WinAvg}) - (\text{Loss\%} \times \text{LossAvg}) > +1.2\%$ neta en IS y OOS; drawdown máximo $\le 15\%$ a 1x.
+6. **Riesgo de falso positivo**: Medio. Requiere parametrizar la ventana de retesteo (2-8 velas) y la tolerancia de precio ($\le 1.5\%$). Debe validarse que no sea sensible al umbral de volumen ($0.7\times$ a $0.9\times$).
+
+---
+
+#### 3. Sign of Strength (SOS) + Last Point of Support (LPS) en 4h (Ruptura y Retroceso en Tendencia)
+*Tipo*: **SEÑAL NUEVA (Permite operar en Bull Markets)**  
+*Score*: **8.4 / 10**
+
+1. **Definición operativa exacta**:  
+   - Vela $t_0$: Ruptura alcista del máximo de 30 velas (120h) con volumen extremo $\ge 2.5\times$ y cierre en el tercio superior de la vela (Sign of Strength).  
+   - Retesteo (LPS): En las siguientes 1 a 5 velas de 4h, el precio retrocede hacia la zona de ruptura ($high_{30}$ previo $\pm 1\%$) con volumen en declive ($\le 1.2\times$ promedio).  
+   - Gatillo: Primera vela de 4h que cierre verde tras el retesteo. Stop en $-6\%$ (bajo el soporte roto). Horizonte 72h.
+2. **Hipótesis con dirección a priori**: LONG tendencia. Win-rate $\ge 54\%$, retorno medio $\ge +2.0\%$ por trade.
+3. **Mecanismo**: Rompe el sesgo único del bot de operar rebotes de fondo. En mercados alcistas (como 2024), los springs son escasos y el bot se apaga. Wyckoff describió la acumulación completa: una vez absorbida la oferta, la demanda institucional empuja el precio fuera del rango (SOS); el retroceso con bajo volumen (LPS) confirma que la antigua resistencia ahora es soporte institucional.
+4. **Eventos esperados**: ~400 a 600 eventos en 4.7 años across 29 pares.
+5. **Cómo probarla**: Estrategia en Freqtrade lab (`Wyckoff_SOS_LPS`). Costo: **4 a 5 horas**.  
+   *Criterio de aprobación*: Ganancia media $> +1.5\%$ en IS y OOS; consistente especialmente en 2023 y 2024; stop rate $\le 20\%$.
+6. **Riesgo de falso positivo**: Medio-bajo. Es la contraparte estructural del Spring.
+
+---
+
+#### 4. Líderes de Absorción por Fuerza Relativa en Velas de Pánico
+*Tipo*: **SEÑAL NUEVA / FILTRO DE SELECCIÓN DE ALTS**  
+*Score*: **8.2 / 10**
+
+1. **Definición operativa exacta**:  
+   - Vela de caída de mercado: Vela 4h de BTC con retorno $\le -2.5\%$.  
+   - Condición del par Altcoin: En esa misma vela de 4h, el par cierra en POSITIVO ($\text{retorno} > +0.2\%$) o con caída despreciable ($> -0.5\%$) y con volumen relativo $\ge 2.0\times$.  
+   - Gatillo: LONG en el cierre de la vela de 4h, mantener 48h-72h, stop -8%.
+2. **Hipótesis con dirección a priori**: LONG de la altcoin líder. Retorno medio $\ge +2.5\%$ en 72h; acierto $\ge 58\%$.
+3. **Mecanismo**: Cuando cae un chaparrón sobre todo el mercado, cualquier activo que se niegue a bajar mientras negocia un volumen anormalmente alto está experimentando absorción institucional activa ("compras con mano fuerte"). Cuando BTC frena su caída o rebota mínimamente, estos activos actúan como una pelota inflable sostenida bajo el agua: son los primeros en dispararse violentamente al alza.
+4. **Eventos esperados**: ~250 a 350 eventos en 4.7 años (~60/año).
+5. **Cómo probarla**: Filtrar velas 4h de BTC con caída $\le -2.5\%$, calcular retornos de las 29 alts y medir su rendimiento posterior. Costo: **2 a 3 horas**.  
+   *Criterio de aprobación*: Diferencia de medias vs el promedio de alts en la misma vela $\ge +2.0\%$ con IC bootstrap por día que excluya 0 tanto en IS como en OOS.
+6. **Riesgo de falso positivo**: Bajo. El mecanismo de fuerza relativa durante estrés sistémico es uno de los fenómenos más robustos de las finanzas cuantitativas cross-sectional.
+
+---
+
+#### 5. Short Squeeze por Funding Rate Extremo Negativo Cross-Sectional
+*Tipo*: **SEÑAL NUEVA (Régimen de Derivados)**  
+*Score*: **8.0 / 10**
+
+1. **Definición operativa exacta**: Usando el historial de funding cada 8h de Binance futuros (ya disponible en el lab):  
+   - Calcular en cada corte de 8h el percentil del funding de los 29 pares.  
+   - Si $\ge 30\%$ de los pares tienen funding $\le -0.03\%$ (tasa de $-32.8\%$ anualizada) en el mismo ciclo de 8h: DISPARA ALERTA MACRO SHORT SQUEEZE.  
+   - Operativa: LONG en BTC/ETH o cesta top-3 alts más negativas a 72h.
+2. **Hipótesis con dirección a priori**: LONG generalizado. Win-rate $\ge 62\%$, retorno medio $\ge +2.8\%$ a 72h.
+3. **Mecanismo**: En spec 037 probaste el funding como un *filtro par a par sobre el Spring* y no dio nada. Pero el funding par a par tiene ruido idiosincrático. Cuando el funding de **todo el mercado** se hunde en terreno profundamente negativo, refleja un posicionamiento minorista abarrotado (*crowded shorts*) persiguiendo caídas con apalancamiento. Los creadores de mercado y arbitrajistas de cash-and-carry cobran tasas exorbitantes por estar largos; el menor impulso alcista desencadena compras forzadas por liquidación de cortos (*cascading short squeeze*).
+4. **Eventos esperados**: 35 a 55 eventos en 4.7 años (aprox. 8 a 12 eventos/año de altísima calidad).
+5. **Cómo probarla**: Script pandas cruzando las marcas de funding cada 8h con los retornos netos subsiguientes. Costo: **2 horas**.  
+   *Criterio de aprobación*: Win-rate $> 60\%$ en IS y OOS, retorno medio $> +2.0\%$ neto; signo idéntico y consistente año por año.
+6. **Riesgo de falso positivo**: Muy bajo. La física del apalancamiento y el costo de acarreo negativo crean límites asimétricos al posicionamiento bajista.
+
+---
+
+#### 6. Falsa Ruptura de Rango de Compresión (NR7 / Bollinger Squeeze Spring)
+*Tipo*: **SEÑAL NUEVA (Alineación Volatilidad $\to$ Ruptura Fallida)**  
+*Score*: **7.8 / 10**
+
+1. **Definición operativa exacta**:  
+   - Estado de compresión: El ancho de las Bandas de Bollinger de 4h ($\frac{\text{Upper} - \text{Lower}}{\text{SMA20}}$) está en su 15% percentil más bajo de los últimos 40 días, O la vela $t_{-1}$ es una vela NR7 (rango `High - Low` más estrecho de las últimas 7 velas).  
+   - Gatillo: La vela actual rompe el mínimo del rango de compresión, pero cierra de nuevo DENTRO del rango, con mecha inferior $\ge 40\%$ de la vela total.  
+   - Operativa: LONG inmediato al cierre, stop ajustado bajo la mecha (máximo -5%), horizonte 48h o trailing a la banda opuesta.
+2. **Hipótesis con dirección a priori**: LONG expansión de volatilidad. Acierto $\ge 55\%$, ganancia media $\ge +2.2\%$.
+3. **Mecanismo**: Los mercados alternan entre regímenes de baja volatilidad y alta volatilidad. Cuando un activo rompe a la baja desde una compresión extrema, invita a los traders de momentum a vender. Si esa ruptura fracasa de inmediato (trampa de osos), todo el combustible acumulado durante la compresión se libera violentamente en la dirección opuesta.
+4. **Eventos esperados**: ~200 a 300 eventos en 4.7 años.
+5. **Cómo probarla**: Estrategia en Freqtrade usando `pandas_ta.bbands` y lógica de falso quiebre. Costo: **3 horas**.  
+   *Criterio de aprobación*: Media $> +1.5\%$ en IS y OOS; $R/R \ge 1.8$.
+6. **Riesgo de falso positivo**: Medio. Requiere calibrar el umbral de compresión (percentil 15% vs 10%).
+
+---
+
+#### 7. Desconexión de Correlación Cross-Sectional (Régimen de Rotación / Fin de Pánico)
+*Tipo*: **SEÑAL NUEVA (Ángulo Distinto: Dinámica de Matriz)**  
+*Score*: **7.6 / 10**
+
+1. **Definición operativa exacta**:  
+   - Calcular la matriz de correlación rolling de 20 velas de 4h (80 horas) entre los retornos de los 29 pares.  
+   - Calcular la correlación promedio del mercado $\bar{\rho}_t$ y la dispersión cross-sectional de retornos $\sigma_{\text{CS}, t} = \text{std}(\{r_{i,t}\}_{i=1}^N)$.  
+   - Evento: Tras un pico de pánico ($\bar{\rho} > 0.80$), $\bar{\rho}$ cae abruptamente por debajo de $0.50$ mientras $\sigma_{\text{CS}}$ se mantiene alta.  
+   - Gatillo: Alerta de "Desacople de Mercado / Régimen de Rotación". Operativa: LONG en los 3 pares con mayor retorno 24h vs SHORT en los 3 pares con menor retorno 24h (o solo LONG de los pares líderes si BTC > EMA50).
+2. **Hipótesis con dirección a priori**: Long-only en líderes: retorno $> +2.0\%$ en 72h.
+3. **Mecanismo**: Cuando el mercado capitula, la correlación se aproxima a 1.0 (todo cae junto por liquidaciones). Cuando el pánico cesa, la correlación se rompe: el capital no sale de crypto, sino que rota hacia los proyectos con catalizadores o liquidez fresca. Operar aquí aprovecha la dispersión de activos en lugar de depender de la dirección de BTC.
+4. **Eventos esperados**: ~40 episodios de régimen al año.
+5. **Cómo probarla**: Análisis matricial en Python (numpy/pandas) sobre los retornos del laboratorio. Costo: **4 horas**.  
+   *Criterio de aprobación*: Sharpe de la canasta long/short o long-leaders $> 1.4$ tanto en IS como en OOS.
+6. **Riesgo de falso positivo**: Medio. Es sensible a la ventana rolling de la matriz (15 a 30 velas).
+
+---
+
+#### 8. Mean-Reversion Condicional tras Caída $\ge 15\%$ en 24h (Filtrada por Desaceleración)
+*Tipo*: **SEÑAL NUEVA (Rescate de una idea con edge conocido)**  
+*Score*: **7.5 / 10**
+
+1. **Definición operativa exacta**:  
+   - Filtro base: Caída acumulada en 24h $\le -15\%$.  
+   - *Filtro de desaceleración (evita cuchillos cayendo)*: En la última vela de 4h: (a) El mínimo de la vela se produjo en las primeras 2 horas (usando velas de 1h), (b) La vela de 4h cierra en el tercio superior de su rango (`(Close - Low) / (High - Low) >= 0.60`), y (c) Taker-Buy Volume en esa vela $\ge 45\%$ (agotamiento de ventas a mercado).  
+   - Selección si hay múltiples: Tomar el par con mayor ratio de mecha inferior / rango. Stop -10%, horizonte 48h.
+2. **Hipótesis con dirección a priori**: LONG a 48h. Win-rate $\ge 60\%$, retorno medio $\ge +3.0\%$.
+3. **Mecanismo**: En tus notas reconociste: *"Funciona señal por señal pero no con pocas posiciones porque algunas siguen cayendo"*. El error fue entrar a ciegas en la primera vela que marcaba $-15\%$. Añadir el requisito mecánico de desaceleración (mecha inferior de rechazo + mínimo no retesteado en la segunda mitad de la vela) asegura que entras *después* del clímax de liquidación, cuando el flujo comprador ya frenó la inercia.
+4. **Eventos esperados**: ~180 a 260 eventos en 4.7 años.
+5. **Cómo probarla**: Filtrar en el lab las alertas del script original de mean-reversion agregando la condición de mecha y posición del close. Costo: **3 horas**.  
+   *Criterio de aprobación*: Con restricción de 3 posiciones simultáneas, retorno medio $> +1.5\%$ y max drawdown $< 20\%$ en IS y OOS.
+6. **Riesgo de falso positivo**: Bajo-medio. La física del rebote elástico tras caídas parabólicas es real; el filtro de mecha previene atrapar activos camino a cero.
+
+---
+
+#### 9. Failed Auction / Value Area Rejection en VWAP Semanal Anclado
+*Tipo*: **SEÑAL NUEVA (Teoría de Subasta y Precios de Equilibrio)**  
+*Score*: **7.2 / 10**
+
+1. **Definición operativa exacta**:  
+   - Calcular el Anchored VWAP reiniciado cada lunes a las 00:00 UTC con bandas de desviación estándar ($\pm 2.0\sigma$).  
+   - Evento: Entre el martes y el jueves, el precio perfora la banda inferior ($\text{Low} < \text{VWAP} - 2\sigma$) pero la vela de 4h cierra nuevamente por encima de la banda inferior con volumen $\ge 1.5\times$.  
+   - Gatillo: LONG con objetivo en el VWAP semanal (retorno a la media), stop bajo el mínimo de la excursión (máximo -6%).
+2. **Hipótesis con dirección a priori**: LONG retorno al equilibrio. Win-rate $\ge 57\%$, ganancia media $\ge +1.8\%$.
+3. **Mecanismo**: En Auction Market Theory, los precios fuera de $2\sigma$ del VWAP semanal representan territorio donde el mercado está buscando aceptación de valor a la baja. Si la subasta falla y el precio vuelve a la zona de valor, los participantes determinan que los precios bajos fueron rechazados por el mercado, forzando una rotación hacia el precio promedio ponderado semanal.
+4. **Eventos esperados**: ~300 a 450 eventos en 4.7 años across 29 pares.
+5. **Cómo probarla**: Script en Python usando la función de VWAP anclado semanal. Costo: **3 horas**.  
+   *Criterio de aprobación*: Media $> +1.2\%$ neta en IS y OOS; consistente en todos los años.
+6. **Riesgo de falso positivo**: Medio. Depende de no sobre-optimizar el multiplicador de desviación estándar ($1.8\sigma$ a $2.2\sigma$).
+
+---
+
+#### 10. Agotamiento de Venta Taker (Taker Buy Ratio Divergence en Soporte)
+*Tipo*: **MEJORA DE LA SEÑAL ACTUAL / SEÑAL NUEVA**  
+*Score*: **7.0 / 10**
+
+1. **Definición operativa exacta**:  
+   - El archivo crudo de klines de Binance incluye `taker_buy_base_volume`. Calcular:  
+     $$\text{TakerBuyRatio} = \frac{\text{taker\_buy\_volume}}{\text{total\_volume}}$$  
+   - En una vela de 4h que marca un nuevo mínimo de 20 velas con volumen extremo $\ge 2.5\times$: medir el `TakerBuyRatio`.  
+   - Condición: El precio cae fuertemente, pero $\text{TakerBuyRatio} \ge 0.52$ (a pesar del colapso de precio, las órdenes ejecutadas a mercado fueron mayoritariamente de COMPRA).  
+   - Operativa: LONG 72h, stop -10%.
+2. **Hipótesis con dirección a priori**: LONG. Win-rate $\ge 62\%$, retorno medio $\ge +2.4\%$.
+3. **Mecanismo**: En spec 021 se descartó el flujo taker neto como filtro lineal general porque invertía el signo. La trampa fue evaluarlo en todas partes. En el *extremo de una vela de pánico*, si el taker buy ratio es mayoritariamente comprador, demuestra una absorción brutal: las órdenes de venta límite institucionales se retiraron y el dinero agresivo comenzó a barrer el libro de órdenes al alza ("aggressive accumulation").
+4. **Eventos esperados**: ~150 a 220 eventos en 4.7 años.
+5. **Cómo probarla**: Usar los klines históricos con taker buy volume del laboratorio y filtrar sobre los Springs existentes. Costo: **3 horas**.  
+   *Criterio de aprobación*: Diferencia respecto al Spring base $\ge +1.2\%$ con IC bootstrap por día $> 0$ en IS y OOS.
+6. **Riesgo de falso positivo**: Medio-alto. Los datos de taker volume en Binance a veces presentan anomalías en futuros durante picos de latencia.
+
+---
+
+#### 11. Event-Driven: Asimetría Estructurada en Anuncios de Desliste de Binance
+*Tipo*: **SEÑAL NUEVA (Ángulo Totalmente Distinto: Event-Driven)**  
+*Score*: **6.8 / 10**
+
+1. **Definición operativa exacta**:  
+   - Ingesta de avisos oficiales de Binance: *"Binance Futures Will Delist USDT-Margined Perpetuals on [SYMBOL] at [DATE/TIME]"*.  
+   - Estrategia en dos fases:  
+     - Fase 1 (primeros 15 min): No entrar (riesgo de pump de liquidación de cortos).  
+     - Fase 2 (1h a 4h tras el anuncio): Cuando el precio marque la primera vela de 1h con cierre inferior a su apertura tras el anuncio, abrir SHORT (o cerrar cualquier long). Stop en el máximo post-anuncio (+8%), mantener hasta 24h antes del desliste efectivo.
+2. **Hipótesis con dirección a priori**: SHORT sistemático. Win-rate $\ge 75\%$, retorno medio $\ge +6.0\%$ por evento.
+3. **Mecanismo**: Un anuncio de desliste es una condena de muerte para la liquidez de un perpetuo: los creadores de mercado apagan sus algoritmos, los fondos retiran colateral y los tenedores se ven forzados a cerrar posiciones antes del settlement forzoso. La presión vendedora es obligatoria e inelástica.
+4. **Eventos esperados**: 15 a 30 eventos por año en Binance.
+5. **Cómo probarla**: Cruzar las fechas/horas históricas de anuncios de desliste de Binance (disponibles en el feed público de noticias) con los precios de los contratos deslistados descargados de `data.binance.vision`. Costo: **4 horas**.  
+   *Criterio de aprobación*: Win-rate $> 70\%$ en el histórico; retorno acumulado netamente positivo.
+6. **Riesgo de falso positivo**: Bajo (el mecanismo es determinista), pero con riesgo de ejecución (liquidez escasa y spreads amplios al momento de operar a mano).
+
+---
+
+#### 12. Divergencia de Amplitud Alcista (Breadth Thrust / Higher Lows del Mercado)
+*Tipo*: **SEÑAL NUEVA (Detección de Fondos Macro)**  
+*Score*: **6.5 / 10**
+
+1. **Definición operativa exacta**:  
+   - En velas de 4h, medir el % de los 30 pares cotizando por encima de su EMA(20): $\text{PctAboveEMA20}_t$.  
+   - Condición de divergencia: BTC hace un nuevo mínimo de 30 días ($Low_t < \min(Low_{t-180..t-1})$), PERO $\text{PctAboveEMA20}_t$ es mayor que cuando BTC hizo su mínimo previo (ej. sube de $10\%$ a $> 35\%$).  
+   - Gatillo: Alerta de "Divergencia de Amplitud Alcista". LONG en BTC/ETH o cesta de alts fuertes a 5-7 días.
+2. **Hipótesis con dirección a priori**: LONG de medio plazo. Acierto $\ge 65\%$, retorno medio $\ge +3.5\%$.
+3. **Mecanismo**: En la fase final de una tendencia bajista, las altcoins más débiles ya fueron liquidadas hasta el hueso y no tienen más vendedores forzados. El precio de BTC cae a un nuevo mínimo por ventas puntuales de ballenas o liquidaciones de derivados de BTC, pero el resto del ecosistema no lo acompaña. Es el síntoma canónico de acumulación antes de un cambio de tendencia mayor.
+4. **Eventos esperados**: 10 a 18 eventos en 4.7 años (aprox. 3-4 veces al año).
+5. **Cómo probarla**: Script cross-sectional comparando la serie temporal de mínimos de BTC con el indicador de amplitud. Costo: **3 horas**.  
+   *Criterio de aprobación*: Win-rate $> 60\%$ en IS y OOS; captura de los suelos de 2022 (noviembre), 2023 (marzo/septiembre) y 2024 (agosto).
+6. **Riesgo de falso positivo**: Bajo-medio. Pocos eventos, pero de escala macro.
+
+---
+
+#### 13. Liberación de Volatilidad Post-Vencimiento de Opciones (OpEx Pinning Reversal)
+*Tipo*: **SEÑAL NUEVA (Ángulo Calendario / Derivados)**  
+*Score*: **6.2 / 10**
+
+1. **Definición operativa exacta**:  
+   - Calendario: Último viernes de cada mes a las 08:00 UTC (vencimiento de opciones de Deribit/Binance).  
+   - Condición previa: Si en las 24h previas (jueves 08:00 UTC a viernes 08:00 UTC) el mercado estuvo en un rango estrecho (rango de BTC $< 2.0\%$) cotizando cerca de niveles de dolor máximo (*Max Pain*) o por debajo de su EMA(50) de 4h.  
+   - Gatillo: En la vela de 4h inmediatamente posterior al vencimiento (cierre 12:00 UTC del viernes), si la vela cierra verde con volumen superior a las 3 velas previas: LONG a 72h.
+2. **Hipótesis con dirección a priori**: LONG post-vencimiento. Retorno medio $\ge +1.8\%$.
+3. **Mecanismo**: Antes de las 08:00 UTC del viernes de vencimiento mensual, los creadores de mercado de opciones realizan cobertura delta continua (*gamma hedging*), lo que "clava" el precio (*pinning*) e impide movimientos bruscos. A las 08:00 UTC las opciones expiran y las coberturas se deshacen en masa, permitiendo que la volatilidad reprimida se expanda bruscamente en la dirección de menor resistencia.
+4. **Eventos esperados**: ~56 eventos en 4.7 años (1 mensual $\times 56$ meses).
+5. **Cómo probarla**: Aislar exactamente las velas de los viernes de vencimiento mensual a las 12:00 UTC. Costo: **2 horas**.  
+   *Criterio de aprobación*: Retorno medio a 72h significativamente mayor que el retorno de las mismas velas en los otros viernes del mes (control pareado).
+6. **Riesgo de falso positivo**: Medio. Requiere que la muestra de 56 eventos no esté sesgada por 2 o 3 viernes de enorme subida.
+
+---
+
+#### 14. Rotación Extrema en el Ratio ETH/BTC (Z-Score de Dominancia)
+*Tipo*: **SEÑAL NUEVA (Pares Sintéticos / Rotación)**  
+*Score*: **5.8 / 10**
+
+1. **Definición operativa exacta**:  
+   - Calcular en 4h el ratio de precios `ETH/USDT` dividido por `BTC/USDT` (par sintético ETH/BTC).  
+   - Calcular el Z-Score de 60 periodos (10 días) de la distancia del ratio a su SMA(20).  
+   - Condición: Z-Score $\le -2.5$ (colapso de ETH vs BTC) coincidiendo con una vela de 4h donde el volumen de ETH es $\ge 2.5\times$ el volumen de BTC.  
+   - Gatillo: ALERTA DE GIRO DE DOMINANCIA: LONG ETH / SHORT BTC (o LONG ETH spot/futuros) a 5 días.
+2. **Hipótesis con dirección a priori**: LONG ETH vs BTC. Reversión del ratio $\ge +3.0\%$.
+3. **Mecanismo**: Las fases de drenaje de liquidez de altcoins hacia Bitcoin ocurren en ondas de apalancamiento. Cuando el ratio ETH/BTC se desvía a extremos estadísticos ($<-2.5\sigma$) con volumen de capitulación en ETH, se agotan los vendedores del par sintético y comienza la fase clásica de rotación ("altcoin season" local o alivio de beta).
+4. **Eventos esperados**: ~30 a 45 eventos en 4.7 años.
+5. **Cómo probarla**: Backtest del par ETH/BTC en Freqtrade con la estrategia de bandas/z-score. Costo: **2 horas**.  
+   *Criterio de aprobación*: Win-rate $> 58\%$ en IS y OOS; Sharpe $> 1.2$.
+6. **Riesgo de falso positivo**: Medio. En mercados bajistas estructurales (como 2022-2023), el ratio ETH/BTC puede mantener tendencias bajistas prolongadas con "rebotes fallidos".
+
+---
+
+#### 15. Filtrado del Spring Actual por Variación de Open Interest (Desapalancamiento vs Shorts)
+*Tipo*: **MEJORA DE LA SEÑAL ACTUAL**  
+*Score*: **5.5 / 10**
+
+1. **Definición operativa exacta**: En el Wyckoff Spring ya validado en 4h, clasificar el evento según la variación del Open Interest registrada en el campo `micro` en las 8h previas a la confirmación:  
+   - Categoría A (Liquidación masiva): $\Delta \text{OI} \le -5.0\%$.  
+   - Categoría B (Acumulación de cortos agresivos): $\Delta \text{OI} \ge +4.0\%$.  
+   - Categoría C (Indiferente / Ruido): $-5.0\% < \Delta \text{OI} < +4.0\%$.  
+2. **Hipótesis con dirección a priori**: Los Springs de Categoría A y B superan a los de Categoría C en retorno neto en al menos $+1.5$ puntos porcentuales.
+3. **Mecanismo**: Un Spring con colapso de OI confirma que hubo liquidaciones forzadas de compradores (limpieza de apalancamiento). Un Spring donde el precio cayó pero el OI aumentó fuertemente indica que se abrieron posiciones cortas agresivas en el piso, las cuales sirven de combustible explosivo para un short squeeze inmediato. Los springs donde el OI no se mueve son movimientos con baja participación en derivados y propensos a continuar a la deriva.
+4. **Eventos esperados**: Aplicable sobre los ~1,400 springs históricos (donde haya datos de OI) y hacia adelante en todas las alertas en vivo.
+5. **Cómo probarla**: En el script de validación hacia adelante (`validate_forward.py`) y en el archivo de 30 días de OI histórico de Binance. Costo: **3 horas**.  
+   *Criterio de aprobación*: Retorno de $(A \cup B)$ superior a $C$ con significancia estadística bootstrap.
+6. **Riesgo de falso positivo**: Alto por la limitación de datos históricos de OI (solo 30 días hacia atrás en Binance API abierta; requiere validación puramente forward).
+
+---
+
+### B) 3 IDEAS DE UN ÁNGULO TOTALMENTE DISTINTO
+
+Para romper definitivamente la ceguera de mirar gráficos de velas individuales:
+
+#### 1. El Radar de Amplitud de Mercado (Índice de Estrés Colectivo)
+*Por qué es totalmente distinta*: En lugar de vigilar 30 gráficos independientes esperando que uno dibuje un "Spring", vigilas **una sola serie temporal sintética**: el % de activos del ecosistema bajo liquidación forzada.  
+- **Concepto**: El mercado de criptomonedas no es un conjunto de activos independientes; es una piscina común de colateral USDT apalancado en Binance. Cuando el agua baja, todos los barcos encallan a la vez.
+- **Implementación**: El bot deja de saturar a Telegram con 15 mensajes repetitivos en un lapso de 10 minutos durante un crash. Emite una única **Alerta de Emergencia de Régimen: "Capitulación Colectiva (Nivel 4/5): 12 pares en pánico simultáneo"**, y a continuación presenta una tabla comparativa con los 3 activos que muestran el mayor rechazo comprador (mecha inferior o taker flow).
+
+#### 2. Event-Driven por Arbitraje Regulatorio / Operativo (Deslistes y Listados de Binance)
+*Por qué es totalmente distinta*: No analiza el precio histórico para predecir el futuro; reacciona a un **decreto institucional público irrevocable** emitido por el exchange más grande del mundo.  
+- **Concepto**: Los anuncios de Binance mueven el mercado con una fuerza no técnica. El desliste de un contrato de futuros garantiza una salida masiva de capital y el colapso del volumen en días predecibles.  
+- **Implementación**: Un micro-servicio ligero (o función asíncrona dentro del ciclo) que consulta cada 10 minutos el endpoint oficial de anuncios de Binance (`/bapi/composite/v1/public/cms/article/catalog/list`). Cuando detecta un desliste de futuros, emite una alerta estructurada de oportunidad asimétrica bajista.
+
+#### 3. Estructura de Microestructura de Opciones (Max Pain y Gamma Pinning Mensual)
+*Por qué es totalmente distinta*: Utiliza el mercado de derivados institucional (Deribit) para anticipar los momentos exactos de **liberación de volatilidad** en el mercado spot y de futuros de Binance.
+- **Concepto**: El retail opera futuros perpetuos; los market makers operan opciones y cubren sus griegas (*delta/gamma*) en los perpetuos y spot de Binance. Las fechas y horas de vencimiento no son aleatorias: ocurren invariablemente a las 08:00 UTC del último viernes de cada mes.
+- **Implementación**: Una alerta mensual programada: "Vencimiento Mensual Deribit (08:00 UTC)". El bot mide la compresión previa y alerta el rompimiento direccional inmediatamente liberada la cobertura institucional.
+
+---
+
+### C) LA VISIÓN FINAL: ¿CÓMO SERÍA EL MEJOR CRYPTO-SIGNAL POSIBLE?
+
+Un bot de alertas manuales exitoso **no** es un cañón de señales que dispara 10 veces al día generando parálisis por análisis y FOMO en el operador (quien está en Santiago, trabaja, duerme y opera a mano).
+
+El mejor `crypto-signal` posible tiene una arquitectura de **3 Capas Jerárquicas de Alertas**:
+
+```mermaid
+graph TD
+    subgraph Capa 1: Filtro de Régimen Macro (1-2 alertas/semana)
+        A[Índice de Amplitud de Mercado & Funding Cross-Sectional] -->|Define si el mercado es operable| B{¿Mercado en Régimen Apto?}
+    end
+    subgraph Capa 2: Alertas Tácticas de Alta Convicción (3-5 alertas/semana)
+        B -->|Pánico Sistémico| C[Wyckoff Spring Validado 72h / Secondary Test]
+        B -->|Expansión Alcista| D[Wyckoff SOS + LPS en Tendencia]
+        B -->|Compresión Extrema| E[NR7 Bollinger Squeeze Fakeout]
+    end
+    subgraph Capa 3: Micro-Orientación al Operador
+        C --> F[Tarjeta de Ejecución Telegram: Precios Clave, Stop y Hora Local Santiago]
+        D --> F
+        E --> F
+    end
+```
+
+#### Frecuencia y Tipología Semanal
+- **Frecuencia esperada total**: **3 a 6 alertas por semana** (un promedio de menos de 1 al día, permitiendo que el operador las analice con calma y ejecute a mano sin estrés).
+- **Desglose de la cartera de alertas**:
+  1. **Alertas de Régimen (1 por semana o cada 10 días)**: "Capitulación Colectiva Detectada" o "Régimen de Rango Estrecho (Sin Operaciones)".
+  2. **Alertas de Reversión en Pánico (1 a 2 por semana)**: Wyckoff Spring 4h con $\ge 5$ pares simultáneos + Secondary Tests en Fase C.
+  3. **Alertas de Continuación en Tendencia (1 a 2 por semana)**: Sign of Strength + LPS (para no perderse los ciclos alcistas).
+  4. **Alertas Event-Driven (1 a 2 por mes)**: Deslistes o liberación post-vencimiento de opciones.
+
+#### Hoja de Ruta de Construcción (Orden Óptimo):
+1. **Paso 1: Módulo de Amplitud de Mercado**: Implementar el conteo cross-sectional de mínimos y volumen relativo. Convierte el cluster ciego de springs en una señal de amplitud unificada.
+2. **Paso 2: Wyckoff SOS + LPS (Trend Continuation)**: Añadir la contraparte del Spring para tener señales cuando el mercado sube.
+3. **Paso 3: Secondary Test (Fase C)**: Añadir la alerta de retesteo con bajo volumen para ofrecer entradas con stop de 4-5% en lugar del 10% obligatorio del Spring inicial.
+4. **Paso 4: Ingestor de Anuncios de Desliste**: Capturar la asimetría pura de noticias de exchange.
+
+---
+
+### D) "LO QUE YO NO HARÍA": 3 TRAMPAS MORTALES
+
+Claude y el equipo deben cuidarse de tres sesgos cognitivos muy comunes en cuantitativos frustrados:
+
+#### 1. Seguir buscando "el filtro mágico" para el Spring actual (P-Hacking por Agotamiento)
+- **La trampa**: Ya probaste RSI, CMF, NVI, 60 patrones de velas, horarios, funding y minutos críticos. La tentación ahora es probar si "el percentil 14 del ADX combinado con el ángulo de la EMA21" mejora el trade.
+- **Por qué destruye**: El Spring de Wyckoff en 4h ya tiene un edge neto robusto (+1.5% a +1.8%). Su única debilidad es que ocurre en racimos concentrados en pocos días. Ningún indicador técnico sobre el par individual va a transformar un día de caída macro en una victoria aislada. Seguir buscando filtros es torturar los datos hasta que confiesen una coincidencia estadística aleatoria.
+
+#### 2. Optimizar la regla de selección para "3 posiciones" sobre una muestra pequeña ($n < 30$ clusters)
+- **La trampa**: Como la cuenta de prueba del laboratorio solo toma 3 posiciones y pierde rendimiento vs "tomar todas", intentar entrenar un algoritmo o scoring para elegir "cuál de las 10 monedas en pánico va a subir más".
+- **Por qué destruye**: En un día de capitulación sistémica, las diferencias de retorno a 72h entre SOL, AVAX y NEAR son un paseo aleatorio gobernado por micro-flujos impredecibles. Cualquier regla que concluya que "la moneda con ticker que empieza con S rindió más en 2024" será puro sobreajuste. La solución para pocas posiciones no es un filtro milagroso de selección, sino operar el activo ancla (BTC/ETH) o repartir el capital en micro-lotes de la canasta.
+
+#### 3. Confundir un Bot de Alertas con un Motor de Ejecución de Alta Frecuencia
+- **La trampa**: Obsesionarse con optimizar la entrada al milisegundo (órdenes límite complejas, trailing stops dinámicos, break-even a los 15 minutos).
+- **Por qué destruye**: Ya mediste en el spec 036 con velas de 1 minuto que **esperar una orden límite o mover a break-even destruye el acierto de 58% a 13%**. El operador humano en Santiago tiene una latencia de vida real (trabaja, atiende a su familia, duerme). Si diseñas alertas que dependen de ejecutar en los primeros 90 segundos o ajustar stops a cada hora, el sistema fracasará operativamente en el mundo real.
+
+---
+
+### E) MIS 3 EXPERIMENTOS PARA CORRER HOY
+
+Tres experimentos limpios, directamente ejecutables en tu laboratorio Freqtrade con el histórico disponible, con código rápido y criterio de aprobación fijado de antemano:
+
+---
+
+#### Experimento 1: Validación del Índice de Amplitud de Capitulación de Mercado
+* **Hipótesis**: Cuando $\ge 25\%$ de los pares USDT vigila-dos registran simultáneamente un nuevo mínimo de 20 velas (4h) con volumen $\ge 2.0\times$, el retorno medio a 72h del mercado completo es superior a $+2.0\%$ neto con un acierto $\ge 60\%$.
+* **Implementación en el Lab**:
+  - Script en `~/freq/user_data/notebooks` o archivo `.py`: leer klines de 4h de los pares disponibles (2021-2026).
+  - Matriz booleana de eventos. Identificar las marcas de tiempo $T_{\text{panic}}$ donde la suma de columnas sea $\ge \text{round}(0.25 \times N)$.
+  - Medir para cada $T_{\text{panic}}$ el retorno a 72h de una canasta equiponderada de todos los pares y de BTC individualmente, aplicando costo de comisión real (0.05% taker $\times 2$) y funding medio acumulado.
+* **Criterio de Aprobación Incondicional**:
+  1. Retorno medio por evento $> +1.8\%$ tanto en IS (2022-2024) como en OOS (2025-2026).
+  2. Acierto de la canasta $\ge 58\%$ en ambos periodos.
+  3. Al menos 35 eventos/días independientes identificados en total.
+  4. Intervalo de confianza al 95% (bootstrap por día) estrictamente superior a 0.
+
+---
+
+#### Experimento 2: Backtest de Wyckoff SOS + LPS (Continuación de Tendencia en 4h)
+* **Hipótesis**: Comprar el primer retroceso con volumen seco ($<1.2\times$) tras una ruptura de rango de 30 velas con volumen extremo ($\ge 2.5\times$) genera un rendimiento neto $\ge +1.5\%$ a 72h con stop en $-6\%$.
+* **Implementación en el Lab**:
+  - Crear estrategia `Wyckoff_SOS_LPS.py` en `~/freq/user_data/strategies`.
+  - Definir `populate_indicators`: `rolling_max(close, 30)`, `sma(volume, 20)`.
+  - Definir `populate_entry_trend`:
+    ```python
+    sos = (dataframe['close'].shift(1) > dataframe['rolling_max_30'].shift(2)) & \
+          (dataframe['volume'].shift(1) >= 2.5 * dataframe['volume_sma'].shift(1))
+    lps = (dataframe['low'] <= dataframe['rolling_max_30'].shift(2) * 1.01) & \
+          (dataframe['volume'] < 1.2 * dataframe['volume_sma']) & \
+          (dataframe['close'] > dataframe['open'])
+    dataframe.loc[sos.rolling(5).max() > 0 & lps, 'enter_long'] = 1
+    ```
+  - Parámetros de salida: `stoploss = -0.06`, salida por tiempo a las 72h (`custom_exit` o ROI 72h).
+* **Criterio de Aprobación Incondicional**:
+  1. Retorno medio por trade $> +1.2\%$ neta en IS (2022-2024) y $> +1.2\%$ en OOS (2025-2026).
+  2. Acierto $\ge 53\%$ en ambos periodos.
+  3. Mínimo 150 trades independientes en el histórico completo.
+  4. Retorno positivo en al menos 4 de los 5 años (2022 a 2026).
+
+---
+
+#### Experimento 3: Secondary Test Wyckoff (Test de Falta de Oferta en Fase C)
+* **Hipótesis**: Entrar largo cuando el precio retestea el mínimo del Spring ($\pm 1.5\%$) dentro de las 8 velas siguientes con volumen seco ($\le 0.85\times$) y vela verde de 4h, utilizando un stoploss ajustado de $-5\%$, supera el ratio de Sharpe del Spring original de stop $-10\%$.
+* **Implementación en el Lab**:
+  - Tomar la lista existente de 1,386 eventos Spring validados (`WyckoffLab_SpringH72_SL10`).
+  - Buscar en cada caso si en las 8 velas posteriores ocurre el evento de retesteo con secado de volumen.
+  - Para los eventos confirmados, simular entrada inmediata con stoploss en $-5.0\%$ y horizonte 72h.
+* **Criterio de Aprobación Incondicional**:
+  1. Expectativa matemática neta por trade $\ge +1.5\%$ en IS y OOS.
+  2. Tasa de ejecución del stoploss $\le 28\%$ (menor que la tasa del stop de -5% en springs a ciegas, que era $> 45\%$).
+  3. Diferencia pareada vs el Spring base estadísticamente superior en Sharpe ratio mediante remuestreo bootstrap por día.
+
+---
+
+### Resumen para el Compañero
+
+Claude: deja de buscar en los osciladores y en los minutos. Tu edge validado ya te dijo la verdad hace semanas: **el valor está en la capitulación coordinada y en la dinámica de absorción del volumen**. Si amplías la mirada hacia la **amplitud de mercado**, incorporas la **continuación de tendencia (SOS/LPS)** y dejas que el bot alerte la **fase de retesteo con stops más lógicos**, `crypto-signal` pasará de ser un detector monótono de cuchillos cayendo a un sistema completo de inteligencia de mercado para el operador.

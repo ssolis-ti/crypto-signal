@@ -1,0 +1,191 @@
+[0m
+> plan · deepseek-flash
+[0m→ [0mRead README.md 
+[0m→ [0mRead docs/ESTADO_Y_PENDIENTES.md 
+[0m✱ [0mGlob "app/analyzers/**/*" [90m64 matches[0m
+[0m✱ [0mGlob "app/analysis/**/*" [90m13 matches[0m
+> plan · deepseek-flash
+[0m→ [0mRead specs/042-robustez-checklist-externa/spec.md 
+[0m→ [0mRead specs/041-horarios-y-continentes/spec.md 
+[0m→ [0mRead app/analysis/wyckoff_alerts.py 
+> plan · deepseek-flash
+[0m→ [0mRead app/analysis/market_context.py 
+[0m→ [0mRead app/analyzers/indicators/wyckoff.py 
+[0m→ [0mRead app/analysis/market_microstructure.py 
+> plan · deepseek-flash
+[0m✱ [0mGlob "app/data/**/*.py" [90m3 matches[0m
+[0m✱ [0mGlob "app/behaviour/**/*.py" [90m3 matches[0m
+[0m✱ [0mGlob "brainstorm/**/*" [90m0 matches[0m
+[0m✱ [0mGlob "docs/**/*.md" [90m2 matches[0m
+> plan · deepseek-flash
+[0m→ [0mRead app/behaviour/data.py 
+[0m→ [0mRead app/analysis/signal_enhancer.py 
+> plan · deepseek-flash
+[0m% [0mWebFetch https://data.binance.vision/?prefix=data/futures/um/daily/klines/ 
+[0m% [0mWebFetch https://data.binance.vision/?prefix=data/futures/um/daily/metrics/ 
+> plan · deepseek-flash
+[0m% [0mWebFetch https://s3-ap-northeast-1.amazonaws.com/data.binance.vision?delimiter=/&prefix=data/spot/daily/klines/ 
+[0m% [0mWebFetch https://s3-ap-northeast-1.amazonaws.com/data.binance.vision?delimiter=/&prefix=data/futures/um/daily/metrics/ 
+> plan · deepseek-flash
+[0m→ [0mRead C:/Users/Proyecto Z/.local/share/opencode/tool-output/tool_0ef71640a001TRDPO7cor64iJe 
+[0m→ [0mRead C:/Users/Proyecto Z/.local/share/opencode/tool-output/tool_0ef7165b0001YNQ0zdauzrCMhF 
+> plan · deepseek-flash
+[0m% [0mWebFetch https://s3-ap-northeast-1.amazonaws.com/data.binance.vision?list-type=2&prefix=data/futures/um/daily/metrics/BTCUSDT/&max-keys=3 
+[0m% [0mWebFetch https://s3-ap-northeast-1.amazonaws.com/data.binance.vision?prefix=data/futures/um/daily/metrics/BTCUSDT/&max-keys=4 
+> plan · deepseek-flash
+[0m$ [0mcd "$TEMP" && curl -s -o btcmetrics.zip "https://data.binance.vision/data/futures/um/daily/metrics/BTCUSDT/BTCUSDT-metrics-2020-09-01.zip" && python -c "import zipfile;z=zipfile.ZipFile('btcmetrics.zip');n=z.namelist();print(n);d=z.read(n[0]).decode();print('\n'.join(d.splitlines()[:6]))"
+['BTCUSDT-metrics-2020-09-01.csv']
+create_time,symbol,sum_open_interest,sum_open_interest_value,count_toptrader_long_short_ratio,sum_toptrader_long_short_ratio,count_long_short_ratio,sum_taker_long_short_vol_ratio
+2020-09-01 00:00:00,BTCUSDT,39080.23100000,456144339.23360443,1.17547937,1.23012681,1.35731217,0.78373373
+2020-09-01 00:00:00,BTCUSDT,39080.23100000,456144339.23360443,1.17547937,1.23012681,1.35731217,0.78373373
+2020-09-01 00:05:00,BTCUSDT,39106.41300000,455693833.60853225,1.17905012,1.22928510,1.35924435,0.85063183
+2020-09-01 00:05:00,BTCUSDT,39106.41300000,455693833.60853225,1.17905012,1.22928510,1.35924435,0.85063183
+2020-09-01 00:10:00,BTCUSDT,39113.35400000,455324812.05064000,1.17299026,1.22786523,1.35321999,1.11142594
+> plan · deepseek-flash
+Leí el README, `docs/ESTADO_Y_PENDIENTES.md`, las specs 041 y 042, y el código de `app/analysis/` y `app/analyzers/`. Antes de las ideas, **un hallazgo de datos que cambia el tablero**:
+
+> **Verifiqué en `data.binance.vision` (S3, en vivo) que existe `futures/um/daily/metrics/` y `.../monthly/metrics/` desde 2020-09-01**, con columnas: `sum_open_interest`, `sum_open_interest_value`, `count_toptrader_long_short_ratio`, `sum_toptrader_long_short_ratio`, `count_long_short_ratio`, `sum_taker_long_short_vol_ratio`, a 5 minutos. Bajé un archivo real de BTCUSDT y confirmé las columnas.
+> Es decir: el "OI y ratio long/short solo existen forward, no se pueden backtestear" **es falso para Binance**; solo lo es para los endpoints REST de CCXT. Hay 6 años de open interest, posicionamiento de top traders y flujo taker a 5 min, **por par, incluidos los deslistados**. También confirmé klines spot diarios (para base spot-perp). Esto habilita 3-4 de las ideas de abajo que hoy se creían imposibles.
+
+No toqué ni leí `.env` ni `config.yml`; todo lo de acá es sobre los datos/docs.
+
+---
+
+# A) Ideas ordenadas por (valor × prob.) / costo
+
+**1. Amplitud de capitulación directa** — `NUEVA` · costo ≈ 3 h · prob. alta
+- **Cálculo (4h, 49 perp):** por vela, `breadth_down = fracción de pares con ret4h ≤ −4%`; `breadth_low = fracción con low ≤ mínimo de 20 velas y rel_vol ≥ 1.5`; `energy = Σ max(0,−ret4h) · min(rel_vol,5)`. Umbral fijo a priori (p92–p95 del IS, congelado para OOS).
+- **Hipótesis (long):** amplitud extrema → retorno forward 72h del mercado **positivo**.
+- **Mecanismo:** es exactamente el mecanismo que ya validaste (5+ springs en la misma vela = +2.5%), pero medido **directo sobre todos los pares**, sin depender de que cada uno dibuje un rango/spring. Debería dar más eventos.
+- **Eventos:** estimo decenas de velas y ~30–80 días distintos; medir, no asumir.
+- **Prueba:** pandas sobre 4h ya existente + bootstrap por día. Criterio: signo + en IS y OOS, IC99% por día excluye 0, ≥30 días distintos por período.
+- **Falso positivo:** ventanas solapadas inflan n → usar días distintos/bloques.
+
+**2. Instrumento en día de clúster: BTC vs canasta vs rezagado** — `NUEVA/MEJORA` · 1–2 h · prob. alta
+- **Cálculo:** en las velas con ≥5 eventos, comparar 72h forward de (a) BTC, (b) canasta equiponderada de los pares del clúster, (c) todos los pares, (d) el más caído.
+- **Hipótesis (canasta ≥ BTC):** el edge es de mercado; la canasta o el rezagado rinde más que BTC.
+- **Mecanismo:** si el alfa es "capitulación de todo el mercado", el instrumento óptimo no es el par del spring.
+- **Por qué es oro:** permite **avisar BTC/canasta en días de clúster aunque ningún par haga spring** → sube frecuencia sin inventar filtro.
+- **Prueba/criterio:** diferencia de medias por día (bloques), IC excluye 0 en IS y OOS.
+
+**3. OI flush histórico (liquidation cascade)** — `NUEVA` · 8–12 h (ingesta) · prob. media-alta
+- **Cálculo:** metrics a 5 min → 4h: `ΔOI_4h` y `ΔOI_24h` z-score vs 30d; señal = caída de precio ≥X% **y** ΔOI ≤ −Y% (flush de longs).
+- **Hipótesis (long):** flush OI+precio → rebote 24–72h.
+- **Mecanismo:** liquidaciones forzadas agotan al vendedor marginal.
+- **Eventos:** decenas a >100; abundantes.
+- **Prueba/criterio:** estándar IS/OOS + bootstrap por día. Bajar métricas mensuales (~49×~57 zips), no diarias.
+- **Falso positivo:** el OI binance "metrics" tiene filas duplicadas (las vi) → deduplicar.
+
+**4. Régimen de funding agregado** — `NUEVA` · 2 h · prob. media
+- **Cálculo:** funding real 8h ya en el lab → media/mediana cross-sectional del universo; z-score. Decil inferior = shorts crowded/pánico.
+- **Hipótesis (long):** funding agregado muy negativo → forward 24/72h positivo.
+- **Mecanismo:** funding es posicionamiento/culpa, no timing; a nivel **mercado** nunca se probó (037 lo probó por par y 041 por horario).
+- **Criterio:** por deciles, signo + en ambos períodos, ≥30 días distintos/celda.
+
+**5. % del universo bajo su MA200 (amplitud diaria)** — `NUEVA` · 2 h · prob. media
+- **Cálculo:** diario, `% de pares con close < MA200` (y variante 4h MA50). Extremo ≥~80%.
+- **Hipótesis (long):** sobreventa estructural del mercado → rebote 1–4 semanas.
+- **Mecanismo:** breadth clásico; mide agotamiento, no un par.
+- **Eventos:** ~50–150 días. Criterio estándar.
+
+**6. Segunda entrada / higher low tras capitulación** — `MEJORA` · 3 h · prob. media
+- **Cálculo:** tras un clúster, buscar un segundo mínimo ≥ al previo con volumen menor (LPS de Wyckoff) dentro de 12–48h; entrar ahí.
+- **Hipótesis (mejor stop, igual retorno):** el segundo toque da mejor R:R que el primero.
+- **Mecanismo:** el primer spring es ruido; la acumulación se confirma en el retest.
+- **Criterio:** comparar media/stop-rate vs entrada original **emparejando por evento**.
+
+**7. Top traders vs cuentas globales (divergencia)** — `NUEVA` · 3 h tras ingesta · prob. media
+- **Cálculo:** `div = sum_toptrader_long_short_ratio − count_long_short_ratio` (5 min→4h).
+- **Hipótesis (long):** top traders netos long vs retail corto tras caída → forward positivo.
+- **Mecanismo:** "smart money" absorbe.
+- **Falso positivo:** el ratio es continuo y autocorrelacionado; usar umbral de percentil y bloques por día.
+
+**8. Taker long/short vol ratio agregado** — `NUEVA` · 2 h tras ingesta · prob. media
+- **Cálculo:** `sum_taker_long_short_vol_ratio` agregado del universo; extremo de venta.
+- **Hipótesis (long):** agresión vendedora extrema (ratio muy bajo) → absorción → rebote.
+- **Nota:** el taker **por par** falló (021/036); a nivel **mercado** no se probó.
+
+**9. Base spot-perp extrema** — `NUEVA` · 6 h · prob. media-baja
+- **Cálculo:** `basis = (close_perp − close_spot)/close_spot` a 4h (klines spot ya confirmadas en vision).
+- **Hipótesis (long):** descuento del perpetuo muy extremo (deleveraging) → normaliza → rebote.
+- **Eventos:** continuos → por deciles. Riesgo: mezcla funding+base; controlar por funding.
+
+**10. Funding extremo standalone por par** — `NUEVA` · 2 h · prob. media-baja
+- **Cálculo:** percentil del funding propio del par; decil inf/sup.
+- **Hipótesis (long):** funding muy negativo → forward positivo (contrarian puro, sin spring).
+- **Riesgo:** turnover y costos de funding; medir neto.
+
+**11. Ruptura de correlación / dispersión cross-sectional** — `NUEVA` · 4 h · prob. baja-media
+- **Cálculo:** correlación media pairwise alt-BTC en ventana 30×4h; dispersión de ret4h.
+- **Hipótesis:** corr >p90 y mercado cayendo → pánico → long; corr colapsa tras alta → evitar.
+- **Mecanismo:** estrés sistémico vs rotación idiosincrática.
+
+**12. Compresión de volatilidad → expansión** — `NUEVA` · 3 h · prob. baja-media
+- **Cálculo:** bandwidth Bollinger o percentil ATR ≤p10 (squeeze/NR7); señal = cierre fuera del rango de 20 velas.
+- **Hipótesis (long al alza):** compresión precede expansión direccional.
+- **Riesgo:** dirección ambiguua → fijar solo lado long, o como *gate* del spring (cuidado p-hacking).
+
+**13. Anclaje VWAP desde la capitulación / POC aproximado** — `NUEVA` · 4 h · prob. baja-media
+- **Cálculo:** VWAP anclado al mínimo de la capitulación; aviso al recuperarlo con volumen.
+- **Hipótesis (long):** recuperar el costo medio institucional → continuación.
+- **Aviso:** POC real requiere tick; con velas 4h es una **aproximación**, no perfil de volumen.
+
+**14. Sectores/narrativas (L1, DeFi, meme, IA)** — `NUEVA` · 6–8 h · prob. baja-media
+- **Cálculo:** clasificación a priori de pares; RS de cada sector vs canasta.
+- **Hipótesis:** sector que cae ≥X% con mercado plano → long al líder del sector.
+- **Riesgo:** clasificación sesgada y cambiante (survivorship de narrativa); n chico por sector.
+
+**15. Lead-lag BTC→alts a 1h** — `NUEVA` · 2 h · prob. baja
+- **Cálculo:** correlación cruzada ret_BTC(t) vs ret_alt(t+k), k=1,2.
+- **Hipótesis:** BTC lidera → estabilización de BTC habilita long alt.
+- **Por qué igual vale:** barato y es el único ángulo "tiempo" no horario.
+
+**16. Event-driven por contenido (news)** — `NUEVA` · 15–20 h · prob. baja-media, alto valor
+- **Cálculo:** GetXAPI + Gemini clasifican contenido en catalizadores (listing, hack, regulación, partnership); event study forward 24–72h.
+- **Hipótesis (fijar por tipo):** exploit/hack → short del token; listing mayor → pump inicial y fade.
+- **Riesgo:** eventos raros, sesgo de selección, clasificador imperfecto. Specs 030/031 ya mostraron que el **contenido** sí tiene señal cualitativa.
+
+**0. Meta (no es señal): corregir sesgo de supervivencia** — 4–6 h. Bajar klines de perps deslistados de vision y repetir el baseline. **Hacerlo primero**: todo lo de arriba hereda ese sesgo.
+
+---
+
+# B) Tres ángulos totalmente distintos
+
+**B1. El mercado como paciente, no los pares (state machine / "latido").** No buscar setups en un par, sino un **estado** del mercado por vela: calma / estrés / capitulación / recuperación, a partir de amplitud (#1), funding agregado (#4) y OI flush (#3). La alerta dice "el mercado entró en capitulación", no "SOL hizo spring". Es un producto distinto: da contexto y habilita avisar BTC/canasta cuando no hay spring.
+
+**B2. Event-driven por contenido real.** En vez de medir el mercado, leer **qué pasó** (unlock, delisting/listing, hack, regulación) con la MCP de Twitter/Reddit + Gemini. No es otro filtro: es otra fuente de verdad. Alto costo, alta novedad, y es lo único que avisa antes de que el precio reaccione.
+
+**B3. La correlación como objeto, no el precio.** Rolling corr BTC-alts y su **ruptura**; red de lead-lag entre pares; premio entre exchanges como termómetro de estrés. Se mira la **estructura** del mercado (acoplamiento/desacoplamiento), no el nivel de un precio.
+
+---
+
+# C) Visión final
+
+**Alertas, por tipo y frecuencia:**
+1. **Capitulación de mercado** (#1/#3/#4): "el mercado está en capitulación; canasta/BTC long 72h". ~2–4/semana en estrés, 0 en calma.
+2. **Spring individual** (lo actual): el punto de entrada fino.
+3. **Segunda entrada** (#6): el retest con mejor stop.
+4. **Riesgo por evento** (#16): informativo, no entrada.
+5. **Resumen matutino** (hora Santiago) con régimen + lo que se registró: no es señal, es el que evita el problema del 31% de avisos de madrugada (041).
+
+Total: **3–8 avisos/semana**, consolidados; nunca más de eso.
+
+**Orden de construcción:** (0) corregir supervivencia; (1) ingerir metrics de vision (desbloquea OI/L-S/taker); (2) amplitud de capitulación + elección de instrumento (#1, #2); (3) segunda entrada; (4) confirmadores de mercado (funding/OI agregados); (5) resumen de régimen; (6) capa de noticias. Cada pieza **debe pararse sola** (registro y validación) antes de tocar el mensaje; ninguna filtra la alerta sin holdout.
+
+---
+
+# D) Lo que yo NO haría (trampas)
+
+1. **Escanear el espacio de umbrales/timeframes/instrumentos** hasta que algo dé significativo. Con 49 pares × 6 timeframes × N umbrales siempre aparece algo. Pre-registrar **una** definición por idea y corregir por comparaciones múltiples (ya lo saben por 027/038).
+2. **Ignorar el solapamiento temporal.** Una capitulación dura 1–3 velas y el forward 72h se solapa: el n aparente se infla 3–5×. Contar **días distintos** y bootstrapear por bloque/día, no por evento.
+3. **Construir amplitud con el universo de HOY.** Calcular breadth histórica con los 49 sobrevivientes de 2026 es look-ahead de supervivencia doble; hay que usar el universo point-in-time por volumen y sumar deslistados.
+
+---
+
+# E) Mis 3 experimentos para HOY
+
+**E1. Ingesta de metrics + OI flush (4h).** Bajar `monthly/metrics` de los 49 símbolos, deduplicar filas, resamplear a 4h, probar "caída de precio + ΔOI muy negativo → long 72h". **Aprobación:** signo positivo y ΔOI significativo en IS 2022-24 **y** OOS 2025-26; IC bootstrap por día excluye 0; ≥30 días distintos por período.
+
+**E2. Amplitud de capitulación (sin descargas).** Sobre los 4h que ya tienen, calcular `breadth_down`/`energy` y regresión/deciles contra el forward 72h/canasta. **Aprobación:** señal en signo correcto en ambos períodos, IC por día excluye 0, y supera la línea base "todos los días"; umbral congelado desde IS.
+
+**E3. Régimen de funding agregado.** Con el funding real del lab, decil inferior de la media cross-sectional → forward 24/72h. **Aprobación:** positivo en ambos períodos, IC por día excluye 0, ≥30 días distintos por celda. Como son 3 tests de una misma familia, aplicaría corrección por 3 comparaciones y exigiría que sobreviva.
