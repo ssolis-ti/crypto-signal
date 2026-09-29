@@ -125,6 +125,8 @@ class Behaviour():
             radar_min_ratio=rumor_radar_config.get('min_mention_ratio', 2.0),
             record_path=DEFAULT_RECORD_PATH,
             microstructure_enabled=wyckoff_config.get('microstructure', {}).get('enabled', False),
+            timezone_str=self.timezone,
+            clock_offset_fn=self.data_collector._clock_offset,
         )
 
     def run(self, market_data, output_mode):

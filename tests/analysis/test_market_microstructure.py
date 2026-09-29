@@ -16,7 +16,9 @@ class FakeExchange:
 
     def fetch_open_interest_history(self, symbol, tf, limit):
         self._maybe('oi')
-        return [{'openInterestValue': 1000.0}, {'openInterestValue': 1100.0}]
+        span = getattr(self, 'oi_span_hours', 24) * 3600 * 1000
+        return [{'openInterestValue': 1000.0, 'timestamp': 0},
+                {'openInterestValue': 1100.0, 'timestamp': span}]
 
     def fetch_open_interest(self, symbol):
         return {'openInterestAmount': 5.0}
@@ -72,3 +74,11 @@ def test_book_metrics_empty_and_band():
 def test_futures_symbol():
     assert MarketMicrostructure.futures_symbol('BTC/USDT') == 'BTC/USDT:USDT'
     assert MarketMicrostructure.futures_symbol('BTC/USDT:USDT') == 'BTC/USDT:USDT'
+
+
+def test_oi_change_is_not_labelled_24h_when_history_is_shorter():
+    ex = FakeExchange()
+    ex.oi_span_hours = 5  # par recien listado o hueco del endpoint
+    data = MarketMicrostructure(enabled=True, exchange=ex).snapshot('binance', 'BTC/USDT')
+    assert data['open_interest_usd'] == 1100.0
+    assert 'oi_change_24h_pct' not in data

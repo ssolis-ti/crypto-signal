@@ -18,6 +18,7 @@ import structlog
 REQUEST_TIMEOUT_MS = 10000
 BOOK_LEVELS = 500
 OI_HISTORY_HOURS = 24
+OI_MIN_SPAN_HOURS = 23
 DEPTH_BAND_PCT = 1.0
 
 
@@ -77,11 +78,15 @@ class MarketMicrostructure:
     def _open_interest(self, ex, symbol: str, mark_price, data: Dict) -> None:
         try:
             history = ex.fetch_open_interest_history(symbol, '1h', limit=OI_HISTORY_HOURS + 1)
-            values = [h.get('openInterestValue') for h in history if h.get('openInterestValue')]
-            if values:
-                data['open_interest_usd'] = round(float(values[-1]), 0)
-                if len(values) >= 2 and values[0]:
-                    data['oi_change_24h_pct'] = round((values[-1] - values[0]) / values[0] * 100, 2)
+            rows = [h for h in history if h.get('openInterestValue')]
+            if rows:
+                first, last = rows[0], rows[-1]
+                data['open_interest_usd'] = round(float(last['openInterestValue']), 0)
+                # Un par recien listado (o un hueco del endpoint) no cubre 24h: no se rotula como cambio 24h.
+                span_ms = (last.get('timestamp') or 0) - (first.get('timestamp') or 0)
+                if len(rows) >= 2 and span_ms >= OI_MIN_SPAN_HOURS * 3600 * 1000:
+                    data['oi_change_24h_pct'] = round(
+                        (last['openInterestValue'] - first['openInterestValue']) / first['openInterestValue'] * 100, 2)
                 return
         except Exception as e:
             self.logger.error(f"[MICRO] historial de open interest {symbol}: {e}")

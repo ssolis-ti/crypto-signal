@@ -100,7 +100,8 @@ def main():
 
     for exchange in market_data:
         num = 1
-        for chunk in split_market_data(market_data[exchange], settings['market_data_chunk_size']):
+        chunk_size = effective_chunk_size(settings, len(market_data[exchange]))
+        for chunk in split_market_data(market_data[exchange], chunk_size):
             market_data_chunk = dict()
             market_data_chunk[exchange] = {
                 key: market_data[exchange][key] for key in chunk}
@@ -136,6 +137,37 @@ def main():
 
     for worker in thread_list:
         worker.join()
+
+
+def effective_chunk_size(settings, pair_count):
+    """
+    Tamano de chunk por worker. Con las alertas Wyckoff activas TODOS los pares deben ir en el mismo
+    worker: el dato "pares simultaneos con evento en la misma vela" (la clave del edge) se cuenta por
+    worker, y con varios workers quedaba partido (p. ej. 30 pares con chunk 20 = dos conteos de 20 y 10).
+    """
+    chunk_size = settings['market_data_chunk_size']
+    wyckoff = settings.get('wyckoff_alerts') or {}
+    if wyckoff.get('enabled') and pair_count > chunk_size:
+        structlog.get_logger().warning(
+            "wyckoff_alerts activo: un solo worker con los %d pares (market_data_chunk_size=%s "
+            "partiria el conteo de pares simultaneos)" % (pair_count, chunk_size))
+        return pair_count
+    return chunk_size
+
+
+def seconds_until_next_cycle(update_interval, now=None, slack=20.0):
+    """
+    Segundos hasta el proximo ciclo, alineado al reloj de pared: un poco despues de cada multiplo de
+    `update_interval` (las velas de 4h cierran en multiplos de 5 min). Antes dormia `update_interval` despues
+    de CADA vuelta, asi que el ciclo derivaba y el aviso llegaba entre 5 y 9 min despues del cierre.
+    """
+    if update_interval < 60:  # intervalos cortos (pruebas): dormir tal cual, alinear no tiene sentido
+        return update_interval
+    now = time.time() if now is None else now
+    candidate = (now // update_interval) * update_interval + slack
+    if candidate <= now + 5:
+        candidate += update_interval
+    return candidate - now
 
 
 def split_market_data(market_data, chunk_size):
@@ -191,7 +223,7 @@ class AnalysisWorker(Thread):
 
                 self.logger.info("%s sleeping for %s seconds",
                                  self.threadName, update_interval)
-                time.sleep(update_interval)
+                time.sleep(seconds_until_next_cycle(update_interval))
             except Exception as e:
                 self.logger.error(f"CRITICAL ERROR in {self.threadName}: {e}")
                 self.logger.error(traceback.format_exc())

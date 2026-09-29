@@ -1,0 +1,34 @@
+Sos un ingeniero cuantitativo riguroso y un auditor de codigo. SOLO LECTURA: no modifiques ningun archivo del repo; tu unica salida es la respuesta final (texto). No leas .env ni config.yml. No salgas de este directorio. Todo en espanol.
+
+CONTEXTO (leelo primero, es breve): audit_data/DATOS_LEEME.md, README.md (tabla de slices: lo ya probado y REFUTADO no se propone de nuevo), docs/ESTADO_Y_PENDIENTES.md, specs/036-minutos-criticos/ (resultados de minutos) y specs/039-springs-perdidos-y-eql/spec.md.
+IMPORTANTE: crypto-signal es un bot SOLO de alertas por Telegram; el operador opera A MANO en Binance futuros. NO asumas su capital. Freqtrade es OTRO proyecto (solo laboratorio de backtests): no los confundas. El operador vive en la zona horaria America/Santiago (Chile: UTC-3 en verano, UTC-4 en invierno, con cambio de hora).
+
+HECHOS MEDIDOS
+- Velas de 4h cierran a las 00, 04, 08, 12, 16, 20 UTC. El aviso llega ~7 min despues. La senal usa la vela CERRADA; el trade entra a la apertura de la siguiente.
+- Plan validado: Spring (long) manteniendo ~72h con stop -10%: acierto 56-58%, media +1.5% a +1.8% por trade (1x, con comisiones y funding), 860 eventos en 2022-24 y 525 en 2025-26 (29 pares de futuros de Binance).
+- Ya medido en el proyecto: hora del dia a nivel de MINUTOS dentro de la vela = ruido; cierre en fin de semana = candidato debil (solo se registra); demora de entrada: cada 4 h cuesta ~0.5 pp.
+- El edge viene de capitulaciones de todo el mercado (5+ pares con evento en la misma vela ~+2.5%; aislados ~0).
+- Datos disponibles en el laboratorio para probar: velas 4h/1h/15m de futuros desde 2021, funding real (cada 8h: 00/08/16 UTC), y los trades de los backtests.
+- Estandar de validacion del proyecto: split cronologico IS 2022-24 / OOS 2025-26; un filtro solo cuenta si mejora en AMBOS; bootstrap por DIA (los eventos comparten vela); correccion por comparaciones multiples; el criterio se fija ANTES de correr.
+
+PARTE A — BRAINSTORM: tipo de hora y continentes (12 a 20 ideas concretas y DISTINTAS)
+Pregunta: ¿el resultado de un spring/upthrust depende de CUANDO cierra la vela de confirmacion (hora UTC, sesion de mercado, dia de la semana, calendario)? Cubri como minimo y agrega lo inesperado:
+1. Las 6 velas de 4h por separado (cierre a 00/04/08/12/16/20 UTC) y agrupaciones por SESION: Asia (~00-08 UTC), Europa (~07-16 UTC), EEUU (~13:30-21 UTC), solapamientos Europa-EEUU, y el "valle" sin sesion.
+2. Eventos ligados al reloj: liquidacion de funding (00/08/16 UTC), cierre diario UTC, apertura de Wall Street (13:30/14:30 UTC segun DST de EEUU), cierres/aperturas de CME de futuros de BTC y sus GAPS de fin de semana, vencimientos de opciones (viernes 08:00 UTC, mensuales/trimestrales), datos macro (CPI, FOMC, empleo) — como se podria etiquetar cada evento contra un calendario, sin mirar el futuro.
+3. Dia de la semana y calendario: lunes/viernes, fin de semana ya medido (que falta?), inicio/fin de mes, feriados de Asia (Ano Nuevo Chino), efecto "domingo por la noche".
+4. Continentes como FUENTE del flujo: que sesion domina el volumen por par (pares asiaticos vs occidentales), si un spring que ocurre en la sesion "dueña" del par es distinto a uno fuera de ella.
+5. Cambios de hora (DST) de EEUU y Europa: mueven las sesiones 1 h en UTC dos veces por año; como evitar que contamine cualquier corte por hora.
+6. El lado del OPERADOR: America/Santiago. A que hora local llega cada alerta, cuales caen de madrugada (sueño = entrada tardia, y ya medimos que cada 4 h de demora cuesta ~0.5 pp), y como usar los datos de horario para decidir el mensaje (por ejemplo avisar con la hora local, o un resumen matutino).
+Para CADA idea da: definicion operativa exacta (que columna/regla, que valores), hipotesis con DIRECCION fijada de antemano, por que podria ser real, cuantos eventos quedarian por celda (advertir si son pocos: 1385 eventos / 6 velas ~ 230 por celda; por sesion/dia menos), y el riesgo de comparaciones multiples. Ordena por (valor esperado x probabilidad de que sea real) / costo de probar. Proponé un criterio de aprobacion concreto para las 3 mejores.
+
+PARTE B — AUDITORIA DEL RELOJ EN EL CODIGO (busca bugs REALES, no estilo)
+Revisa TODO uso de tiempo en app/ (grep de datetime, timezone, tz, utc, UTC, astimezone, timestamp, pytz, zoneinfo, dayofweek, weekday, strftime, isoformat, sleep, update_interval, apscheduler/schedule). Verifica, con archivo:linea:
+1. ¿Todo se maneja en UTC de punta a punta (velas, indicadores, dedup, registros jsonl, mensajes)? ¿Hay mezcla de naive vs aware, o de hora local con UTC (config `timezone: America/Santiago` existe: ¿que hace con el?).
+2. Velas: ¿el timestamp que trae el exchange es el de APERTURA (UTC)? ¿drop_unclosed_candle usa el reloj correcto? ¿que pasa si el reloj del PC esta desfasado o justo en el borde (segundo 0 del cierre)? ¿cuanto tarda el ciclo respecto al cierre (update_interval)?
+3. Clasificacion de fin de semana (_is_weekend_close), aviso de alerta retardada (_stale_notice), ventana de springs perdidos (MAX_LATE_CANDLES), dedup por firma con timestamp: ¿algun error de borde (sabado 00:00 UTC, cambio de dia, cambio de ano)?
+4. Mensajes al operador: ¿muestran la hora de la vela/alerta? ¿en UTC o en hora local Santiago? Si no muestran hora, ¿deberian? Propone el texto exacto.
+5. Funciones de tiempo de terceros: velocidad de menciones en Twitter (ventanas de 'ahora' vs 'hace 7 dias', until_time), open interest 24h, ratio long/short: ¿el reloj/zona es coherente?
+6. Contenedor: ¿la zona horaria del contenedor Docker afecta algo (TZ, logs)? ¿Cambio de hora de Chile o del PC (Windows) puede romper algo?
+Para cada hallazgo: severidad (alta/media/baja), archivo:linea, escenario concreto de fallo, y arreglo minimo propuesto. Si algo esta bien, dilo en una linea (no rellenes).
+
+FORMATO: dos secciones, "PARTE A" y "PARTE B". Al final, una lista de "los 3 experimentos de horario que yo correria primero" y "los 3 bugs de reloj mas graves". Se honesto: si no hay evidencia, decilo; no inventes numeros.

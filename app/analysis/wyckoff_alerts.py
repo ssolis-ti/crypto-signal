@@ -17,10 +17,11 @@ detail_min_quality ni al score 0-100.
 """
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
 import pandas as pd
+import pytz
 import structlog
 
 from analyzers.utils import IndicatorUtils
@@ -40,6 +41,7 @@ CANDLE_SECONDS = 4 * 3600
 # laboratorio (specs/039): cada 4h de demora cuesta ~0.5 pp; a 12h el promedio sigue positivo pero el acierto
 # baja a ~47-52%. Mas viejo que eso ya no se avisa.
 MAX_LATE_CANDLES = 3
+WEEKDAYS_ES = ('lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom')
 
 VALIDATED_CANDLE_PERIOD = '4h'
 LOOKBACK = 20
@@ -88,7 +90,8 @@ class WyckoffAlerter:
                  rumor_radar_enabled: bool = False,
                  radar_min_ratio: float = DEFAULT_RADAR_MIN_RATIO,
                  record_path: Optional[str] = None,
-                 microstructure_enabled: bool = False):
+                 microstructure_enabled: bool = False,
+                 timezone_str: str = 'UTC', clock_offset_fn=None):
         self.logger = structlog.get_logger()
         self.notifier = notifier
         self.enabled = enabled
@@ -103,6 +106,10 @@ class WyckoffAlerter:
         self.radar_min_ratio = radar_min_ratio
         self.record_path = record_path
         self.microstructure = MarketMicrostructure(enabled=microstructure_enabled)
+        self.timezone_str = timezone_str or 'UTC'
+        # Segundos a sumar al reloj local para obtener la hora del exchange (ver DataCollector._clock_offset).
+        self._clock_offset_fn = clock_offset_fn
+        self._current_exchange: Optional[str] = None
         self._load_signatures_from_record()
 
     def _load_signatures_from_record(self) -> None:
@@ -136,6 +143,7 @@ class WyckoffAlerter:
         """
         if not self.enabled or candle_period != VALIDATED_CANDLE_PERIOD:
             return
+        self._current_exchange = exchange
 
         if not historical_data or len(historical_data) < self._min_history():
             return
@@ -339,6 +347,7 @@ class WyckoffAlerter:
             f"🛰️ <b>RADAR VOLUMEN + RUMOR</b> (sin dirección)\n"
             f"{self._stale_notice(timestamp)}"
             f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
+            f"{self._candle_label(timestamp)}"
             f"Volumen: {rel_vol:.1f}x el promedio | vela {color} {candle_change:+.1f}%\n\n"
             f"{TwitterSentimentAnalyzer.format_section(twitter_result)}\n\n"
             f"⚠️ <i>Señal NO validada (specs/033): no es el edge Wyckoff. "
@@ -369,9 +378,34 @@ class WyckoffAlerter:
         before = df['close'].iloc[-7]
         return (df['close'].iloc[-1] - before) / before * 100 if before else None
 
-    @staticmethod
-    def _now_utc() -> datetime:
-        return datetime.now(timezone.utc)
+    def _now_utc(self) -> datetime:
+        """Hora UTC corregida con el reloj del exchange si se puede (el del PC/Docker se desfasa al suspender)."""
+        now = datetime.now(timezone.utc)
+        if self._clock_offset_fn and self._current_exchange:
+            try:
+                now += timedelta(seconds=float(self._clock_offset_fn(self._current_exchange)))
+            except Exception as e:
+                self.logger.error(f"[WYCKOFF] No se pudo corregir el reloj: {e}")
+        return now
+
+    def _candle_label(self, timestamp) -> str:
+        """Linea con el cierre de la vela en UTC y en la hora del operador (con dia de la semana)."""
+        if timestamp is None:
+            return ""
+        try:
+            close_utc = pd.Timestamp(timestamp)
+            if close_utc.tzinfo is None:
+                close_utc = close_utc.tz_localize('UTC')
+            close_utc = close_utc + pd.Timedelta(seconds=CANDLE_SECONDS)
+            text = f"{WEEKDAYS_ES[close_utc.dayofweek]} {close_utc:%H:%M} UTC"
+            if self.timezone_str != 'UTC':
+                local = close_utc.tz_convert(pytz.timezone(self.timezone_str))
+                city = self.timezone_str.split('/')[-1].replace('_', ' ')
+                text += f" = {WEEKDAYS_ES[local.dayofweek]} {local:%H:%M} {city}"
+            return f"🕐 Cierre de la vela: {text}\n"
+        except Exception as e:
+            self.logger.error(f"[WYCKOFF] No se pudo armar la hora del cierre: {e}")
+            return ""
 
     def _stale_notice(self, timestamp) -> str:
         """Aviso si la vela cerro hace mas de 2h (p. ej. la PC estuvo apagada): el precio ya pudo correr."""
@@ -438,6 +472,7 @@ class WyckoffAlerter:
             f"{headline}\n"
             f"{self._stale_notice(timestamp)}"
             f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
+            f"{self._candle_label(timestamp)}"
             f"{label}\n"
             f"Volumen en la ruptura: {break_relative_volume:.1f}x el promedio\n"
             f"{self._quality_lines(direction, sweep_depth, concurrent, self._is_weekend_close(timestamp))}\n"

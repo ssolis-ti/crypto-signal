@@ -2,9 +2,17 @@
 """
 
 import logging
+import time
 import sys
 
 import structlog
+
+
+def _utc_formatter(fmt):
+    """Formatter con hora UTC (auditar cuando salio cada alerta; el PC/contenedor puede estar en otra zona)."""
+    formatter = logging.Formatter(fmt, datefmt='%Y-%m-%d %H:%M:%S')
+    formatter.converter = time.gmtime
+    return formatter
 
 
 def configure_logging(loglevel, log_mode):
@@ -22,9 +30,9 @@ def configure_logging(loglevel, log_mode):
 
     if log_mode == 'json':
         # Fallback to standard logging for JSON mode as python-json-logger was removed
-        log_formatter = logging.Formatter('%(message)s')
+        log_formatter = _utc_formatter('%(asctime)sZ %(message)s')
     elif log_mode == 'text':
-        log_formatter = logging.Formatter('%(message)s')
+        log_formatter = _utc_formatter('%(asctime)sZ %(message)s')
     elif log_mode == 'standard':
         log_formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

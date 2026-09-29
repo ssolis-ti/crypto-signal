@@ -900,3 +900,48 @@ class TestTelegramFailureIsRetried:
             alerter.check_cycle('binance', data)
 
         assert notifier.calls == SEND_MAX_FAILURES
+
+
+
+class TestClockAndCandleLabel:
+    def test_label_shows_utc_and_operator_local_time_with_weekday(self):
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, timezone_str='America/Santiago')
+        # vela vie 2026-01-09 16:00-20:00 UTC: cierra 20:00 UTC = 17:00 Santiago (verano, UTC-3)
+        label = alerter._candle_label(pd.Timestamp('2026-01-09T16:00:00Z'))
+        assert label == "🕐 Cierre de la vela: vie 20:00 UTC = vie 17:00 Santiago\n"
+
+    def test_label_uses_winter_offset_and_can_change_the_local_weekday(self):
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, timezone_str='America/Santiago')
+        # vela vie 2026-07-10 20:00-24:00 UTC: cierra sab 00:00 UTC = vie 20:00 Santiago (invierno, UTC-4)
+        label = alerter._candle_label(pd.Timestamp('2026-07-10T20:00:00Z'))
+        assert 'sáb 00:00 UTC = vie 20:00 Santiago' in label
+
+    def test_label_utc_only_when_no_timezone(self):
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True)
+        assert alerter._candle_label(pd.Timestamp('2026-01-09T16:00:00Z')) == "🕐 Cierre de la vela: vie 20:00 UTC\n"
+
+    def test_label_handles_missing_or_naive_timestamps(self):
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, timezone_str='America/Santiago')
+        assert alerter._candle_label(None) == ""
+        assert 'vie 20:00 UTC' in alerter._candle_label(pd.Timestamp('2026-01-09T16:00:00'))
+
+    def test_alert_message_includes_the_closing_time(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True, timezone_str='America/Santiago')
+        alerter.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
+        assert 'Cierre de la vela:' in notifier.messages[0]
+        assert 'Santiago' in notifier.messages[0]
+
+    def test_clock_offset_from_exchange_is_applied_to_now(self):
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, clock_offset_fn=lambda ex: 3600.0)
+        alerter._current_exchange = 'binance'
+        delta = (alerter._now_utc() - datetime.now(timezone.utc)).total_seconds()
+        assert 3595 < delta < 3605
+
+    def test_no_correction_without_exchange_or_when_offset_fails(self):
+        def boom(exchange):
+            raise RuntimeError('sin red')
+        for alerter in (WyckoffAlerter(RecordingNotifier(), enabled=True, clock_offset_fn=lambda ex: 3600.0),
+                        WyckoffAlerter(RecordingNotifier(), enabled=True, clock_offset_fn=boom)):
+            alerter._current_exchange = None if alerter._clock_offset_fn is not boom else 'binance'
+            assert abs((alerter._now_utc() - datetime.now(timezone.utc)).total_seconds()) < 5

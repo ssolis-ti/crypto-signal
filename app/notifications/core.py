@@ -84,6 +84,7 @@ class Notifier():
     def set_timezone(self, timezone):
         self.timezone = timezone
         self.chart_renderer.timezone_str = timezone
+        self.builder.timezone_str = timezone
 
     def set_enable_charts(self, enable_charts):
         self.enable_charts = enable_charts

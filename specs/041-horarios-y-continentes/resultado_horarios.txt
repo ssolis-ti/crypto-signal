@@ -1,0 +1,34 @@
+eventos: {'IS': 861, 'OOS': 525} | con >=5 pares simultaneos: 796
+
+DESCRIPTIVO: media por hora UTC de cierre (IS / OOS)
+  00:00 UTC  IS n=236 +2.09%   OOS n=114 +1.30%
+  04:00 UTC  IS n=106 +0.87%   OOS n= 87 +2.88%
+  08:00 UTC  IS n=137 +0.10%   OOS n= 93 +3.03%
+  12:00 UTC  IS n= 61 +6.78%   OOS n= 53 +1.13%
+  16:00 UTC  IS n=121 +2.61%   OOS n= 64 -2.51%
+  20:00 UTC  IS n=199 +0.55%   OOS n=114 +2.68%
+
+DESCRIPTIVO: hora local de Santiago a la que llega el aviso (share de eventos, ambos periodos)
+   {0: '6%', 1: '8%', 4: '6%', 5: '10%', 8: '4%', 9: '4%', 12: '6%', 13: '8%', 16: '12%', 17: '11%', 20: '9%', 21: '16%'}
+   avisos que caen entre 00:00 y 06:59 hora Santiago: 31%
+
+DESCRIPTIVO: cierre lunes 00:00 UTC (reapertura CME) n=22 media +3.10%
+
+hipotesis                          per     n A   media dias |   n B   media dias | dif(A-B)
+H1 funding (00/08/16) peor         IS      494   +1.67  131 |   367   +1.72  129 | -0.05
+H1 funding (00/08/16) peor         OOS     271   +0.99   79 |   254   +2.42   84 | -1.43
+H1 funding (00/08/16) peor         AMBOS   765   +1.43  210 |   621   +2.00  213 | -0.58  IC99% [-3.55, +2.12]
+H2 12/16 UTC mejor                 IS      182   +4.01   58 |   679   +1.07  181 | +2.94
+H2 12/16 UTC mejor                 OOS     117   -0.86   36 |   408   +2.42  115 | -3.28
+H2 12/16 UTC mejor                 AMBOS   299   +2.10   94 |  1087   +1.57  296 | +0.53  IC99% [-2.93, +4.20]
+H3 cluster>=5: occidental mejor    IS      360   +3.87   39 |   119   -0.38   12 | +4.26
+H3 cluster>=5: occidental mejor    OOS     205   +1.47   19 |   112   +4.73   10 | -3.27
+H3 cluster>=5: occidental mejor    AMBOS   565   +3.00   58 |   231   +2.10   22 | +0.90  IC99% [-4.11, +6.02]
+H4 fin de semana puro peor         IS       60   +0.77   11 |   801   +1.76  198 | -0.99
+H4 fin de semana puro peor         OOS      42   -2.09   18 |   483   +2.01  120 | -4.10
+H4 fin de semana puro peor         AMBOS   102   -0.41   29 |  1284   +1.85  318 | -2.26  IC99% [-7.12, +0.61]
+H5 inicio/fin de mes mejor         IS      118   +1.86   36 |   743   +1.66  170 | +0.20
+H5 inicio/fin de mes mejor         OOS     122   -1.92   25 |   403   +2.78  111 | -4.70
+H5 inicio/fin de mes mejor         AMBOS   240   -0.06   61 |  1146   +2.05  281 | -2.11  IC99% [-5.55, +2.06]
+
+VEREDICTO: {'H1 funding (00/08/16) peor': 'NO aprueba', 'H2 12/16 UTC mejor': 'NO aprueba', 'H3 cluster>=5: occidental mejor': 'NO aprueba', 'H4 fin de semana puro peor': 'NO aprueba', 'H5 inicio/fin de mes mejor': 'NO aprueba'}
