@@ -8,6 +8,8 @@ import structlog
 from ccxt import ExchangeError
 from tenacity import RetryError
 
+from data.manager import drop_unclosed_candle
+
 class DataCollector:
     """
     Clase responsable de la obtención de datos de mercado.
@@ -77,6 +79,9 @@ class DataCollector:
             historical_data = self.exchange_interface.get_historical_data(
                 market_pair, exchange, candle_period
             )
+            # No repaint (Principio II): este es el camino principal del pipeline y no pasa
+            # por DataManager.get_ohlcv, asi que la vela en formacion se descarta aca.
+            historical_data = drop_unclosed_candle(historical_data, candle_period)
         except RetryError:
             self.logger.error('Too many retries fetching information for pair %s, skipping', market_pair)
         except ExchangeError:

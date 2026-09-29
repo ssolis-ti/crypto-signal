@@ -1,0 +1,38 @@
+"""
+El camino principal del pipeline (DataCollector -> CCXTDriver) debe descartar la vela en
+formacion igual que DataManager.get_ohlcv (Principio II, specs/001-no-repaint-signals/).
+"""
+import time
+from unittest.mock import MagicMock
+
+from behaviour.data import DataCollector
+
+FOUR_H_MS = 4 * 3600 * 1000
+
+
+def _collector(ohlcv):
+    interface = MagicMock()
+    interface.get_historical_data.return_value = ohlcv
+    return DataCollector(interface, indicator_conf={}, informant_conf={}, strategy_analyzer=MagicMock())
+
+
+def test_unclosed_4h_candle_is_dropped():
+    now_ms = int(time.time() * 1000)
+    open_candle_start = now_ms - (now_ms % FOUR_H_MS)  # vela de 4h en curso
+    closed = [open_candle_start - FOUR_H_MS, 1, 1, 1, 1, 1]
+    forming = [open_candle_start, 1, 1, 1, 1, 1]
+
+    result = _collector([closed, forming])._get_historical_data('BTC/USDT', 'binance', '4h')
+
+    assert result == [closed]
+
+
+def test_closed_candles_are_kept():
+    now_ms = int(time.time() * 1000)
+    open_candle_start = now_ms - (now_ms % FOUR_H_MS)
+    older = [open_candle_start - 2 * FOUR_H_MS, 1, 1, 1, 1, 1]
+    closed = [open_candle_start - FOUR_H_MS, 1, 1, 1, 1, 1]
+
+    result = _collector([older, closed])._get_historical_data('BTC/USDT', 'binance', '4h')
+
+    assert result == [older, closed]
