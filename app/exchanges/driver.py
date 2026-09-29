@@ -81,6 +81,10 @@ class CCXTDriver(BaseExchange):
         """
         return list(self.exchanges.keys())
 
+    def get_server_time_ms(self, exchange: str) -> int:
+        """Hora del servidor del exchange (ms desde epoch). Sirve para detectar un reloj local desfasado."""
+        return self.exchanges[exchange].fetch_time()
+
     @retry(retry=retry_if_exception_type(ccxt.NetworkError), stop=stop_after_attempt(3))
     def get_historical_data(
         self, 

@@ -3,12 +3,19 @@ Módulo de Recolección de Datos (DataCollector)
 Encargado de interactuar con la interfaz de exchanges para obtener datos históricos (OHLCV).
 """
 
+import time
 import traceback
+from datetime import datetime, timedelta, timezone
+
 import structlog
 from ccxt import ExchangeError
 from tenacity import RetryError
 
 from data.manager import drop_unclosed_candle
+
+CLOCK_REFRESH_SECONDS = 600
+CLOCK_WARN_SECONDS = 30
+
 
 class DataCollector:
     """
@@ -26,6 +33,7 @@ class DataCollector:
         # Periodos que otros modulos (p. ej. WyckoffAlerter: '4h') necesitan aunque ningun
         # indicador/informante habilitado los use.
         self.required_periods = tuple(required_periods)
+        self._clock_offsets = {}
 
     def get_all_historical_data(self, market_data):
         """
@@ -80,6 +88,36 @@ class DataCollector:
                         )
         return data
 
+    def _clock_offset(self, exchange):
+        """
+        Segundos que hay que SUMAR al reloj local para obtener la hora del exchange. Se mide cada
+        CLOCK_REFRESH_SECONDS. Un reloj local desfasado (tipico tras suspender/reanudar Windows con
+        Docker) haria tratar una vela en formacion como cerrada (repintado) o esconder una cerrada
+        (alerta tarde). Si no se puede medir, se usa el ultimo valor conocido o el reloj local.
+        """
+        entry = self._clock_offsets.get(exchange)
+        if entry and time.monotonic() - entry[1] < CLOCK_REFRESH_SECONDS:
+            return entry[0]
+        offset = entry[0] if entry else 0.0
+        try:
+            before = time.time()
+            server_ms = self.exchange_interface.get_server_time_ms(exchange)
+            after = time.time()
+            if not isinstance(server_ms, (int, float)) or isinstance(server_ms, bool):
+                raise TypeError("hora del exchange no numerica")
+            offset = server_ms / 1000.0 - (before + after) / 2.0
+            if abs(offset) > CLOCK_WARN_SECONDS:
+                self.logger.warning(
+                    "[RELOJ] El reloj local difiere %.0f s del de %s; se usa la hora del exchange "
+                    "para decidir que velas cerraron", offset, exchange)
+        except Exception as e:
+            self.logger.warning("[RELOJ] No se pudo medir el desfase con %s (%s); se usa el ultimo valor conocido", exchange, e)
+        self._clock_offsets[exchange] = (offset, time.monotonic())
+        return offset
+
+    def _now_utc(self, exchange):
+        return datetime.now(timezone.utc) + timedelta(seconds=self._clock_offset(exchange))
+
     def _get_historical_data(self, market_pair, exchange, candle_period):
         """
         Obtiene lista OHLCV para un par/periodo específico.
@@ -91,7 +129,8 @@ class DataCollector:
             )
             # No repaint (Principio II): este es el camino principal del pipeline y no pasa
             # por DataManager.get_ohlcv, asi que la vela en formacion se descarta aca.
-            historical_data = drop_unclosed_candle(historical_data, candle_period)
+            historical_data = drop_unclosed_candle(historical_data, candle_period,
+                                                   now_utc=self._now_utc(exchange))
         except RetryError:
             self.logger.error('Too many retries fetching information for pair %s, skipping', market_pair)
         except ExchangeError:
