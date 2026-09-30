@@ -384,7 +384,11 @@ class WyckoffAlerter:
         if not self.record_path:
             return
         try:
-            event = {'recorded_at': datetime.now(timezone.utc).isoformat(), **event}
+            local_now = datetime.now(timezone.utc)
+            # hora del PC y hora del exchange: si difieren, el reloj del PC (o del contenedor) se desfaso
+            event = {'recorded_at': local_now.isoformat(),
+                     'exchange_time': self._now_utc().isoformat(),
+                     'clock_skew_s': round((local_now - self._now_utc()).total_seconds(), 1), **event}
             directory = os.path.dirname(self.record_path)
             if directory:
                 os.makedirs(directory, exist_ok=True)

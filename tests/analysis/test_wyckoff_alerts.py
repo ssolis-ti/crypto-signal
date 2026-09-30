@@ -1068,3 +1068,13 @@ class TestGroupedDelivery:
         alerter.check_cycle('binance', {'A/USDT': _spring_fixture(), 'B/USDT': upthrust})
         assert len(notifier.messages) == 2
         assert sorted(m[0] for m in notifier.messages) == ['🔴', '🟢']
+
+
+class TestRecordClock:
+    def test_records_carry_exchange_time_and_clock_skew(self, tmp_path):
+        import json
+        path = tmp_path / 'r.jsonl'
+        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=str(path))
+        alerter._record({'type': 'radar'})
+        row = json.loads(path.read_text().splitlines()[0])
+        assert 'exchange_time' in row and 'clock_skew_s' in row and abs(row['clock_skew_s']) < 5
