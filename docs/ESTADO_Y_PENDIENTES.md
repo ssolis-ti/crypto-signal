@@ -39,6 +39,8 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
 
 - **047-048** Estructura completa de Wyckoff (SC, ST, SOS, LPS, SOW, LPSY, spring tras caída) y el espejo corto de todo lo probado en long: **nada aprueba**. Solo el Spring (long) en capitulación amplia tiene ventaja medible.
 
+- **049** Debate sobre Wyckoff con opencode (tradición china) y agy (formalización): la ventaja del spring es ~80-85% rebote de beta de las alts en días de capitulación amplia y ~15-20% estructura; ningún predictor de estructura (esfuerzo-resultado, rango previo, fuerza relativa, momentum) aprueba.
+
 ## Pendiente
 
 0. Candidatos que quedan de la sesión de apoyo mutuo (ver specs/044 y 046; la entrada secundaria/retest ya se probó y NO aprueba): desliste anunciado por Binance como catalizador

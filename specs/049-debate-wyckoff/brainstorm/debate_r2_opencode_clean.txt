@@ -1,0 +1,39 @@
+# Ronda 2 — opencode (DeepSeek)
+
+## 1) Respuestas a agy
+
+**Q1 (庄家 / 洗盘 vs 出货).** No existe métrica falsable verificada en la literatura china que separe 洗盘 de 出货; es folklore de foro (**no verificado**). Regla operativa pre-registrable sin hindsight: tras la caída, *洗盘* = reclaim del borde inferior del rango/VAL en ≤2 velas **con volumen decreciente en el retest y ΔOI ≤ 0**; *出货* = reclaims que fallan repetidamente, ΔOI > 0 con precio cayendo y dominio taker-sell. Testeable solo en los 47 días de capitulación amplia; cualquier efecto < MDE≈1.6 pp es indistinguible de ruido → **el discriminador sutil está muerto por potencia antes de correr**; solo un efecto grande es medible.
+
+**Q2 (三买 sin re-etiquetado).** Parámetros congelados: ZigZag de reversión ≥2.5×ATR14 (sin re-ajuste); 中枢 = solape de 3 segmentos consecutivos; 三买 = primer pullback tras salir del 中枢 por arriba que **no reingresa** (Close > borde sup.) en K=3 velas, con vol del quiebre ≥2×SMA20 y vol seco en el retroceso. K y umbral se congelan en IS, se valida OOS, y se permutan los bordes del 中枢 como control. Advertencia: operativamente ≈ LPS, y **047 ya falsó LPS** (E4: −0.34% IS / −0.78% OOS). Prior débil; probablemente muerta.
+
+**Q3 (筹码分布 vs Volume Profile).** La atribución a 陈浩/指南针 es **no verificada**; en esencia 筹码分布 = volumen-por-precio suavizado con decaimiento por rotación, no footprint. Test falsable: modelo anidado — VP estático (POC/VAL sobre volumen realizado) vs 筹码 con parámetro de decaimiento λ estimado; comparar log-loss/AIC fuera de muestra y, sobre todo, contra el **control de tautología del VWAP**: si el "pico de chips" no aporta más que una banda VWAP±k·ATR, es tautología. Con 47 días independientes la identificabilidad de λ es dudosa → **muerta por potencia**.
+
+## 2) Desacuerdos
+
+**(a) ¿Wyckoff o mean-reversion de canasta?** Gana la lectura de opencode, y la evidencia está en las specs, no en la teoría. 047 falsó *todos* los eventos estructurales (SC/ST/SOS/LPS/SOW/LPSY), y el spring por caída previa dio dif +0.25 pp con IC99 [−4.30,+4.54]. 044b: en los 47 episodios BTC +0.24% y ETH +0.33% mientras la canasta de springs de alts +2.23% → es retorno transversal de alts, no absorción de mercado. 044: la amplitud de mínimos *sin* rebote rinde ~0 → lo que paga es el rebote, no la barrida. 048: el espejo corto falla y los techos no agrupan → asimetría de liquidaciones forzadas, no de fases simétricas. 043: el edge vive en monedas grandes y muere en deslistados OOS (−0.23%) → huella de régimen/beta. agy tiene razón en que **una vela de 4h + 72h fijas + stop −10% no es el método**; pero eso es validez de constructo, y el ónus de la prueba es de la estructura Wyckoff: hoy lo medible es beta. Que barras de volumen/desbalance sean mejores que las de tiempo es plausible (§036 ya tiene 1m) y testeable, pero **no rescata la estructura** ni recupera potencia: el techo de días independientes sigue ~47. **Discriminante:** regresión transversal del retorno 72h de cada spring sobre (i) bloque beta/oversold y (ii) bloque estructura (rango previo + EVR), con errores agrupados por día y permutación de bloques; si (ii) no suma ΔR², es mean-reversion de canasta.
+
+**(b) Liu–Tsyvinski vs el hallazgo.** No son contradictorios: el momentum cripto documentado es **transversal y de semanas/meses**; el edge del proyecto es **direccional/temporal tras un shock sistémico**, y a 72h es más afín a *short-term reversal* (también documentado) que a momentum. Test que concilia: (i) regresar el retorno 72h sobre momentum (1–4 semanas) **y** sobre el indicador de capitulación amplia; si el coeficiente de capitulación sobrevive al control de momentum/reversal, es un efecto de régimen distinto; (ii) contrastar contra un índice de alts y contra un factor de tamaño/liquidez, porque los springs seleccionan alts de alta beta. Control: días de "capitulación" placebo por permutación del umbral de amplitud.
+
+## 3) Convergencia — 4 experimentos
+
+MDE real: MDE=(z_{1−α/2}+z_{1−β})σ/√N; σ=4% → **47 días: 1.63 pp (α=.05/P80)**; IS 27 d: 2.16; OOS 20 d: 2.51; ~100 d: 1.12. Con α=.01/P80: 2.0 pp. Todo criterio <1.6 pp nace muerto.
+
+**E1 · RS intra-clúster pareado.** *Def:* en cada día de capitulación amplia (≥20% pares con spring), RS_i = r_alt−r_BTC en 48h previas; canasta fuerte (tercil sup) vs débil; retorno a 72h. *Unidad:* día (47; 27 IS/20 OOS). *Umbrales:* terciles y ventana 48h congelados en IS. *Familia:* 1 test confirmatorio; Holm sobre los 4; bootstrap de bloques por día. *Aprobación:* fuerte−débil ≥1.6 pp e IC95>0 en IS y OOS. *Control:* permutación de rótulos RS **dentro de cada día**; placebo de días. **Potencia: al límite** (pareado baja el MDE a ~1.2–1.6 pp; el +1.5% de agy queda justo en el borde).
+
+**E2 · EVR-residuo (esfuerzo-resultado).** *Def:* regresión rodante Huber ln(Spread)~ln(Vol)+ln(ATR14) en 100 velas; z_ε=residuo/MAD; señal si z_ε≤−1 y cierre en tercio superior. *Unidad:* día. *Umbral:* −1.0/100 congelado IS. *Familia:* Holm; bootstrap días. *Aprobación:* incremental ≥ MDE. *Control:* permutar z_ε dentro de día; regresión con volumen aleatorizado. **Potencia: muerta como filtro (+0.80% de agy < 1.63 pp)**; revive solo como predictor continuo (pendiente, todos los días-evento).
+
+**E3 · Causa/estructura previa como moderador (test beta-vs-Wyckoff).** *Def:* interacción capitulación amplia × causa C (KER30≤0.22 y ancho Bollinger en P25 de 90d). *Unidad:* día. *Familia:* Holm. *Aprobación:* interacción >0, IC95>0 y ΔR²>0 en IS y OOS. *Control:* rango **placebo** en ventana aleatoria con el mismo beta; permutación de fechas. **Potencia: probablemente muerta** — el gap amplio-vs-no-amplio cae de +3.27 pp (IS) a +0.47 pp (OOS), bajo el MDE OOS de 2.51 pp.
+
+**E4 · VAL-reclaim / perfil de volumen (proxy de rango).** *Def:* perfil de 120 velas 4h, 50 bins; VAL=70% del volumen; mínimo perfora VAL ≥1% y cierra/recupera con vol ≥2×SMA20; salida 72h o POC. *Unidad:* día (**~100–300 días**). *Umbrales:* 70%/120/1% congelados IS. *Familia:* Holm; bootstrap día. *Aprobación:* media ≥ MDE del diseño, IC95>0 IS y OOS. *Control:* VAL **placebo** en niveles aleatorios y banda VWAP±kATR (anti-tautología). **Potencia: la mejor de las cuatro.**
+
+Descarto Weis Wave (zigzag discrecional → cherry-picking), taker-15m (+0.70 pp, muerto; §036 ya mostró taker como ruido) y Chan 3-buy (≈ LPS ya falsado).
+
+## 4) Discriminador beta vs estructura (5 líneas)
+1. En los 47 días de capitulación amplia, tomar todos los springs y su retorno a 72h.
+2. Dos bloques ortogonalizados por día: **beta** = drawdown 24h relativo a BTC + beta rolling vs BTC; **estructura** = (a) rango previo ≥15 velas con KER≤0.22 y (b) EVR residual de absorción.
+3. Regresión transversal ret72h ~ beta + estructura + beta×estructura, errores agrupados por día.
+4. **Gana beta** si estructura no añade ΔR²>0 fuera de muestra (permutación de bloques, IC95 incluye 0); **gana Wyckoff** si aporta incremental estable IS y OOS.
+5. Control placebo: recomputar "estructura" en una ventana previa aleatoria con el mismo beta; si el placebo rinde igual, la estructura es narrativa.
+
+## 5) Apuesta
+**~80% beta/rebote y ~20% estructura Wyckoff**: BTC/ETH planos y la asimetría V del 048 muestran que el grueso es rebote de alts tras liquidación forzada, y el 20% restante queda para que el volumen extremo y la amplitud amplia seleccionan *cuándo y en qué* alts el rebote se confirma —algo que ningún factor clásico captura del todo.

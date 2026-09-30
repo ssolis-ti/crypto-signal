@@ -1,0 +1,28 @@
+springs con variables: 3426 | z: 100% | KER: 100% | RS: 100% | mom: 100%
+terciles (solo 2022-24): {'z': [0.646, 1.955], 'ker': [0.181, 0.365], 'rs': [-5.769, -1.547], 'mom': [-16.345, -3.514]}
+
+hipotesis                              per   n mejor   media dias | n peor   media dias | dif (mejor - peor)
+H1 esfuerzo-resultado (z bajo mejor)   IS        784   +0.32  276 |    784   +3.83  140 |  -3.51
+H1 esfuerzo-resultado (z bajo mejor)   OOS       498   +1.60  174 |    212   +0.43   65 |  +1.18
+H1 esfuerzo-resultado (z bajo mejor)   AMBOS    1282   +0.82  450 |    996   +3.11  205 |  -2.29  IC98.75% [-6.04, +1.39]
+H2 causa/rango (KER bajo mejor)        IS        784   +2.01  239 |    784   +2.10  149 |  -0.09
+H2 causa/rango (KER bajo mejor)        OOS       383   +0.75  148 |    243   -0.07   79 |  +0.83
+H2 causa/rango (KER bajo mejor)        AMBOS    1167   +1.60  387 |   1027   +1.59  228 |  +0.01  IC98.75% [-3.57, +3.61]
+H3 fuerza relativa 48h (alta mejor)    IS        784   +0.66  203 |    784   +3.34  197 |  -2.69
+H3 fuerza relativa 48h (alta mejor)    OOS       345   -1.16  140 |    362   +0.55  103 |  -1.71
+H3 fuerza relativa 48h (alta mejor)    AMBOS    1129   +0.10  343 |   1146   +2.46  300 |  -2.36  IC98.75% [-5.77, +0.78]
+H4 momentum 30d (alto mejor)           IS        784   +2.36  236 |    784   +2.60  200 |  -0.25
+H4 momentum 30d (alto mejor)           OOS       291   +0.45  143 |    441   +2.22  116 |  -1.77
+H4 momentum 30d (alto mejor)           AMBOS    1075   +1.84  379 |   1225   +2.46  316 |  -0.62  IC98.75% [-3.61, +2.48]
+
+Correlacion de rangos (Spearman) de cada variable con el retorno a 72h:
+  z    todos +0.100 | 2022-24 +0.169 | 2025-26 -0.079
+  ker  todos +0.025 | 2022-24 +0.001 | 2025-26 +0.077
+  rs   todos -0.055 | 2022-24 -0.099 | 2025-26 +0.036
+  mom  todos -0.019 | 2022-24 -0.024 | 2025-26 -0.014
+
+VEREDICTO (criterio pre-registrado):
+  H1 esfuerzo-resultado (z bajo mejor): NO aprueba
+  H2 causa/rango (KER bajo mejor): NO aprueba
+  H3 fuerza relativa 48h (alta mejor): NO aprueba
+  H4 momentum 30d (alto mejor): NO aprueba

@@ -1,0 +1,87 @@
+# Ronda 1 — opencode (DeepSeek): corpus, técnicas, matemática, propuestas y una crítica
+
+Leí README, `docs/ESTADO_Y_PENDIENTES.md`, specs 043/044/047/048 y los brainstorm de 043/044 (r1–r2). No toqué `.env` ni `config.yml` (no los leí). Cito de memoria: donde dudo de un dato bibliográfico, lo marco **no verificado**.
+
+---
+
+## 1) CORPUS
+
+| Autor / escuela | Qué dice de verificable | Estatus |
+|---|---|---|
+| **Richard D. Wyckoff** | *Studies in Tape Reading* (1910, pseud. “Rollo Tape”), *How I Trade and Invest in Stocks and Bonds* (1922), y el curso compilado del Stock Market Institute (1931). Leyes oferta-demanda, esfuerzo-resultado, causa-efecto; el rango; el “Composite Man” como metáfora del operador agregado. | Método de lectura, no un modelo. Sin evidencia peer-reviewed de sus reglas. Que él usara las letras **A–E**: **no verificado** (es estandarización de sucesores). |
+| **Hutson** (1991) | *Charting the Stock Market: The Wyckoff Method* — divulgación del esquema. | Divulgación. |
+| **Pruden** | “Three-Legged Stool”: técnica + psicología + gestión de riesgo. | Marco pedagógico, no evidencia. |
+| **Tom Williams / VSA** | *Master the Markets*: “no demand/no supply”, stopping volume, test, upthrust. | Reglas falsables, pero evidencia de foro/producto (TradeGuider). **No peer-reviewed**. |
+| **David Weis** | Weis Wave: volumen acumulado por swing de precio (*Trades About to Happen*, 2013). | Testeable y **nunca usado acá**. |
+| **Dayton, Villahermosa** | — | **No verificado**; no arriesgo atribuciones. |
+| **Market Profile / AMT** | Steidlmayer; Dalton, *Mind Over Markets*: TPO, POC, value area, single prints. | Framework distinto (tiempo-en-precio). Cuantificable. |
+| **ICT/SMC** | Huddleston: liquidity pools/sweeps, order blocks, FVG, MSS. | Doctrina retail; “smart money” no verificable con datos públicos. Folklore hasta prueba. |
+| **P&F count** | Conteo horizontal→vertical. | Mecánico y falsable (con parámetros). |
+| **Elliott** (1938) / **Gann** | Ondas / ángulos y ciclos. | No falsables en la práctica (recuentos revisables); Gann casi sin respaldo. |
+
+**Tradición china (威科夫, Wēikēfū).**
+
+- **庄家 (zhuāngjiā, “el operador/banquero”)** — ciclo 吸筹 (xīchóu, acumulación) → 洗盘 (xǐpán, lavado) → 拉升 (lāshēng, markup) → 出货 (chūhuò, distribución). Mapea a las fases, pero es folklore de foro: presupone **un** operador que conoce el float; en cripto (MMs + arbitraje + CEX/DEX) es metáfora, no modelo. El **洗盘 no es el spring**: el spring es el falso quiebre bajista (挖坑 wā kēng, “cavar el pozo”; 诱空 yòu kōng, trampa bajista); 洗盘 incluye también lavado lateral por tiempo (横盘洗盘).
+- **筹码分布 (chóumǎ fēnbù, distribución de costos) / 筹码峰 (chóumǎ fēng, pico de chips)**: atribuida a 陈浩 y su software 指南针 (**detalle no verificado**). Es una **estimación** de volumen-por-precio (reparte el volumen dentro del rango de cada vela); ≈ perfil de volumen aproximado, **no footprint**.
+- **缠论 (Chán lùn)**, de 缠中说禅 (*教你炒股票108课*; identidad real discutida, se dice 李彪 — **no verificado**). Define recursivamente 分型 (fēnxíng, fractales), 笔 (bǐ, trazos), 线段 (xiànduàn, segmentos), 中枢 (zhōngshū, pivote) y 背驰 (bèichí, divergencia de momentum). Equivalencias: 中枢 ≈ rango (causa); 背驰 ≈ esfuerzo-resultado; 三买/三卖 (sān mǎi/mài) ≈ LPS/LPSY; 第一买点 ≈ spring. Es **codificable** (a diferencia de la lectura Wyckoff), pero su evidencia OOS es de reportes de broker/comunidad, no de journals: débil.
+- **量价关系 (liàng-jià guānxì)**: taxonomía popular (量增价升, 量价背离 bèilí, 天量天价/地量地价). Parte es esfuerzo-resultado; “天量天价” como ley universal es falsable y probablemente falsa. **一阳穿三线** (yī yáng chuān sān xiàn) y **江恩 (Jiāng'ēn)** = folklore/esotérico.
+- **Con respaldo real (no Wyckoff)**: efecto disposición (处置效应) — Feng & Seasholes (2005); herding (羊群效应) — Chang, Cheng & Khorana (2000) y literatura CSAD; atención + límites de precio, Seasholes & Wu (2007) en Shanghái; efecto magnet (磁吸效应) en China/Taiwán. En cripto, los factores cross-sectional documentados son market/size/**momentum** (Liu, Tsyvinski & Wu, *JF* 2022; Liu & Tsyvinski, *RFS* 2021). Es decir: **hay respaldo para momentum/relative strength, no para las reglas Wyckoff**.
+
+---
+
+## 2) TÉCNICAS: ¿falsable? ¿hipótesis?
+
+| Técnica | Falsable | Hipótesis estadística |
+|---|---|---|
+| Ley oferta-demanda | Sólo operacionalizada | H₀: β=0 en ret_{t+1}=α+β·(imbalance de flujo) |
+| **Causa-efecto** | **Sí** | log\|ret post-quiebre\| = α+β·log(ancho×duración)+γ·vol+ε |
+| **Esfuerzo-resultado** | **Sí** | residuo de \|ret\|/ATR sobre log(V/SMA20) predice retorno |
+| Composite Man | **No** directo | Proxy (top-trader L/S, OI, taker): ya probado (045/021) y **rechazado** |
+| Fases A–E | No como narrativa | Estado latente (HMM/CUSUM); ¿los estados predicen? |
+| PS/SC/AR/ST/Spring/SOS/LPS/BU | Sí, cada uno | Probado en 047: **ninguno** |
+| Distribución / reacumulación | Sí | Simétrico ya rechazado (048) |
+| P&F count | **Sí** | \|ret post-quiebre\| vs conteo horizontal |
+| Relative strength | **Sí** | Rank intra-clúster → ¿rebote? (test pareado) |
+| Scale-in | No es señal | Expectativa/varianza vs entrada única |
+
+El veredicto honesto: **el esqueleto entero de eventos (SC/ST/SOS/LPS/SOW/LPSY) es falsable y ya fue falsado en 4h con reglas mecánicas (047/048)**. Lo único que sobrevive es “spring + confirmación + volumen”. El resto del corpus que queda **sin operacionalizar** es causa-efecto, esfuerzo-resultado, rango explícito, RS y Weis Wave — que es donde apunto en §4.
+
+---
+
+## 3) MATEMÁTICA Y ESTADÍSTICA (síntesis; profundiza agy)
+
+- **Esfuerzo-resultado**: `r_t = |ln(C/O)|/ATR14` (resultado), `e_t = ln(V_t/SMA20(V))` (esfuerzo). Ajustá `r = a + b·e + u` con errores **HAC (Newey–West, lag≈18)**. Como no hay `statsmodels`, implementá OLS con `numpy.linalg.lstsq` y el kernel Bartlett a mano (~15 líneas), o bootstrap de bloques. **Trampa**: `e` correlaciona con volatilidad → estandarizá por ATR y por día.
+- **Causa-efecto**: `log|ret_{t+1..t+18}| = α + β·log(ancho×duración) + γ·vol + ε`; unidad = día, no vela.
+- **Extremos de volumen**: teoría de valores extremos, Peaks-over-Threshold con `scipy.stats.genpareto`; umbral por *mean residual life plot*, no a ojo.
+- **Régimen / Composite Man**: CUSUM sobre amplitud o volumen firmado; HMM es caro con n≈30 bloques — **empezá por CUSUM**.
+- **Hurst/DFA**: `numpy` alcanza; test contra H=0.5 por permutación.
+- **Inferencia**: bootstrap **por día** / moving-block (longitud ≈ 18 velas); `n_eff ≈ n/(1+2Σρ)`; **FDR (Benjamini–Hochberg) o Holm** sobre cada familia; **MDE** calculado *antes* de correr.
+- **Shrinkage**: James–Stein / empirical Bayes para efectos chicos; nada de “ganó en OOS” solo (patrón 021/027 = ruido).
+
+---
+
+## 4) PROPUESTAS NUEVAS (7; marca ★ = corpus sin usar)
+
+Criterio común (pre-registrado, una sola definición por idea): signo correcto en IS **y** OOS, IC bootstrap por día/bloque excluye 0, ≥30 días por celda, ≥+1.0% neto (o **+0.5 pp incremental**), Holm sobre la familia, `n` de bloques contado antes de correr.
+
+1. ★ **Residuo esfuerzo-resultado dentro del rango.** Regla: en velas dentro de un rango detectado (Donchian, ancho/ATR<k), señal long si el residuo `u_t` está en el decil inferior (mucho volumen, sin avance) y hay reclaim del borde. Dir.: long. n días ~150–400. Costo 3–4 h. (La primitiva de 013 nunca se conectó a una señal.)
+2. ★ **Causa-efecto / P&F count.** P&F (box=k·ATR, reversión 3). Al quiebre, conteo horizontal = causa. H: `|ret 14d|` crece con el conteo; dir. la marca el lado del quiebre. n días ~200–500. Costo 4–6 h.
+3. ★ **Rango explícito + quiebre con volumen** (no “nuevo mínimo”): definí el box y testeá el quiebre *de su borde* (no el mínimo de 20). Dir. long. Costo 3–4 h. Distinto de 047 (allí no había rango explícito).
+4. ★ **Relative strength intra-clúster (pareado).** En cada día de capitulación amplia, rankeá por RS vs BTC y compará el cuartil fuerte vs débil **dentro del mismo día** (permutación de subconjuntos del mismo tamaño). Dir.: fuerte > débil. **n = días (~30–60): potencia baja, decilo antes.** Costo 2–3 h. (Respaldo académico: momentum cripto, a diferencia del resto.)
+5. ★ **Weis Wave.** ZigZag pre-registrado (reversión fija); por onda, `volumen/longitud`. H: secuencia de ondas bajistas con esfuerzo decreciente + onda alcista con resultado mayor → continuación. Dir. long. n días alto. Costo 4 h.
+6. ★ **Perfil de volumen / 筹码分布 aproximado.** Repartí volumen en el rango de cada vela (uniforme o triangular) con decaimiento; POC/VAL. H: capitulación bajo VAL que **recupera** VAL → continuación; chip peak overhead = resistencia. n días ~200. Costo 5–8 h. **Caveat**: aproximación, no footprint.
+7. ★ **缠论 三买 vs LPS.** 中枢 = solape de 3 sub-segmentos consecutivos; 三买 = primer retroceso tras salir del 中枢 que **no reingresa**, con volumen seco. Dir. long. n días ~200. Costo 5 h. **Prior débil** (047 falsó LPS), pero la condición de “no reingresar al pivote” es operativamente distinta.
+
+---
+
+## 5) UNA crítica dura
+
+**El punto donde el enfoque puede estar mal planteado es que “spring 4h + volumen ≥2.5x” quizá no es Wyckoff en absoluto, sino *mean-reversion de canasta tras una liquidación*.** Las propias mediciones lo insinúan: la amplitud de mínimos sin rebote rinde ~0 (044), BTC/ETH no rebotan (044b), y el edge se desvanece en 2025-26 (−0.23% en deslistados, 043). O sea: lo que capturás es el rebote de beta de las alts después de ventas forzadas — **microestructura**, no acumulación. La parte “Wyckoff” (rango, fases, Composite Man, causa) **no agregó nada medible**: la confirmación y el volumen bastaron. Y el Composite Man es inobservable y probablemente falso en cripto: no hay un operador único por moneda, hay fragmentación CEX/DEX/MM/arb. Peor: el método se diseñó sobre tape diario/semanal con horizontes de *construcción de posición*; pedirle a una vela de 4h y a un stop de −10% que materialice “acumulación” es confundir el diagnóstico con la señal. **Consecuencia práctica honesta**: si querés testear Wyckoff de verdad, la unidad debe ser el **rango y su resolución** (días/semanas, §4.2/§4.6), y hay que aceptar que el “edge” que tenés hoy es de régimen/momentum — con respaldo académico — no de causa-efecto.
+
+---
+
+## LO QUE LE PREGUNTARÍA AL OTRO AGENTE
+
+1. Con **~30–60 días independientes** de capitulación, ¿cuál es el **MDE** real de un test pareado intra-clúster por RS (día 4) con sd cross-sectional típica? ¿Lo correrías o ya está muerto por potencia?
+2. Sin tick data, ¿cómo distinguís un **POC de 筹码分布** que aporta información de uno que es **tautología del VWAP**? ¿Qué test falsable propondrías?
+3. ¿El **CUSUM/HMM de régimen** es identificable con n≈30 bloques, o es reetiquetar el umbral de amplitud con más parámetros? ¿Pondrías plata, bajo pre-registro, en que aporta **incremental** sobre el umbral fijo?

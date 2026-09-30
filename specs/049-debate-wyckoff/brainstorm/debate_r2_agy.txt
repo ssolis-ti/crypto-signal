@@ -1,0 +1,121 @@
+# Debate-Brainstorm: Método Wyckoff y Microestructura en Cripto (Ronda 2)
+**Participante:** `agy` (Gemini)  
+**Rol:** Formalización matemática, econometría de microestructura y diseño experimental.  
+**Reglas:** Solo lectura, sin inventar datos, rigor de potencia estadística y máximo ~1300 palabras.
+
+---
+
+## 1. Respuestas a las 3 Preguntas de `opencode`
+
+### P1: MDE del test pareado intra-clúster por RS con ~47 días de capitulación
+Con los datos reales de la spec 044 (47 episodios no solapados: $N_{IS} = 27$, $N_{OOS} = 20$) y desviación estándar del diferencial por trade $\sigma_d \approx 4.0\%$:
+* Fórmula: $\text{MDE} = (z_{1-\alpha/2} + z_{1-\beta}) \cdot \frac{\sigma_d}{\sqrt{N}}$ (a dos colas, potencia $1-\beta = 0.80$).
+* **En muestra unida ($N = 47$, $\alpha = 0.05$):**  
+  $\text{MDE}_{\text{unido}} = (1.96 + 0.842) \times \frac{4.0\%}{\sqrt{47}} = 2.802 \times 0.583\% = \mathbf{1.64\text{ pp}}$.  
+  Si aplicamos corrección por familia ($\alpha = 0.01$, $z = 2.576$): $\text{MDE} = 3.418 \times 0.583\% = \mathbf{1.99\text{ pp}}$.
+* **Por subperíodos individuales:**  
+  $\text{MDE}_{IS} (N=27) = 2.802 \times \frac{4.0\%}{\sqrt{27}} = \mathbf{2.16\text{ pp}}$; $\text{MDE}_{OOS} (N=20) = 2.802 \times \frac{4.0\%}{\sqrt{20}} = \mathbf{2.51\text{ pp}}$.
+
+**Veredicto:** Exigir que apruebe con significancia estadística formal ($p < 0.05$) en IS y OOS **por separado está muerto por potencia antes de correr** (requeriría un spread irreal $>2.5\%$ neto entre alts fuertes y débiles). Sin embargo, **SÍ vale la pena correrlo** bajo un protocolo modificado: prueba de significancia en el pool unido ($N=47$, detectable $\ge 1.64\text{ pp}$) exigiendo solo **consistencia de signo** en OOS ($\bar{d}_{OOS} > 0$).
+
+---
+
+### P2: Distinguir POC de 筹码分布 vs. Tautología del VWAP sin tick data
+El VWAP es el primer momento (media ponderada por volumen); el POC de 筹码分布 es la moda (precio con mayor masa de densidad con decaimiento de rotación). En distribuciones unimodales simétricas, $\text{POC} \approx \text{VWAP}$ por definición.
+
+**Test falsable propuesto (Regresión anidada de caballos de fuerza):**  
+Sobre los rebotes post-quiebre, estimamos:
+$$r_{t+72h} = \alpha + \beta_1 \cdot \mathbf{1}_{\{P_t > \text{VWAP}_t\}} + \beta_2 \cdot \mathbf{1}_{\{P_t > \text{POC}_t\}} + \epsilon_t$$
+* **Hipótesis nula:** $H_0: \beta_2 = 0$ (el POC no aporta información ortogonal al VWAP).
+* Si el estadístico $F$ del test de razón de verosimilitud no rechaza $H_0$ con $p < 0.05$, o si la correlación de Spearman $\rho(\text{POC}_t, \text{VWAP}_t) > 0.95$, el perfil de volumen aproximado se descarta como una complicación espuria.
+
+---
+
+### P3: ¿CUSUM o HMM aportan valor incremental sobre el umbral fijo de amplitud?
+**No pondría un solo dólar en HMM.** Con solo ~47 episodios independientes de capitulación, calibrar una matriz de transición $4 \times 4$ y distribuciones gaussianas multivariadas (más de 40 parámetros libres) es una receta garantizada para sobreajuste e inestabilidad numérica.
+
+Respecto a **CUSUM:** tampoco apostaría a que aporte valor incremental frente al umbral estático de amplitud ($\ge 20\%$). La spec 044 demostró que la amplitud de springs agregada ya captura limpiamente el shock de liquidez. Añadir un filtro dinámico CUSUM sobre $N \approx 47$ consume grados de libertad sin poder estadístico para validar su mejora incremental.
+
+---
+
+## 2. Debate de los Dos Desacuerdos Centrales
+
+### (a) ¿Microestructura/Beta o Campaña Wyckoff?
+* **Posición:** En los datos empíricos de este repositorio, **`opencode` tiene el 85% de la razón analítica**, pero **`agy` tiene la razón epistemológica sobre el diseño**.
+* **Evidencia que lo decide:**
+  1. [spec 044](file:///C:/Users/Proyecto%20Z/Desktop/github/agy/crypto-signal/specs/044-amplitud-capitulacion/spec.md): La amplitud de nuevos mínimos *sin confirmación de spring* rindió **+0.02% unido** (-0.62% en OOS). Comprar pánico sin absorción no tiene edge.
+  2. [spec 044 (instrumentos)](file:///C:/Users/Proyecto%20Z/Desktop/github/agy/crypto-signal/specs/044-amplitud-capitulacion/spec.md#L58-L73): BTC (+0.24%) y ETH (+0.33%) no rebotan; el edge vive exclusivamente en la **canasta de alts (+2.23%)**.
+  3. [spec 047](file:///C:/Users/Proyecto%20Z/Desktop/github/agy/crypto-signal/specs/047-wyckoff-estructura-completa/spec.md): Añadir la "Fase A" de Wyckoff (caída previa $\ge 20\%$) aportó **cero diferencia** (+0.01 pp en IS, IC99.3% $[-4.30, +4.54]$). Y el resto de eventos estructurales (SC, ST, SOS, LPS) fracasaron sistemáticamente con retornos negativos.
+* **Conclusión:** Lo que hoy explota `crypto-signal` no es la acumulación institucional multiescalar de Wyckoff; es un **rebote elástico por agotamiento de liquidaciones forzadas en activos de alta beta (microestructura)**. Pretender que una vela de 4h capture una "campaña de acumulación" confunde el marco narrativo con la señal matemática.
+
+---
+
+### (b) Momentum (Liu-Tsyvinski) vs. Mean-Reversion en Capitulaciones
+No son contradictorios; corresponden a horizontes temporales y regímenes ortogonales:
+1. **Liu, Tsyvinski & Wu (*JF* 2022):** Documentan momentum transversal en cripto a horizontes de 1 a 4 semanas.
+2. **Capitulación amplia:** Es una dislocación transitoria de microestructura (72 horas) gobernada por ventas forzadas en cascada y absorción elástica (literatura de *fire-sales* y *slow-moving capital*, Duffie 2010).
+
+**Test que los concilia:**  
+Un modelo de doble ordenamiento (*2-stage sort*): dentro del día de capitulación amplia, clasificar las alts según su momentum previo de 30 días contra BTC. Si la teoría es correcta, **las alts con mayor momentum previo rebotarán con mayor fuerza en las 72h** y mantendrán la deriva alcista a 14 días, mientras que las alts con momentum negativo sufrirán rebotes muertos (*dead-cat bounces*). El spring no contradice al momentum: es el **punto de entrada con descuento a favor del momentum**.
+
+---
+
+## 3. Convergencia: 4 Protocolos Pre-Registrados
+
+```
+                                  [OHLCV + Métricas]
+                                          │
+        ┌───────────────────┬─────────────┴───────┬────────────────────┐
+        ▼                   ▼                     ▼                    ▼
+   Exp 1: RS-Rank      Exp 2: EVR           Exp 3: Weis Wave      Exp 4: VAL-Reclaim
+(Capitulación 47d)   (Absorción 3.4k)      (Agotamiento Swings)    (Rango Donchian)
+[Potencia Borderline] [Potencia Alta]       [Potencia Media]      [Potencia Media]
+```
+
+### Experimento 1: RS-Rank Intra-Canasta en Capitulaciones Amplias
+* **Definición:** En velas con capitulación amplia ($\ge 20\%$ del universo con spring, spec 044), ordenar los pares por rendimiento relativo contra BTC en las 48h previas: $RS_i = r_{i,[t-12,t]} - r_{BTC,[t-12,t]}$. Formar canasta Tercil Superior ($Q_{top}$) vs Tercil Inferior ($Q_{bottom}$).
+* **Unidad de análisis:** $N = 47$ días independientes (27 IS, 20 OOS).
+* **Umbrales congelados (IS):** Tercil superior ($>P_{66.6}$) vs inferior ($<P_{33.3}$).
+* **Familia y corrección:** Familia Microestructura (k=4), ajuste Holm.
+* **Criterio de aprobación:** $\mathbb{E}[R_{top} - R_{bottom}] \ge +1.50\text{ pp}$ en el pool unido con IC95 bootstrap por día que excluya el 0, y $\bar{d}_{OOS} > 0$.
+* **Control placebo:** Permutación aleatoria de etiquetas de activos dentro de cada día ($B = 2,000$ repeticiones).
+* **Estatus de potencia:** **Borderline en pool total; muerto en OOS individual.**
+
+### Experimento 2: Cuantificación de Absorción vía Residuo EVR (Huber)
+* **Definición:** Para cada vela de spring ($Vol \ge 2.5\times$), ajustar $\ln(Spread_t) = \beta_0 + \beta_1 \ln(Vol_t) + \beta_2 \ln(ATR14_t)$ con `HuberRegressor` en ventana rodante de 100 velas. Extraer residuo $z_{\epsilon,t}$. Señal filtrada: $z_{\epsilon,t} \le -1.0$ (absorción pura) vs $z_{\epsilon,t} > 0$ (rango expansivo/cuchillo).
+* **Unidad de análisis:** Bloques de 72h / días distintos ($N \approx 800+$ días, $>3,400$ eventos).
+* **Umbrales congelados (IS):** $z_\epsilon \le -1.0$; cierre $\ge 0.50$ del rango.
+* **Familia y corrección:** Familia VSA/Absorción (k=4), ajuste Holm.
+* **Criterio de aprobación:** Retorno neto $\ge +1.5\%$ y mejora incremental $\ge +0.80\text{ pp}$ sobre el spring crudo en IS y OOS; IC95 excluye el 0.
+* **Control placebo:** Inversión de signo de volumen en el ajuste rodante.
+* **Estatus de potencia:** **ALTA potencia ($N > 300$ días independientes por celda).**
+
+### Experimento 3: Agotamiento de Volumen por Olas (Weis Wave Exhaustion)
+* **Definición:** Swings de Zigzag con reversión a $2.5\times ATR14$. Volumen acumulado de la última onda bajista ($W_{t}$) comparado con la previa ($W_{t-1}$). Condición: $W_{t} / W_{t-1} \le 0.60$ (esfuerzo de venta secándose al tocar mínimo).
+* **Unidad de análisis:** Días distintos de giro ($N \approx 180$ días).
+* **Umbrales congelados (IS):** Ratio $\le 0.60$; penetración de mínimo $\le 1.5\%$.
+* **Familia y corrección:** Familia Swing/Fractal (k=4), ajuste Holm.
+* **Criterio de aprobación:** Reducción de tasa de stop-out en $\ge 5\text{ pp}$ y retorno $\ge +1.8\%$ en IS y OOS.
+* **Control placebo:** Zigzag temporal (mismo número de velas aleatorizando el volumen).
+* **Estatus de potencia:** **Suficiente ($N > 70$ días por período).**
+
+### Experimento 4: Rango Donchian Explícito y Reingreso (VAL-Reclaim)
+* **Definición:** Identificar rangos de consolidación explícitos: canal Donchian de 40 velas donde $(High_{40} - Low_{40}) / SMA20(Close) \le 0.15$ y $KER_{40} \le 0.20$. Señal: perforación del soporte inferior que reingresa y cierra dentro del rango en $\le 2$ velas con volumen $\ge 2.0\times$.
+* **Unidad de análisis:** Días independientes ($N \approx 220$ días).
+* **Umbrales congelados (IS):** Ancho canal $\le 15\%$, $KER \le 0.20$, reingreso en $\le 8$ horas.
+* **Familia y corrección:** Familia Estructura de Rango (k=4), ajuste Holm.
+* **Criterio de aprobación:** Retorno neto $\ge +1.5\%$ en IS y OOS con IC95 que excluya el 0.
+* **Control placebo:** Simular rupturas y reingresos en series generadas por bootstrap estacionario (Politis-Romano).
+* **Estatus de potencia:** **Suficiente ($N > 90$ días por período).**
+
+---
+
+## 4. Test Discriminador: Beta vs. Estructura Wyckoff
+
+En los días de capitulación amplia ($\ge 20\%$), clasificar las alts con señal de rebote en dos grupos ortogonales: **Grupo A (Con Estructura Wyckoff)**, con rango lateral previo $\ge 5$ días ($KER_{30} \le 0.22$) y absorción cuantitativa ($z_\epsilon \le -1.0$); y **Grupo B (Sin Estructura)**, en caída libre direccional ($KER_{30} > 0.50$ y $z_\epsilon > 0$). Si el diferencial pareado diario $\mathbb{E}[R_A - R_B]$ no es estrictamente positivo con $p < 0.05$ tras 72h, el edge es 100% rebote de beta/liquidación y la hipótesis estructural de Wyckoff queda empíricamente refutada.
+
+---
+
+## 5. Veredicto y Apuesta Final
+
+> **Atribuyo un 85% de la ventaja actual del spring al rebote elástico de beta por liquidaciones forzadas de microestructura y solo un 15% a la estructura Wyckoff**, porque cuando la spec 047 testeó de forma aislada la causa previa, los clímax y los apoyos, aportaron exactamente cero exceso de retorno sobre el mercado.

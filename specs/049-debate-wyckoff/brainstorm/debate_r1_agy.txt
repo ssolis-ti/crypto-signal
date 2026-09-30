@@ -1,0 +1,247 @@
+# Debate-Brainstorm: Método Wyckoff y Microestructura en Cripto (Ronda 1)
+**Participante:** `agy` (Gemini)  
+**Rol:** Formalización matemática-estadística rigurosa y análisis de la tradición occidental de sucesores (VSA, Weis Wave, Market Profile, ICT/SMC).  
+**Contexto de referencia:** crypto-signal (alertas Telegram, velas 4h, universo point-in-time 226 pares con deslistados, IS 2022–2024 / OOS 2025–2026).
+
+---
+
+## 1. Corpus: Wyckoff y sus Sucesores Occidentales (Evidencia vs. Folklore)
+
+El corpus occidental de Wyckoff abarca más de un siglo de transformaciones, pasando de la lectura pura de cinta a narrativas institucionales y, finalmente, al reempaquetado del retail contemporáneo. Separar el grano de la paja exige un filtro epistemológico estricto:
+
+```
+[1910-1930s] Wyckoff (Tape Reading / SMI) ──► Flujo de órdenes primitivo y rangos
+       │
+[1990s] Williams (VSA) ──────────────────────► Barra a barra: Spread, Close, Volume
+       │
+[1980s-90s] Market Profile (Steidlmayer/Dalton) ► Teoría de Subasta y Distribución de Valor
+       │
+[2010s] Weis Wave / Villahermosa ────────────► Ondas acumulativas y Volume Profile
+       │
+[2016+] ICT / SMC ───────────────────────────► Reempaquetado comercial ("Algoritmos secretos")
+```
+
+### Richard D. Wyckoff (1873–1934)
+* **Textos clave:** *Studies in Tape Reading* (1910, bajo el seudónimo Rollo Tape), *How I Trade and Invest in Stocks and Bonds* (1922), y el curso de la *Stock Market Institute* (SMI, década de 1930).
+* **Lo verificable:** En *Studies in Tape Reading*, Wyckoff no hablaba de figuras geométricas ni de letras A–E; analizaba la cinta de cotizaciones: precio, volumen transado por impresión y velocidad de llegada. Su núcleo empírico es el **desbalance de liquidez**: si entra volumen masivo y el precio no cae, existe una fuerza pasiva absorbiendo la oferta flotante.
+* **Folklore y opinión:** El **"Composite Man"** (u Operador Compuesto). Wyckoff lo concibió explícitamente como un artificio pedagógico: *"Imagina que todas las fluctuaciones del mercado son el resultado de la manipulación de una sola mente"*. Tratar al Composite Man como un actor colusivo real que diseña esquemas matemáticos para engañar al público es una personificación antropomórfica indemostrable y raya en el pensamiento conspirativo.
+
+### Tom Williams y el Volume Spread Analysis (VSA)
+* **Texto clave:** *The Undeclared Secrets That Drive the Stock Market* (1993, reeditado como *Master the Markets*).
+* **Lo verificable:** Williams redujo el análisis a tres dimensiones estrictas por barra: **Spread** (rango High − Low), **Posición del Cierre** (tercio superior, medio o inferior) y **Volumen relativo**. Conceptos como *Stopping Volume* (gran volumen, spread moderado, cierre a mitad/alto tras caída) y *No Demand Bar* (vela alcista de spread estrecho con volumen inferior a las dos anteriores) son métricas de microestructura parametrizables.
+* **Folklore y opinión:** La afirmación de que los "syndicates" o "smart money" manipulan cada oscilación menor para cazar al retail. Williams mercantilizó su teoría a través de un software propietario (*TradeGuider*), vendiendo señales opacas donde la lógica interna no era falsable independientemente.
+
+### David Weis y la Weis Wave
+* **Texto clave:** *Trades About to Happen: A Modern Adaptation of the Wyckoff Method* (2013).
+* **Lo verificable:** La **Weis Wave** acumula el volumen a lo largo de swings de zigzag en lugar de discretizarlo en barras de tiempo fijas. Permite medir el esfuerzo total por tramo y comparar directamente el empuje de la oferta versus la demanda. Es un avance conceptual genuino sobre las velas estáticas.
+* **Folklore y opinión:** El parámetro de reversión del zigzag es subjetivo. Dependiendo del umbral elegido, una ola puede mostrar absorción o continuación, lo que introduce un sesgo severo de selección retrospectiva (*cherry-picking*).
+
+### Market Profile y Auction Market Theory (AMT)
+* **Autores:** J. Peter Steidlmayer (CBOT, 1985), James Dalton (*Mind Over Markets*, 1990; *Markets in Profile*, 2007).
+* **Lo verificable:** Es la formalización más sólida y cercana a la teoría económica del equilibrio. El mercado es un mecanismo de subasta continua diseñado para facilitar transacciones. Introduce el **Value Area** (el rango de precios que abarca aproximadamente el 68–70% del volumen, análogo a una desviación estándar en una distribución gaussiana), el **POC (Point of Control)** y la distinción formal entre **actividad responsiva** (comprar por debajo del valor justo = Spring) y **actividad de iniciativa** (comprar en ruptura por encima del valor = SOS).
+* **Opinión:** Asumir que la distribución intradía del volumen siempre converge a una campana de Gauss; en cripto, las distribuciones multimodales y las colas pesadas son la norma.
+
+### ICT / SMC (Inner Circle Trader / Smart Money Concepts)
+* **Origen:** Michael Huddleston (c. 2016–presente).
+* **Lo verificable:** El 95% de SMC es una reformulación con nombres nuevos de Wyckoff, VSA y Auction Market Theory:
+  * *Liquidity Sweep / Raid* = Spring / Upthrust.
+  * *Change of Character (CHoCH)* = Sign of Strength (SOS) / Sign of Weakness (SOW).
+  * *Order Block* = La última vela contraria que originó el desbalance de absorción (LPS / LPSY).
+  * *Fair Value Gap (FVG)* = Single prints de Market Profile / desbalance agresivo de liquidez.
+* **Folklore absoluto:** La narrativa del "Interbank Price Delivery Algorithm" (IPDA). Huddleston postula la existencia de un algoritmo bancario central secreto que manipula las cotizaciones a nivel de pip en horarios exactos. Esto es pura mitología de redes sociales sin ningún respaldo empírico ni de microestructura interbancaria.
+
+### Point & Figure (P&F) Count, Elliott y Gann
+* **Wyckoff P&F Count (Ley de Causa y Efecto):** La regla de proyectar el objetivo vertical contando el número horizontal de columnas de consolidación en un gráfico de punto y figura es **folklore numerológico**. No existe fundamento teórico ni empírico verificado para que una matriz discreta de reversión determine de forma lineal la distancia del markup, salvo como una aproximación burda de la relación entre duración y expansión de volatilidad.
+* **W.D. Gann:** Ángulos geométricos, ruedas cuadradas y astrología financiera: **pseudociencia pura**, carente de validez estadística.
+* **Elliott Wave:** Estructura fractal seductora, pero en su práctica clásica adolece de **no falsabilidad sistemática**: ante cualquier fallo de una onda motriz, las reglas auxiliares (extensiones, diagonales, truncamientos, correcciones complejas W-X-Y) permiten re-etiquetar el gráfico *ex-post* indefinidamente.
+
+---
+
+## 2. Técnicas y Reglas del Método: Falsabilidad e Hipótesis Estadísticas
+
+| Técnica / Concepto Wyckoff | ¿Es una afirmación falsable? | Formulación como hipótesis estadística operativa |
+|---|---|---|
+| **1. Ley de Oferta y Demanda** | Tautológica en economía clásica; **Falsable** si se mide mediante flujo de órdenes agresivo. | $H_1: \mathbb{E}[r_{t+k} \mid \text{TakerBuyRatio}_t > 0.65] > \mathbb{E}[r_{t+k}]$. El exceso de compras agresivas sobre pasivas predice retornos positivos a horizonte $k$. |
+| **2. Ley de Causa y Efecto** | **Falsable**, si se define "causa" como compresión temporal/volatilidad y "efecto" como desplazamiento neto post-ruptura. | $H_1: \text{Corr}(\text{Duración}_{rango}, \max |\Delta P_{trend}|) > 0$. La duración del rango correlaciona positivamente con el recorrido del markup. |
+| **3. Ley de Esfuerzo vs. Resultado** | **Altamente falsable**. Cruza volumen (input/esfuerzo) con rango de precio (output/resultado). | $H_1: P(\text{Reversión} \mid Vol \ge Q_{90} \land Spread \le Q_{20}) > P(\text{Reversión} \mid Vol \ge Q_{90} \land Spread \ge Q_{80})$. Volumen extremo con rango colapsado anticipa reversión por absorción. |
+| **4. El Composite Man** | **No falsable** en su sentido literal. Metáfora antropomórfica. | $H_1: \rho(\text{LargeOrderFlow}_t, \text{LargeOrderFlow}_{t+1}) > 0$. ¿Existe persistencia serial en el flujo de grandes bloques de capital durante rangos laterales? |
+| **5. Fases A a E (Esquema secuencial)** | **Falsable como modelo de estados**. (En spec 047 falló mecánicamente). | $H_1: P(\text{Markup exitoso} \mid \text{Secuencia } SC \to AR \to ST \to Spring) > P(\text{Markup exitoso} \mid Spring \text{ aislado})$. La presencia de fases previas debe incrementar la probabilidad de éxito del Spring. |
+| **6. Clímax de Venta (SC)** | **Falsable**. Ruptura de soporte con volumen de pánico y rango expansivo. | $H_1: \mathbb{E}[r_{t+72h} \mid Low \le Min_{20}, Vol \ge 3\times SMA, Spread \ge 1.5\times ATR] > \mu_{incond}$. (Probado en spec 047: **Refutado**, invirtió signo). |
+| **7. Spring (Fase C)** | **Falsable y validado**. Barrida de mínimo previa con cierre recuperado y volumen extremo. | $H_1: \mathbb{E}[r_{t+72h} \mid \text{Spring Confir.} \land \text{Amplitud} \ge 20\%] > \mu_{incond}$. Validado con $+3.8\%$ (IS) y $+1.5\%$ (OOS). |
+| **8. Sign of Strength (SOS) / LPS** | **Falsable**. Ruptura alcista del techo del rango con volumen y apoyo posterior con bajo volumen. | $H_1: \mathbb{E}[r_{t+72h} \mid Close > Max_{30}, Vol \ge 2\times SMA] > 0$. (Probado en spec 047: **Refutado**, retorno negativo en ambos periodos). |
+| **9. Fuerza Relativa (Relative Strength)** | **Altamente falsable**. Desempeño relativo del activo respecto al benchmark durante estrés. | $H_1: \mathbb{E}[r_{alt, t+k} \mid r_{alt, t-m} - r_{BTC, t-m} \ge Q_{80}] > \mathbb{E}[r_{alt, t+k} \mid r_{alt, t-m} - r_{BTC, t-m} \le Q_{20}]$. Las alts que caen menos rebotan más. |
+| **10. Conteo P&F de Causa** | **Falsable**, pero empíricamente no verificado / mitológico en ratios 1:1. | $H_1: \beta_1 > 0$ en $\Delta P_{exit} = \beta_0 + \beta_1 \times (\text{Columnas P\&F}) + \epsilon$. |
+
+---
+
+## 3. Formalización Matemática y Estadística Rigurosa
+
+Esta es la base analítica requerida para transformar el lenguaje cualitativo de Wyckoff en hipótesis computables:
+
+### 3.1 Esfuerzo vs. Resultado como Residuo de Regresión Robusta
+El "esfuerzo sin resultado" describe una barra donde el volumen fue descomunal pero el rango de precio fue incapaz de expandirse (absorción). La relación normal esperada entre rango y volumen es alométrica:
+$$\ln(\text{Spread}_t) = \beta_0 + \beta_1 \ln(\text{Volume}_t) + \beta_2 \ln(\text{ATR}_{14,t}) + \epsilon_t$$
+Para evitar que los outliers climáticos distorsionen la pendiente de referencia, estimamos los coeficientes usando un estimador M de Huber (`sklearn.linear_model.HuberRegressor`):
+$$\min_{\beta} \sum_{t=1}^T \rho_\delta \left( \frac{\ln(\text{Spread}_t) - \mathbf{x}_t^T \beta}{\sigma} \right)$$
+El **residuo estandarizado** de Wyckoff se define como:
+$$z_{\epsilon, t} = \frac{\epsilon_t}{\hat{\sigma}_{\text{MAD}}}$$
+* **Absorción compradora pura (Effort without Result):** $\ln(\text{Volume}_t) \ge P_{90}$ con $z_{\epsilon, t} \le -1.50$ (rango anormalmente estrecho para semejante volumen) y cierre en la mitad superior: $\frac{\text{Close}_t - \text{Low}_t}{\text{High}_t - \text{Low}_t} \ge 0.50$.
+* **Vacío de liquidez (Result without Effort):** $\ln(\text{Volume}_t) \le P_{30}$ con $z_{\epsilon, t} \ge +1.50$ (movimiento hueco, susceptible de ser revertido).
+
+### 3.2 Causa y Efecto: Regresión con Errores Robustos a Autocorrelación
+La formalización matemática de la Ley de Causa y Efecto vincula la masa crítica del rango de acumulación con el retorno del markup subsecuente. Definimos la métrica de **Causa Normalizada** ($C_i$) para un rango de duración $T$ velas:
+$$C_i = \ln(T_i) \times \left(1 - \frac{1}{T_i} \sum_{t \in \text{rango}} \frac{\text{Spread}_t}{\text{ATR}_{baseline}}\right)$$
+Modelamos el movimiento posterior $R_{\text{markup}, i} = \ln(P_{\text{peak}} / P_{\text{breakout}})$ mediante OLS:
+$$R_{\text{markup}, i} = \alpha + \beta_1 C_i + \beta_2 \sigma_{\text{prior}, i} + \epsilon_i$$
+**Trampa estadística crítica:** Los eventos de acumulación presentan heterocedasticidad y dependencia temporal. Es imperativo calcular la matriz de covarianza de los estimadores usando **errores estándar Newey-West (HAC)** con ancho de banda de Bartlett $L = \lfloor 4(N/100)^{2/9} \rfloor$, calculable vía matriz sandwich en `numpy`/`scipy`:
+$$\hat{V}_{\text{HAC}} = (X^T X)^{-1} \left( \hat{\Gamma}_0 + \sum_{l=1}^L \left(1 - \frac{l}{L+1}\right) (\hat{\Gamma}_l + \hat{\Gamma}_l^T) \right) (X^T X)^{-1}$$
+
+### 3.3 Regímenes de Wyckoff: Hidden Markov Models (HMM) y Detección de Cambios de Régimen
+Las fases de Wyckoff no son estados deterministas; son estados latentes no observables directamente. Formalizamos el mercado mediante un **Modelo de Markov Oculto (HMM)** de primer orden con emisiones gaussianas multivariadas:
+* Espacio de estados latentes: $S_t \in \{1: \text{Mark-down}, 2: \text{Fase A/B (Acumulación)}, 3: \text{Spring / Absorción}, 4: \text{Mark-up}\}$.
+* Vector de observaciones: $\mathbf{y}_t = \left[ r_t, \ln\left(\frac{\text{Vol}_t}{\text{SMA20}_t}\right), z_{\epsilon, t}, \Delta\text{OI}_t \right]^T$.
+* La matriz de transición $A_{ij} = P(S_t = j \mid S_{t-1} = i)$ captura la direccionalidad del ciclo de Wyckoff ($P(4 \mid 3) > P(1 \mid 3)$).
+
+Para detectar el punto exacto de transición entre la Fase A (pánico) y la Fase B/C (absorción), implementamos la prueba de **CUSUM bilateral** sobre el desbalance acumulado de volumen agresivo ($D_t = \text{TakerBuyVol}_t - \text{TakerSellVol}_t$):
+$$S_t^+ = \max(0, S_{t-1}^+ + D_t - k), \quad S_t^- = \max(0, S_{t-1}^- - D_t - k)$$
+Cuando $S_t^+ > h$, se declara formalmente el cese de la presión vendedora neta.
+
+```
+Distribución de Volumen en Rupturas
+f(V)
+ │         Cola Extrema (EVT - GPD)
+ │        ┌───────────────────────┐
+ │        │ ξ > 0 (Frechet)       │
+ │        │ Volumen Climático     │
+ │        │ P(V > u + y | V > u)  │
+ ├────────┴───────────────────────► Volumen
+ 0       u (Umbral de pánico)
+```
+
+### 3.4 Volumen Climático y Teoría de Valores Extremos (EVT)
+Fijar una regla heurística como $\text{Vol} \ge 2.5\times \text{SMA20}$ es frágil ante cambios de régimen de volatilidad. El clímax es un evento de cola pesada. Mediante el enfoque **Peaks-Over-Threshold (POT)**, la distribución de los excesos $Y = (V - u)$ sobre un umbral alto $u$ converge asintóticamente a la **Distribución de Pareto Generalizada (GPD)**:
+$$G(y; \xi, \sigma) = 1 - \left( 1 + \frac{\xi y}{\sigma} \right)^{-1/\xi}, \quad \text{con } 1 + \frac{\xi y}{\sigma} > 0$$
+Ajustamos $\xi$ (forma) y $\sigma$ (escala) mediante máxima verosimilitud en `scipy.stats.genpareto.fit(excesses)`. Si $\xi > 0$, la distribución de volumen pertenece a la familia Fréchet (cola pesada). El volumen climático de Wyckoff se formaliza como aquel cuya probabilidad de cola es inferior a $\alpha = 0.005$:
+$$V_{\text{clímax}} = u + \frac{\sigma}{\xi} \left[ \left(\frac{N}{N_u} \alpha\right)^{-\xi} - 1 \right]$$
+
+### 3.5 Exponente de Hurst y Eficiencia Fractal (Kaufman ER)
+Para distinguir cuantitativamente un Trading Range (Fase B/C) de una tendencia (Fase E):
+1. **Exponente de Hurst ($H$):** Mediante Detrended Fluctuation Analysis (DFA) sobre los retornos acumulados:
+   * $H < 0.45$: Régimen antipersistente / mean-reverting (Mercado en rango, válido para operar Springs).
+   * $H > 0.55$: Régimen persistente / tendencial (Fase E; operar Springs en contra es ruina).
+2. **Kaufman Efficiency Ratio ($KER$):**
+   $$KER_t = \frac{|P_t - P_{t-k}|}{\sum_{i=0}^{k-1} |P_{t-i} - P_{t-i-1}|} \in [0, 1]$$
+   En un rango de acumulación Wyckoff genuino con $k=30$ velas, $KER \le 0.20$ (ruido máximo, cero avance neto). Un Sign of Strength (SOS) legítimo exige un quiebre donde $KER$ se expanda abruptamente por encima de $0.60$.
+
+### 3.6 Inferencia Robusta, Remuestreo y Corrección Múltiple
+* **Tamaño de muestra efectivo ($N_{eff}$) con ventanas de holding solapadas:** Si mantenemos 72 horas ($h = 18$ velas de 4h), los retornos de velas consecutivas están serialmente correlacionados por construcción. Usar $N$ subestima el error estándar y genera p-valores espurios. El tamaño de muestra efectivo aproximado según Bartlett es:
+  $$N_{eff} \approx \frac{N}{1 + 2 \sum_{j=1}^{h-1} \left(1 - \frac{j}{h}\right) \hat{\rho}_j}$$
+  Si $N = 3,476$ señales pero se agrupan en $h=18$, los grados de libertad reales se reducen drásticamente.
+* **Day-Level Group Bootstrap:** En días de capitulación, la correlación transversal de los pares es cercana a 1. El remuestreo DEBE hacerse remuestreando el **bloque-día** completo con reemplazo (`np.random.choice(dias_unicos)`), preservando la estructura de covarianza entre pares.
+* **Control de Tasa de Falsos Descubrimientos (FDR):** Al testear múltiples variantes de Wyckoff, la corrección de Bonferroni es hiperconservadora y destruye la potencia estadística. Aplicamos el algoritmo de **Benjamini-Hochberg (BH)**: ordenar los p-valores $p_{(1)} \le p_{(2)} \le \dots \le p_{(m)}$ y encontrar el mayor índice $k$ tal que:
+  $$p_{(k)} \le \frac{k}{m} Q^*, \quad \text{con } Q^* = 0.05$$
+* **Shrinkage Bayesiano (Empirical Bayes):** Para estimar el retorno medio de una altcoin individual $i$ ante un spring, encogemos su media observada $\bar{y}_i$ hacia la media transversal de todo el mercado $\mu_0$:
+  $$\hat{\theta}_i = (1 - B_i) \bar{y}_i + B_i \mu_0, \quad B_i = \frac{\sigma_i^2 / n_i}{\sigma_i^2 / n_i + \tau^2}$$
+  donde $\tau^2$ es la varianza entre activos. Esto elimina los falsos positivos de alts poco líquidas que aparentan edges astronómicos por puro ruido.
+* **Poder Estadístico Real:** Con solo $N_{\text{días}} \approx 47$ episodios independientes de capitulación amplia en casi 5 años, la desviación estándar típica de un trade es $\sigma \approx 4.0\%$. Para detectar una diferencia modesta de $\Delta = 1.0\%$ con $\alpha = 0.01$, el poder estadístico ($1 - \beta$) es:
+  $$\text{Poder} \approx \Phi\left( \frac{\Delta \sqrt{N}}{\sigma} - z_{1 - \alpha/2} \right) = \Phi\left( \frac{1.0 \times \sqrt{47}}{4.0} - 2.576 \right) = \Phi(1.71 - 2.576) = \Phi(-0.866) \approx 19.3\%$$
+  > [!WARNING]
+  > Un poder estadístico de apenas ~19% significa que muchas pruebas secundarias de filtros en `crypto-signal` no aprueban no necesariamente porque el efecto no exista, sino porque el diseño carece de potencia para rechazar la hipótesis nula con tan pocos días independientes.
+
+---
+
+## 4. Propuestas Nuevas: 6 Experimentos Concretos
+
+Ninguna de estas propuestas repite lo ya refutado (clímax aislado, retest pasivo, SOS mecánico, OI/long-short, funding, sesiones horarias ni el lado corto simétrico).
+
+```
+Propuesta 1: Fuerza Relativa (RS-Rank) en Capitulaciones Amplias
+[Día de Capitulación Amplia >= 20%]
+   ├── Tercil Inferior (Alts destrozadas -30%) ──► Trampas de valor / Liquidación
+   └── Tercil Superior (Alts firmes -8%)        ──► ABSORCIÓN Wyckoff ──► Long Canasta (+Edge)
+
+Propuesta 2: Residuo de Esfuerzo vs Resultado (EVR-Residual)
+[Vela de Spring 4h con Vol >= 2.5x]
+   ├── Residuo z > 0 (Rango desmedido / Cuchillo) ──► Descartar
+   └── Residuo z <= -1.0 (Rango estrecho / Cierre alto) ──► ABSORCIÓN CONFIRMADA ──► Alerta
+```
+
+### Experimento 1: Fuerza Relativa Transversal de Wyckoff en Capitulaciones Amplias (RS-Rank)
+* **Concepto Wyckoff:** Regla original: *"En una caída general del mercado, compre la acción que muestre resistencia y se niegue a caer al mismo ritmo que las demás"*.
+* **Definición operativa:** En velas de capitulación amplia ($\ge 20\%$ de los pares con Spring confirmada, spec 044), calcular para cada par con señal su rendimiento relativo contra BTC en las 48h previas: $\text{RS}_i = r_{i, [t-12, t]} - r_{BTC, [t-12, t]}$. Ordenar los pares en terciles.
+* **Hipótesis direccional fijada:** La canasta del tercil superior (las alts que cayeron menos pero barrieron su mínimo local con volumen) supera a la canasta del tercil inferior (las alts que se desplomaron sin freno) en las 72h posteriores.
+* **Criterio de aprobación:** Retorno neto $\mathbb{E}[R_{\text{top}}] - \mathbb{E}[R_{\text{bottom}}] \ge +1.5\%$ con IC95 bootstrap por día que excluya el 0 en IS (2022–24) y OOS (2025–26).
+* **N esperado:** ~47 episodios de mercado (días distintos), evaluando ~5–15 pares por episodio.
+* **Costo computacional:** Muy bajo (vectorizado en pandas).
+
+### Experimento 2: Cuantificación de Absorción vía Residuo EVR (Effort vs. Result)
+* **Concepto Wyckoff:** Ley de Esfuerzo vs. Resultado (Williams/Wyckoff). El volumen climático solo representa absorción si el rango se frena.
+* **Definición operativa:** Sobre cada Spring candidato con volumen $\ge 2.5\times$ SMA20, ajustar la regresión robusta de Huber $\ln(\text{Spread}) \sim \ln(\text{Volume}) + \ln(\text{ATR14})$ sobre las 100 velas previas del par. Extraer el residuo estandarizado $z_{\epsilon, t}$. Filtrar: solo alertar si $z_{\epsilon, t} \le -1.0$ (rango anormalmente contenido) y cierre en el tercio superior.
+* **Hipótesis direccional fijada:** Los springs con absorción cuantitativa ($z_{\epsilon} \le -1.0$) tienen una tasa de acierto significativamente mayor ($\ge +5$ pp) y menor tasa de toques de stop (-10%) que los springs de rango desmedido ($z_{\epsilon} > 0$).
+* **Criterio de aprobación:** Exceso sobre el baseline del Spring sin filtro $\ge +0.80\%$ neto en IS y OOS; $N \ge 30$ días por celda.
+* **Costo computacional:** Bajo (cálculo de regresión local rodante con `scikit-learn`).
+
+### Experimento 3: Filtro de Causa Previa vía Compresión Fractal (KER-Cause)
+* **Concepto Wyckoff:** Ley de Causa y Efecto. Un Spring solo es válido si emerge de un rango de trading establecido (Fase B), no en medio de una caída libre ininterrumpida.
+* **Definición operativa:** Exigir que en las 30 velas de 4h previas al Spring (5 días de causa), el Kaufman Efficiency Ratio ($KER_{30}$) sea $\le 0.22$ Y el ancho relativo de las Bandas de Bollinger ($\frac{Upper - Lower}{SMA20}$) se ubique en el cuartil inferior ($P_{25}$) de su historial de 90 días.
+* **Hipótesis direccional fijada:** Los Springs precedidos por una causa cuantificable (compresión de volatilidad y ruido lateral) superan en retorno neto a los Springs que se producen tras impulsos direccionales directos.
+* **Criterio de aprobación:** Retorno neto $\ge +2.0\%$ a 72h con stop -10%, positivo en IS y OOS, con diferencia sobre el grupo sin compresión estadísticamente significativa.
+* **N esperado:** ~150–250 eventos en ~60–80 días independientes.
+* **Costo computacional:** Muy bajo (`pandas_ta`).
+
+### Experimento 4: Agotamiento de Volumen por Olas (Weis Wave Exhaustion)
+* **Concepto Wyckoff:** David Weis. Las ventas se agotan si la ola bajista terminal requiere mucho menos volumen para romper el nivel que la ola bajista anterior.
+* **Definición operativa:** Algoritmo Zigzag con umbral de reversión $2.5\times \text{ATR}_{14}$. Calcular el volumen acumulado en la última ola bajista ($W_{\text{actual}}$) y compararlo con el volumen acumulado de la ola bajista previa ($W_{\text{previa}}$). Condición: $W_{\text{actual}} / W_{\text{previa}} \le 0.60$ (la última ola bajista muestra agotamiento evidente de volumen acumulado), aun cuando la última vela de 4h confirme el Spring.
+* **Hipótesis direccional fijada:** La falta de volumen en la ola macro bajista confirma que la oferta flotante se secó, incrementando el Sharpe Ratio del trade a 72h.
+* **Criterio de aprobación:** Reducción del drawdown máximo medio en $\ge 2.0$ pp y retorno neto $\ge +1.8\%$ en ambos periodos.
+* **N esperado:** ~200 eventos en ~70 días.
+* **Costo computacional:** Medio (cálculo de swing de zigzag acumulativo).
+
+### Experimento 5: Falla de Subasta y Reingreso al Value Area (Market Profile VAL-Reclaim)
+* **Concepto Wyckoff:** Auction Market Theory / Dalton. Un Spring es un rechazo de valor por debajo del Value Area Low (VAL). La regla de subasta postula que el reingreso al área de valor debe rotar hacia el POC y el VAH.
+* **Definición operativa:** Perfil de volumen acumulado sobre una ventana rodante de 120 velas de 4h (20 días). Discretizar el precio en 50 bins. Calcular el Value Area Low (VAL, corte del 70% de volumen acumulado alrededor del POC). Señal: El mínimo de la vela $t$ penetra por debajo del VAL en $\ge 1.0\%$, pero el cierre de $t$ o $t+1$ recupera por encima del VAL con volumen $\ge 2.0\times$ SMA20. Salida: 72h o toque del POC.
+* **Hipótesis direccional fijada:** El reingreso al Value Area tras rechazo en mínimos genera una ventaja alcista estructurada hacia el centro de gravedad del volumen (POC).
+* **Criterio de aprobación:** Win-rate $\ge 60\%$, media neta $\ge +1.5\%$ en IS y OOS; IC95 excluye 0.
+* **N esperado:** ~300 eventos en ~100 días.
+* **Costo computacional:** Medio (histograma de volumen rodante en `numpy`).
+
+### Experimento 6: Desbalance Agresivo Intradía (Taker Flow Imbalance en 15m durante la Vela 4h)
+* **Concepto Wyckoff:** Absorción en la cinta. La vela de 4h esconde la microestructura: si el gran volumen ocurrió cayendo y el rebote fue con volumen cero en el último minuto, es un cuchillo; si el volumen agresivo comprador entró masivamente en el rebote, es absorción genuina.
+* **Definición operativa:** Descomponer la vela 4h de Spring en sus 16 velas de 15m. Calcular el Taker Buy Ratio en las 8 velas de 15m de la segunda mitad de la barra: $\text{TBR}_{15m} = \sum \text{TBV} / \sum (\text{TBV} + \text{TSV})$. Condición: $\text{TBR}_{15m} \ge 0.60$ (la presión compradora agresiva dominó la recuperación).
+* **Hipótesis direccional fijada:** Discrimina falsos rebotes por iliquidez pasiva de verdaderas entradas de demanda agresiva.
+* **Criterio de aprobación:** Mejora incremental $\ge +0.70$ pp sobre el Spring estándar a 72h, consistente en IS y OOS.
+* **N esperado:** Igual al universo de Springs (~3,400 señales).
+* **Costo computacional:** Medio (requiere procesar los archivos de 15m ya disponibles en el laboratorio).
+
+---
+
+## 5. Crítica Dura al Enfoque Mecánico en 4h
+
+¿En qué punto el planteamiento de Claude sobre Wyckoff podría estar fundamentalmente equivocado respecto a cómo opera el método en la realidad?
+
+1. **La falacia del "gatillo de una sola vela" frente al proceso de campaña:**  
+   Wyckoff enfatizó de forma reiterada que la acumulación no es un evento de una vela; es una **campaña estratégica** que toma semanas o meses. El operador compuesto no compra en una vela de 4h: absorbe pacientemente contra la oferta flotante. Intentar codificar un SOS o un LPS como una fórmula fija de `close > max30 and vol > 2x` en una vela aislada de 4h es una bastardización retail. No es sorprendente que spec 047 haya fracasado: una vela de 4h con volumen alto en medio de la nada es solo ruido o liquidación forzada, no un Sign of Strength estructural.
+
+2. **La arbitrariedad del reloj cronológico de 4h:**  
+   El tiempo cronológico es homogéneo; la actividad del mercado es heterogénea. Partir el continuo de precios en bloques de 4h (00:00, 04:00, 08:00 UTC) es un artefacto administrativo arbitrario. Un clímax de venta que se inicia a las 03:30 y concluye a las 04:30 queda artificialmente dividido en dos velas de 4h, destruyendo las métricas de volumen relativo y posición del cierre. La literatura cuantitativa moderna (Easley, López de Prado) demuestra que las barras de volumen o de desbalance de ticks son infinitamente superiores para capturar la microestructura que las barras de tiempo fijo.
+
+3. **Incongruencia entre la evaluación del backtest y la arquitectura real de `crypto-signal`:**  
+   `crypto-signal` es un sistema de **alertas por Telegram para un operador humano discrecional**; no es un execution engine algorítmico automatizado. Evaluar las fases de Wyckoff bajo una regla rígida de "mantener ciegamente 72 horas con stop fijo al -10%" ignora por completo la praxeología del método: un operador de Wyckoff jamás mantiene una posición durante 72h si el precio muestra un fallo de seguimiento en la vela siguiente, ni deja un stop al -10% si el mínimo del Spring es vulnerado con volumen. Al medir el método con una regla ciega de holding fijo, Claude no está midiendo si Wyckoff funciona: está midiendo el desempeño de un sistema de seguimiento ciego aplicado a etiquetas heurísticas.
+
+4. **La asimetría ontológica de la distribución:**  
+   El fracaso de spec 048 (el espejo corto) no es una falla de Wyckoff; es una falla de modelado. Tratar a la distribución como un reflejo exacto de la acumulación contradice las leyes fundamentales del mercado:
+   * Los suelos se forman por **pánico y liquidación forzada** (picos de volatilidad extrema que rebotan en V por agotamiento elástico).
+   * Los techos se forman por **complacencia y falta de liquidez compradora** (procesos lentos de desgaste) o por continuaciones maníacas alimentadas por liquidaciones de cortos. Querer encontrar un "Upthrust clúster" simétrico al Spring es ignorar que el apalancamiento en cripto es inherentemente asimétrico.
+
+---
+
+## Lo que le preguntaría al otro agente (`opencode` / DeepSeek)
+
+1. **Sobre 庄家 (*Zhuangjia*) y el 洗盘 (*Xipan*):**  
+   En la teoría china de manipulación por el creador de mercado principal (*Zhuangjia*), ¿cómo se distingue cuantitativamente y en tiempo real una "sacudida de limpieza" (*Xipan*, 洗盘 —análoga al Spring de Wyckoff—) de un proceso de "abandono y distribución masiva" (*Chuhuo*, 出货) sin caer en el sesgo retrospectivo? ¿Existe en la investigación cuantitativa de foros o papers chinos alguna regla métrica falsable sobre la rotación de volumen que separe ambos fenómenos?
+
+2. **Sobre 缠论 (*Chan Theory*) y la cuantificación de fractales:**  
+   La teoría de Chan (*Chan Zhongshuo*, 缠中说禅) postula una geometría estricta basada en fractales (*Fenxing*, 分型), trazos (*Bi*, 笔), segmentos (*Xianduan*, 线段) y centros de gravedad (*Zhongshu*, 中枢). El "Tercer Punto de Compra" (*Sanmai*, 三买) equivale conceptualmente al LPS/Backup de Wyckoff tras romper un centro. Dado que en la práctica manual la delimitación de un *Xianduan* genera enorme ambigüedad subjetiva, ¿cómo formalizarías algorítmicamente en Python una regla de *Sanmai* sobre velas de 4h que no dependa de re-etiquetado retrospectivo?
+
+3. **Sobre 筹码分布 (*Chouma Fenbu* — Distribución de Fichas/Costos):**  
+   A diferencia del Volume Profile occidental, que acumula estáticamente el volumen por nivel de precio en una ventana, el modelo chino de *Chouma Fenbu* simula el desgaste y recambio del costo de los tenedores (*turnover-decay* de fichas antiguas cuando el precio rota). Desde tu perspectiva, ¿posee esta modelización dinámica de distribución de fichas un respaldo empírico superior al Volume Profile tradicional para identificar la absorción del *Zhuangjia*, o sigue siendo una herramienta visual sujeta a la interpretación subjetiva del retail chino?

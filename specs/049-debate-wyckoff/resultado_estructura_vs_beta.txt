@@ -1,0 +1,21 @@
+velas con al menos un spring: 1021 | velas de capitulacion amplia (>= 20%): 58
+
+CAPITULACION AMPLIA (>= 20% de los pares con spring)  [criterio pre-registrado]
+  comparacion      per   velas dias | A (spring)        B |  dif A-B
+  A - B1 golpeadas IS       29   26 |      +2.21    +0.86 |    +1.35
+  A - B1 golpeadas OOS      27   21 |      +1.60    +0.69 |    +0.90
+  A - B1 golpeadas AMBOS    56   47 |      +1.91    +0.78 |    +1.14  IC97.5% [-0.19, +2.44]
+  A - B2 ruptura sin recup. IS       29   26 |      +2.21    +1.54 |    +0.67
+  A - B2 ruptura sin recup. OOS      26   21 |      +1.74    +1.63 |    +0.11
+  A - B2 ruptura sin recup. AMBOS    55   47 |      +1.99    +1.58 |    +0.41  IC97.5% [-1.03, +1.74]
+
+TODAS LAS VELAS CON SPRING (control)
+  comparacion      per   velas dias | A (spring)        B |  dif A-B
+  A - B1 golpeadas IS      560  353 |      +0.09    -0.06 |    +0.14
+  A - B1 golpeadas OOS     332  221 |      +2.27    -0.28 |    +2.55
+  A - B1 golpeadas AMBOS   892  574 |      +0.90    -0.14 |    +1.04  IC97.5% [-0.67, +3.42]
+  A - B2 ruptura sin recup. IS      381  229 |      +0.11    -0.34 |    +0.45
+  A - B2 ruptura sin recup. OOS     187  120 |      -0.57    -1.10 |    +0.52
+  A - B2 ruptura sin recup. AMBOS   568  349 |      -0.11    -0.59 |    +0.48  IC97.5% [-0.24, +1.17]
+
+VEREDICTO (estructura aporta mas alla de "alts golpeadas"): {'A - B1 golpeadas': 'NO', 'A - B2 ruptura sin recup.': 'NO'}
