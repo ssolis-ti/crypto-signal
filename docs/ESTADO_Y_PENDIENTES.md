@@ -41,6 +41,8 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
 
 - **049** Debate sobre Wyckoff con opencode (tradición china) y agy (formalización): la ventaja del spring es ~80-85% rebote de beta de las alts en días de capitulación amplia y ~15-20% estructura; ningún predictor de estructura (esfuerzo-resultado, rango previo, fuerza relativa, momentum) aprueba.
 
+- **050** Marco y matemática del edge (debate opencode+agy con arXiv verificado): distribución honesta por día (mediana +0.57%, 45% de días en rojo), Kelly empírico y tope por pérdida (~0.3x del capital en la canasta para perder ~3% en un día malo), gate binario ≥20% + canasta equiponderada; índice continuo, selección por par y ponderación por daño muertos por potencia. La validación hacia adelante ahora mide por episodio.
+
 ## Pendiente
 
 0. Candidatos que quedan de la sesión de apoyo mutuo (ver specs/044 y 046; la entrada secundaria/retest ya se probó y NO aprueba): desliste anunciado por Binance como catalizador

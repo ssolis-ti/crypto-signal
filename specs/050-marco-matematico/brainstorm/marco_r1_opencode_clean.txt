@@ -1,0 +1,124 @@
+# DEBATE-BRAINSTORM — Ronda 1 (opencode / DeepSeek)
+
+Verifiqué cada enlace de la sección C abriendo la fuente (API de arXiv y Crossref); lo que no verifiqué va marcado. No leí `.env` ni `config.yml`; solo lectura del repo.
+
+## A) MARCO Y ESTRUCTURA: el edge como modelo explícito y arquitectura por capas
+
+**Modelo latente.** Indexemos velas de 4h cerradas por `t` y pares por `i` en el universo point-in-time `U_t` (49 + 177 deslistados, ≥20M USD/24h, ≥25 velas). Para horizonte `h`:
+
+```
+r_{i,t→t+h} = u_{t,h}  +  θ_h · D_{i,t} · I_t  +  ψ_h · spring_{i,t} · I_t  +  e_{i,t,h}
+```
+
+- `u_{t,h}`: factor común del día (rebote de beta). Es el término dominante (~80-85% de la ventaja).
+- `D_{i,t}`: daño continuo del par (retorno 48h menos el de BTC, estandarizado por ATR).
+- `spring_{i,t} ∈ {0,1}`: confirmación (rompe mínimo 20 velas con vol ≥2.5x y cierra de vuelta ≤3 velas). Aporta `ψ` chico (~15-20%).
+- `I_t ∈ [0,1]`: intensidad de capitulación (hoy binaria: fracción de pares con spring ≥20%).
+- `e`: ruido robusto (Student-t), porque la cola es gruesa (spec 043: 28% de stops en deslistados).
+
+La lectura del test discriminante de spec 049 es exactamente `u_t ≫ θ·D + ψ·spring`: por eso la arquitectura no debe "elegir binario" sino **estimar `u_t` e `I_t` con pooling**, y tratar `ψ` como un extra.
+
+**Cinco capas.**
+
+| Capa | Estado observable | Decide | NO decide |
+|---|---|---|---|
+| L1 Régimen | `I_t, Sync_t, Disp_t, λ̂_t` (λ = branching) | escala la agresividad, no filtra | el par |
+| L2 Selección | score posterior `q_{i,t}=E[r]` jerárquico | canasta (varios springs) | el timing |
+| L3 Timing/salida | vida media OU `h*`, stop | horizonte y stop | el tamaño |
+| L4 Riesgo | `μ̂,σ̂,τ̂` + tope 3 posiciones | `f*` fraccional | qué par |
+| L5 Monitoreo | e-process/CUSUM sobre episodios | bajar tamaño o pausar | el signo del edge |
+
+**Calibración con ~47 días.**
+- L1: **≤2 parámetros**, con pesos fijados a priori; el resto se valida por monotonicidad, no se optimiza.
+- L2: jerárquico (shrinkage); cada par pide prestada fuerza de los demás (ver B3).
+- L3: `κ` se estima *pooled* sobre ~3.400 springs, no sobre 47 días; la decisión de horizonte sí se valida por día.
+- L4: sólo se acepta si mejora crecimiento **sin** empeorar el p5 del drawdown (Pareto).
+- L5: secuencial, consume días en vivo, `α` fijado antes.
+
+**Qué se mide vs. qué se decide.** Con 47 días el MDE unido es ≈1,6 pp (2,8·4%/√47) y por período 2,2 (27 días) / 2,5 pp (20 días). Entonces: **se decide** el signo del efecto de día, canasta vs BTC, y sólo efectos >1,6 pp; **no se decide** un índice continuo con >2-3 grados de libertad, ni diferencias de selección/horizonte <1,6 pp, ni si la atenuación 2025-26 es permanente. Cualquier "mejora" de 0,3-0,5 pp aquí es invisible. Sesgo adicional: con tope de 3 posiciones, la muestra efectiva son menos días y está dominada por pocos días extremos.
+
+## B) MATEMÁTICA NUEVA (6 construcciones)
+
+**B1. CIX — índice continuo de intensidad de capitulación (reemplaza el corte 20%).**
+(1) Para cada par elegible: profundidad `a_{i,t}=min(0, low_{i,t}/min20_{i,t}−1)`, volumen `v_{i,t}=vol/SMA20`, imbalance taker `b_{i,t}=2·takerSell/(takerBuy+takerSell)−1`, velocidad `w_{i,t}=|ret_1|/ATR14`. Score acotado `φ_{i,t}=σ(Σ c_k z_{i,t}^k)` y
+`I_t = Σ_i L_{i,t} φ_{i,t} / Σ_i L_{i,t}`, con `L` = volumen USD. Sincronía = fracción del autovalor principal de la matriz de correlación de returns 20 velas, `Sync_t=λ1/Σλ_j`.
+(2) Mecanismo: una liquidación forzada es un shock común que mueve a *todos* los pares apalancados por encima de su base de colateral → más sincronía = más forzado y menos idiosincrático (fire sale, Coval-Stafford).
+(3) Calibración: fijar `c_k` a priori; a lo sumo ajustar un escalar con prior fuerte. No hay 47 días para 6 pesos.
+(4) numpy: arrays `(T,N)`, `nanmean` ponderado; `np.linalg.eigvalsh` para Sync.
+(5) Test: Spearman(`I_t`, `û_t`) con bootstrap por día + placebo por permutación de etiquetas de día; aprueba si ρ>0 en ambos períodos e `I_t` le gana al indicador binario en scoring OOS (no sólo in-sample).
+(6) MDE: con n=47, |ρ| detectable ≈0,40 (80% poder, α 0,05). Sólo una relación monótona fuerte es visible.
+
+**B2. OU-con-saltos (y λ de Hawkes) para deducir el horizonte.**
+(1) `dX_t = κ(μ−X_t)dt + σ dW_t + J dN_t`, con `X=ln(P/P_ref)` post-capitulación. Momentos: `E[X_h|X_0]=μ+(X_0−μ)e^{−κh}`, `Var=σ²(1−e^{−2κh})/(2κ)+σ_J²`. Vida media `h½=ln2/κ`; horizonte óptimo maximiza el Sharpe de reversión neto de costos. Estimador: AR(1) `X_{t+1}=a+bX_t+ξ`, `κ=−ln(1+b)/Δt`, con shrinkage de `b` hacia 0. La rama de Hawkes da `λ̂` (branching) por conteo de minutos en cascada.
+(2) Mecanismo: el impacto de la venta forzada decae con la resiliencia del dealer; el paper de cascadas (C2) mide que **88% de la venta forzada cae en 30 min y 63% se absorbe fuera de libro**, con `λ̂≈0,1–0,2` (subcrítico). Eso *sugiere* reversión más rápida que 72h.
+(3) Calibración pooled sobre ~3.400 springs; sólo `κ` global. `λ̂` se estima por ventana.
+(4) numpy: `np.polyfit` de AR(1); `scipy.optimize.minimize_scalar` para `h*`.
+(5) Test pre-registrado: ¿`h*` (o `h=24h/48h`) supera a 72h en OOS? Control: permutar el signo de la reversión intra-ventana; placebo: aplicar el mismo `h*` a velas aleatorias.
+(6) MDE: comparación pareada por día ⇒ sólo se cambiaría 72h por una mejora >1,6 pp. Es un test de "matar 72h", no de afinarlo.
+
+**B3. Jerárquico bayesiano día/par con probabilidad posterior de ganancia.**
+(1) `r_{i,t}=α+u_t+v_i+β'x_{i,t}+e_{i,t}`, `u_t~N(0,σ_u²)`, `v_i~N(0,σ_v²)`. Media de día con shrinkage: `û_t = (n_t/(n_t+σ²/σ_u²))·(r̄_t−α−β'x̄_t)`. Posterior predictivo ⇒ `P(r>c)`.
+(2) Mecanismo: el rebote es un factor de día; el shrinkage es la forma correcta de "usar más información por día".
+(3) Con 47 días, `σ_u` se estima con prior débil-informativo (media-vida; p.ej. Half-Cauchy) y se reporta sensibilidad.
+(4) numpy/scipy: Gibbs de 3 bloques con condicionales gaussianas conjugadas (o MAP = Ridge como atajo); nada de pymc.
+(5) Test: **cobertura** del intervalo predictivo 90% en OOS (debe caer en [0,80; 0,98]) + Brier mejor que la tasa base, con placebo de bloques.
+(6) Con ≥30 días, el IC Wilson de cobertura es ±~15 pp: sirve para detectar mala calibración gruesa, no fina.
+
+**B4. Elasticidad de daño (canal fire-sale), intra-día.**
+(1) `r_{i,t→t+h}=α+β·D_{i,t}+u_t+ε`, con `D` = caída relativa a BTC en 48h. Dirección pre-registrada **β>0** (revierte la doctrina: las más golpeadas rebotan más). Es la replicación confirmatoria de H3 de spec 049 (que fue exploratoria).
+(2) Mecanismo: las alts más apalancadas sufren más venta forzada → mayor sobre-reacción → mayor rebote (compensación por liquidez).
+(3) Calibración: `β` jerárquico (shrinkage hacia 0), terciles congelados con 2022-24.
+(4) numpy: regresión con dummies de día (demean por día) + bootstrap por bloques.
+(5) Test: β>0 con IC por día que excluye 0 **dentro del día** y en ambos períodos (no total); placebo: reasignar `D` dentro del día.
+(6) MDE: efecto observado ~2,7 pp; el contraste intra-día baja el MDE a ~1,0-1,6 pp → detectable.
+
+**B5. Tamaño Kelly con incertidumbre y cola gruesa.**
+(1) Con `r|μ~ (μ,σ²)` y `μ~N(μ̂,τ²)`: `g(f)≈fμ̂−(f²/2)(σ²+τ²+μ̂²)` ⇒ `f* ≈ (μ̂−c)/(σ̂²+τ²)`. Con cola gruesa, penalizar por asimetría/curtosis y usar una versión robusta (cuantil 75% de `σ̂²` por bootstrap) o λ fraccional fijo.
+(2) Mecanismo: Kelly pleno asume parámetros conocidos; con 47 días hay que descontar `τ²` (la palanca es proporcional a la confianza en la estimación; ver C6/C7).
+(3) `μ̂,τ̂` del posterior de B3; `σ̂` del bootstrap.
+(4) numpy: `mu_hat/(sigma2+tau2)`, cap duro por posición y 3 simultáneas.
+(5) Test: Monte Carlo con bootstrap por día; aprueba si mediana de log-crecimiento sube **y** p5 del drawdown no empeora.
+(6) Nota brutal: `f*=0,022/0,0016≈14x`; el número "óptimo" es absurdo, lo que confirma que sólo el shrinkage + tope hace usable esto. No se puede distinguir mejoras finas: MDE ≈1,6 pp-equivalente.
+
+**B6. Monitor de salud del edge: e-process/CUSUM + martingala conforme.**
+(1) e-process: `E_t=Π(1+λ_j(y_j−m_0))` con retornos normalizados a `[0,1]`; alarma si `E_t≥1/α`. CUSUM: `S_t=max(0,S_{t-1}+r_t−k)`, alarma `S_t>h`; o Shiryaev-Roberts (C8). Alternativa libre de supuestos: martingala de conformidad (C9).
+(2) Mecanismo: el edge decae (spec 043: +0,35% OOS; deslistados ~0 en 2025-26) y queremos un gobernador con tasa de falsa alarma controlada, no un filtro de alpha.
+(3) `α` fijado (p.ej. 1 alarma falsa cada ~20 años); `h` por ARL.
+(4) numpy: acumulación recursiva.
+(5) Test: ¿habría detectado la atenuación 2025-26 antes que una regla fija? Placebo: permutar días ⇒ tasa de alarma ≤α.
+(6) MDE honesto: para detectar caída de +2% a 0 con sd/día 4% y ~12 episodios/año se necesitan ~31 días ⇒ **2,5-3 años**. Es gobernador de riesgo, no stop rápido.
+
+## C) LITERATURA VERIFICADA
+
+1. **Bacry, Mastromatteo, Muzy (2015)**, *Hawkes processes in finance*, [arXiv:1502.04592](https://arxiv.org/abs/1502.04592). Uso: kernels multivariados de auto/cross-excitación para `Sync_t` y `λ̂` de B1/B2.
+2. **Garcia Seuma (2026)**, *Measuring the engine of a liquidation cascade: subcritical branching inside a first-order transition*, [arXiv:2608.03616](https://arxiv.org/abs/2608.03616). Verificado: el abstract reporta `λ̂≈0,1–0,2` subcrítico, 88% de la venta forzada en 30 min, 63% absorbida fuera de libro, y que las medidas escalares pre-cascada no gradúan la severidad (advertencia para B1 y la trampa E3).
+3. **Garcia Seuma (2026)**, *Where does the criticality live? Early-warning signals…*, [arXiv:2607.27070](https://arxiv.org/abs/2607.27070). Verificado: ningún variable es evento-invariante; la compresión de varianza de taker flow sólo vale a nivel población. Uso: no vender "early warning" por evento.
+4. **Kitron & Wengrowicz (2026)**, *Short-horizon mean reversion in cryptocurrency markets*, [arXiv:2608.21888](https://arxiv.org/abs/2608.21888). Verificado: reversión direccional en 90% de 183 pares Binance, concentrada tras taker flow agresivo y creciente con su intensidad; borde bruto ~1,3 bp vs 5 bp de costo. Uso: el conditioning por taker flow (B1/B4) y el piso de costo que nuestro edge debe superar.
+5. **Cheng, Deng, Wang, Yu (2021)**, *Liquidation, Leverage and Optimal Margin in Bitcoin Futures Markets*, [arXiv:2102.04591](https://arxiv.org/abs/2102.04591). Verificado: GEV de colas; liquidaciones forzadas diarias 3,51%/1,89%; margen óptimo muy por encima del 1%. Uso: justifica cola gruesa y EVT en B3/B5.
+6. **Coval & Stafford (2007)**, *Asset fire sales (and purchases) in equity markets*, JFE, [doi:10.1016/j.jfineco.2006.09.007](https://doi.org/10.1016/j.jfineco.2006.09.007) (verificado por Crossref). Uso: presión de precio por flujos que luego revierte = mecanismo del rebote de beta.
+7. **Momoki & Yoshida (2023)**, *Mixed effects models for extreme value index regression*, [arXiv:2305.05106](https://arxiv.org/abs/2305.05106). Verificado: mixed-effects/EVT para "pedir prestada fuerza" en subgrupos con pocos datos, aplicado a cripto. Uso: base metodológica de B3/B6 con pocos días.
+8. **Turlakov (2016)**, *Leverage and Uncertainty*, [arXiv:1612.07194](https://arxiv.org/abs/1612.07194) (verificado); y **Källblad, Obloj, Zariphopoulou (2013)**, *Time-consistent investment under model uncertainty*, [arXiv:1311.3529](https://arxiv.org/abs/1311.3529) (verificado): Kelly fraccional con incertidumbre y "palanca proporcional a la confianza". Uso: B5.
+
+Adicionales verificados y relevantes: **Angelopoulos & Bates (2022)**, conformal prediction, [arXiv:2107.07511](https://arxiv.org/abs/2107.07511); **Pepelyshev & Polunchenko (2015)**, *Real-time financial surveillance via quickest change-point detection* (CUSUM/Shiryaev-Roberts), [arXiv:1509.01570](https://arxiv.org/abs/1509.01570); **Vovk et al. (2021)**, conformal test martingales, [arXiv:2102.10439](https://arxiv.org/abs/2102.10439); **Bailey & López de Prado**, *The Deflated Sharpe Ratio*, [doi:10.2139/ssrn.2460551](https://doi.org/10.2139/ssrn.2460551) (Crossref); **R. J. Ryan (2026)**, *Conformal Kelly*, [arXiv:2608.01494](https://arxiv.org/abs/2608.01494) — verificado, y su resultado OOS fue **peor que el benchmark**: advertencia contra confiar en mejoras de sizing.
+
+## D) LOS 3 EXPERIMENTOS PRIMERO
+
+**E1 — CIX vs binario (B1).** Protocolo: fijar pesos de `φ`, computar `I_t` con datos hasta `t` (point-in-time, con deslistados), agrupar 47 episodios en cuantiles con cortes congelados en 2022-24. Medida: ρ de Spearman(`I_t`, canasta neta) y diferencia vs indicador ≥20%. Bootstrap por día; placebo por permutación de etiquetas de día. Aprueba: ρ>0 en ambos períodos, IC unido excluye 0, y gana en scoring OOS. Poder: |ρ|≥0,40.
+
+**E2 — Horizonte implícito por OU (B2).** Estimar `κ` pooled y `h*`; comparar `h*`, 24h, 48h y 72h sobre los 47 días, separando por taker-flow alto/bajo (C4). Criterio congelado: reemplazar 72h sólo si mejora ≥1,6 pp unido **y** el signo se repite por período. Placebo: `h*` aplicado a velas aleatorias del mismo par. Poder: 1,6 pp unido; 2,2/2,5 por período.
+
+**E3 — Modelo jerárquico + elasticidad de daño (B3+B4).** Ajustar con datos hasta `t`, predecir `E[r]`, `P(r>c)` y cobertura del intervalo 90% en OOS; coeficiente `β` de daño intra-día. Aprueba: cobertura en [0,80;0,98], Brier mejor que la tasa base (placebo de bloques) y β>0 en ambos períodos. Poder: β detectable ~1,0-1,6 pp; cobertura con IC Wilson ±~15 pp.
+
+## E) TRES TRAMPAS AL IMPLEMENTAR
+
+1. **Sobreajuste de un índice continuo con 47 días.** Ajustar 5-6 pesos y después "descubrir" monotonía es casi seguro ruido de 2-3 días. Se evita: pesos a priori, ≤2 parámetros, placebo por permutación, leave-one-day-out y exigir **valor incremental sobre el binario**, no sólo mejora absoluta.
+2. **Leakage en la calibración jerárquica/OU.** Estimar `κ` o `u_t` con toda la muestra y usarlos para predecir la misma muestra; o ignorar el point-in-time de los deslistados (spec 043). Se evita: estimación expanding-window estrictamente con datos ≤`t`, `D_{i,t}` sólo con información previa, y separar "parámetro pooled" (permisible) de "efecto de día predicho" (prohibido).
+3. **Complejidad y falsa confianza de modelo.** Hawkes/HMM con muchos parámetros, o tratar el monitor conforme como alpha: la evidencia (C2/C3) dice que las cascadas son transiciones abruptas y **no** tienen early-warning invariante por evento, y la conformal puede ser "ciega" ante cambios. Se evita: menos parámetros, monitor como gobernador con garantía anytime-valid, y corregir por comparaciones múltiples con Deflated Sharpe (C11).
+
+*(Mirada de mercados asiáticos: el mecanismo de "magnet" de límites no aplica a perpetuos, pero sí la dinámica de motor de liquidación y herding; el dato de C2 de que la venta forzada se absorbe fuera de libro sugiere que parte del rebote es provisión de liquidez de MM, no "demanda orgánica".)*
+
+## LO QUE LE PREGUNTARÍA AL OTRO
+
+1. Con 47 días, ¿`σ_u` (día) y `σ_e` (par) son identificables, o el shrinkage colapsa todo a la media? ¿Qué prior hace honesto al posterior y cómo se reporta su sensibilidad?
+2. Si `λ̂≈0,1–0,2` y 88% de la venta forzada ocurre en 30 min, ¿por qué gana 72h y no 24h? ¿Es costo/ruido o hay un segundo canal más lento? ¿Qué modelo falsaría 72h?
+3. Si 80-85% es beta, ¿esto es prima por proveer liquidez/seguro de liquidación que se comprimirá al ser crowded? ¿Qué observable distinguiría "prima" de "aglomeración", y el CIX mide riesgo o mide crowding?

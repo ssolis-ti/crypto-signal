@@ -1,0 +1,15 @@
+springs con D: 3476
+
+DIAS DE CAPITULACION AMPLIA (>= 20% de los pares): 1478 springs, 58 velas, 49 dias
+  IS    beta = +0.48 pp por desvio estandar de dano | IC95 por dia [-0.25, +1.22] | dias 27
+  OOS   beta = -0.11 pp por desvio estandar de dano | IC95 por dia [-0.54, +0.44] | dias 22
+  AMBOS beta = +0.25 pp por desvio estandar de dano | IC95 por dia [-0.25, +0.80] | dias 49
+  placebo (D permutado dentro de la vela): beta medio -0.007, p95 +0.23, p(beta_perm >= observado) = 0.038
+
+TODAS LAS VELAS CON >= 5 SPRINGS: 2267 springs, 156 velas, 116 dias
+  IS    beta = +0.49 pp por desvio estandar de dano | IC95 por dia [+0.02, +0.95] | dias 86
+  OOS   beta = -0.08 pp por desvio estandar de dano | IC95 por dia [-0.49, +0.40] | dias 30
+  AMBOS beta = +0.32 pp por desvio estandar de dano | IC95 por dia [-0.04, +0.70] | dias 116
+  placebo (D permutado dentro de la vela): beta medio +0.005, p95 +0.21, p(beta_perm >= observado) = 0.012
+
+VEREDICTO (criterio pre-registrado, beta >= +0.5 pp/sd en IS y OOS con IC95 > 0): {'amplia': 'NO aprueba', '>=5 springs': 'NO aprueba'}

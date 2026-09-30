@@ -93,7 +93,7 @@ def main(path):
         rows.append(dict(
             pair=a['pair'], candle=a['candle'], direction=a['direction'],
             r24=(o or {}).get('r24'), r72=(o or {}).get('r72'),
-            concurrent=a.get('concurrent_pairs'), sweep=a.get('sweep_depth_pct'),
+            concurrent=a.get('concurrent_pairs'), watched=a.get('watched_pairs') or 30, sweep=a.get('sweep_depth_pct'),
             weekend=a.get('weekend_close'), chg24=a.get('change_24h_pct'),
             funding=micro.get('funding_rate_pct'), imbalance=micro.get('book_imbalance'),
             oi_chg=micro.get('oi_change_24h_pct'), ls=micro.get('long_short_ratio'),
@@ -125,6 +125,20 @@ def main(path):
             sub = d[mask.fillna(False)]
             if len(sub):
                 print(summarize(name, sub, 'r72'))
+    episodes_report(df)
+
+
+def episodes_report(df):
+    """Nivel EPISODIO (spec 050): la unidad independiente es el dia/vela de capitulacion amplia, no cada alerta."""
+    hot = df[(df.direction == 'hot') & df.r72.notna() & df.concurrent.notna()].copy()
+    hot['wide'] = (hot.concurrent / hot.watched) >= 0.20
+    ep = hot[hot.wide].groupby('candle').r72.agg(['mean', 'count']).rename(columns={'mean': 'canasta', 'count': 'springs'})
+    print(f"== EPISODIOS DE CAPITULACION AMPLIA (>= 20% de los pares): {len(ep)} episodios maduros")
+    print("  Referencia historica por dia (49 dias, spec 050): media +1.76%, mediana +0.57%, 45% de los dias en rojo, p10 -9.45%, p90 +12.0%")
+    if len(ep):
+        print(f"  Observado: media {ep.canasta.mean():+.2f}% | mediana {ep.canasta.median():+.2f}% | dias en rojo {(ep.canasta < 0).mean()*100:.0f}% | springs por episodio: mediana {int(ep.springs.median())}")
+    print("  Con sd diaria ~7.4 pp: 10 episodios NO alcanzan para juzgar (error estandar ~2.3 pp); ~25 episodios dan una idea gruesa; un monitor")
+    print("  secuencial de degradacion necesita ~100 episodios (~10 anios). Mientras tanto: gobernar el RIESGO, no concluir sobre el edge.")
 
 
 if __name__ == '__main__':

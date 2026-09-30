@@ -1002,3 +1002,16 @@ class TestWideClusterFraction:
     def test_plan_is_honest_about_survivorship(self):
         from analysis.wyckoff_alerts import SPRING_PLAN
         assert 'deslistaron' in SPRING_PLAN and '+0.35%' in SPRING_PLAN
+
+
+class TestHonestWideClusterMessage:
+    def test_wide_cluster_states_the_daily_distribution_not_a_sure_return(self):
+        text = WyckoffAlerter._quality_lines('hot', None, 8, watched=30)
+        assert 'capitulacion amplia' in text
+        assert 'mediana +0.6%' in text and '45% de los dias termina en rojo' in text
+        assert '-9.5% a +12%' in text
+        assert 'VARIOS springs' in text
+
+    def test_narrow_cluster_message_unchanged(self):
+        text = WyckoffAlerter._quality_lines('hot', None, 2, watched=30)
+        assert 'poco extendido' in text and 'mediana' not in text

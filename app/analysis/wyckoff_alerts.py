@@ -471,8 +471,11 @@ class WyckoffAlerter:
             line = f"Pares con evento en esta misma vela: {concurrent} de {total} ({fraction * 100:.0f}%)"
             if direction == 'hot':
                 if fraction >= WIDE_CLUSTER_FRACTION:
-                    line += (" ✅ capitulacion amplia: en el backtest (>= 20% de los pares) media +3.8% y 65% de acierto "
-                             "en 2022-24, +1.5% y 54% en 2025-26 (por trade)")
+                    line += (" ✅ capitulacion amplia (>= 20% de los pares). Historico por DIA (49 dias, canasta con todos "
+                             "los springs, 72h): mediana +0.6%, media +1.8%, el 45% de los dias termina en rojo, rango tipico "
+                             "(p10-p90) de -9.5% a +12%. Es una apuesta de rebote con dias malos frecuentes, no un rendimiento "
+                             "seguro: toma VARIOS springs (canasta), no uno, y dimensiona pensando en perder ~10% de lo "
+                             "asignado en un dia malo (1 de cada 10)")
                 else:
                     line += (" ⚠️ poco extendido (< 20% de los pares): en el backtest rindio mucho menos "
                              "(~+0.5% a +1%, acierto 41-51%)")

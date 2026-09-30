@@ -1,0 +1,77 @@
+# Ronda 2 (opencode / DeepSeek) — Marco y matemática del edge "spring en días de capitulación amplia"
+
+Solo lectura. No leí `.env` ni `config.yml`. Los datos que uso son los medidos en `specs/044-amplitud-capitulacion/resultado_varianza_componentes.txt`; no repito la ronda 1.
+
+## 0) Verificación real de enlaces (abrí arXiv API y Crossref)
+
+| ID | Estado | Qué es de verdad |
+|---|---|---|
+| 1411.5062 | ✔ existe y coincide | Leung & Li, *Optimal Mean Reversion Trading with Transaction Costs and Stop-Loss Exit*, IJTAF 18(3) 2015. Doble parada óptima OU + stop-loss; **fronteras constantes**, no `b*(t)` dependiente del tiempo. |
+| 2003.10502 | ✔ existe y coincide | Lipton & López de Prado, heat potentials, niveles óptimos de profit/stop/horizonte. Es *este* paper (no Leung-Li) el que da la frontera con vencimiento. |
+| 1904.06019 | ✔ existe y coincide | Tibshirani, Foygel Barber, Candès, Ramdas, *Conformal Prediction Under Covariate Shift*. |
+| 2608.03616 | ✔ existe y coincide | Garcia Seuma: λ̂≈0.1–0.2, **88% en 30 min, 63% absorbido fuera de libro**, salto de acoplamiento 1.6–4.4 sd. Todo lo citado está en el abstract. |
+| 2607.27070 | ✔ existe | Garcia Seuma; la "compresión de varianza de taker flow" es el único regularidad poblacional. |
+| 2608.21888 | ✔ existe | Kitron & Wengrowicz; 90% de 183 pares Binance, borde bruto ~1.3 bp vs 5 bp de costo. |
+| **2508.18868** | ✘ **mal atribuido** | Es **Lillo, Mazzarisi & Tsaknaki (2025), *Tackling estimation risk in Kelly investing using options*** (q-fin.MF). **No es Baker & McHale y no trata la fórmula del Kelly muestral.** Baker & McHale (2013) existe por separado (*Decision Analysis*, DOI 10.1287/deca.2013.0271, Crossref ✔), no está en arXiv. Es una conflación de dos fuentes. |
+
+## 1) Respuestas a tus 3 preguntas
+
+**P1 — Certificar absorción solo con OHLCV.** El propio dato de spec 044 lo resuelve: "mínimos con volumen sin reversionar" rinde **+0.02%**; el edge lo da el *cierre de vuelta* (el spring). Es decir, **el spring confirmado YA es el certificado OHLCV de absorción**; no necesitás otro. Si querés un estadístico incremental acotado, usá el "reloj de rango/mecha":
+`A_t = [(close_t−low_t)/(high_t−low_t)] · 1{low_t > L* − 0.25·ATR14} · (1 − min(1, V_t/V_pico))`, con `L*` = mínimo desde la ruptura; absorción si `A_t ≥ 0.5` en `k=2` velas. Es 0 parámetros ajustados, pero **NO debe demorar la entrada**: spec 036 midió que esperar 1–2 h cuesta −0.34/−0.44 pp y que las órdenes límite retrocediendo 0.3–2% tienen peor EV por señal (+1.13–1.23 vs +1.50). Usalo para **tamaño y mensaje**, no para el gatillo.
+
+**P2 — Asimetría V vs deriva lenta.** Modelá dos escalas: `X_t = A e^{−θ_f t} + B e^{−θ_s t} + ε_t`, `θ_f ≫ θ_s`. En discreto es un **AR(2)** (OU-2); estimá `θ_f` con las primeras 2 velas y `θ_s` con 8–72 h. El "segundo piso que cede" es `B < 0`. Regla: entrar solo si `A>0` y `B ≥ −0.2·A`; si `B<0` con IC que excluye 0, es dead-cat → no operar o size×0.3. El test de una sola escala es `H0: B=0` (Wald). El efecto disposición/límites retail entra como hazard de ruptura: `P(nuevo mínimo | +X%)`.
+
+**P3 — Ejecución manual.** Con decay medido ~0.2 pp/h (0.3–0.4 pp por 1–2 h) y diferencial maker/taker de ~0.05–0.08 pp ida y vuelta, **esperar es siempre EV negativo**. Regla: 50% límite agresivo cruzando el ask; 50% límite al mid con **deadline 5–10 min** y luego a mercado. Excepción: si `spread > 0.5·ATR(5min)` (spread estresado), 100% límite con deadline 5 min para no pagar el pico. Nada de esperar al despertar: el 31% de alertas cae 00:00–06:59 Santiago (spec 041) y el aviso debe traer la escalera ya armada.
+
+## 2) Crítica cruzada
+
+**(a) Referencias.** Verificado arriba: 5 de 6 coinciden; **2508.18868 no**. Además, atribuir a Leung-Li una frontera `b*(t)` dependiente del tiempo es impreciso: Leung-Li dan umbrales constantes; el tiempo-variable es Lipton-LdP.
+
+**(b) Errores matemáticos y supuestos no medidos** (corrijo con los datos medidos):
+
+- **CUSUM.** Con sd real **7.36 pp** (no 4.0): `h = σ²/(μ1−μ0)·ln100 = 7.36²/2.23·4.605 = 111.8 pp` (no 0.330). Bajo edge muerto la deriva es `k = 1.115 pp/episodio` ⇒ `ARL1 ≈ h/k = 111.8/1.115 ≈ 100 episodios`. Con ~10.4 episodios/año ⇒ **~9.6 años**. Y aun con su propio `h=0.33`, `0.33/0.01115 = 29.6` episodios, **no 4.2**: su ARL1 además es internamente inconsistente. **Muerta por tiempo.**
+- **θ = 0.038 h⁻¹ y media-vida 18 h "medidos":** son números sembrados, no medidos, y contradicen el resultado del laboratorio (72 h > 24–48 h). Si `t½=18h`, a 48 h ya revirtió 84% y 72 h no debería ganar. Tratar como *desconocido*. La fórmula `θ̂=−(1/Δt)ln(ΣX_lag X_lead/ΣX_lag²)` **no centra en la media**: infla φ y sesga la media-vida.
+- **`b*(t)`**: la fórmula de Leung-Li se escribe, pero el código devuelve `1.5·σ·√half_life·(1−e^{−T/t½})`, una heurística con `target_mult=1.5` arbitrario. Dimensiones de escala de difusión, no del problema de frontera libre. **No implementado.**
+- **Kelly.** `(N−3)/(N−1)=0.9565` **sí está derivado** (E[1/s²]=ν/(ν−2)/σ², ν=N−1). `1/(1+1/(N·SR²))=0.9359` es derivable **solo** con el prior aberrante μ~N(0,μ̂²) y **omite** que la varianza predictiva crece σ̂²/N (con eso daría 1/(1+1/N)=0.979). `(ν−2)/ν=0.5` **no está derivado**: es correcto solo si σ̂² es la *escala* t; si es la varianza muestral, doble descuenta, y para t₄ (curtosis infinita) `f*=μ/σ²` no es el óptimo: hay que resolver `E[r/(1+fr)]=0`.
+- **f* = 14×** sale de σ=4%. Con sd=7.36: `f*_MLE = 0.0223/0.005417 = 4.1×`. **Sobreestima el apalancamiento 3.4×.** Y con el sd del PnL 72 h tradeado (mayor que 7.36) baja a ~2.5–4×.
+- **SE(μ̂)=0.58 pp = 26%:** con σ real, `SE = 7.36/√49 = 1.05 pp = 47%` de μ̂; t≈2.1, no 3.8.
+- **MDE pareados con ρ=0.85 asumido y σ=4 pp:** real, sobre canasta diaria, `σ_Δ = 7.36·√(2(1−ρ))`. Da: ρ=0.5→MDE 2.95 pp; ρ=0.8→1.86; ρ=0.9→1.32; ρ=0.95→0.93. Sus **0.66/0.51 pp son 2–5× optimistas**. Hay que **medir ρ**, no suponerla.
+- **N_total ≈ 450:** real **1,478 springs / 49 días** (mediana 22/día, 147 símbolos). El día está bien estimado (contracción 0.97); el par no (mediana 6 episodios/símbolo).
+- **I_cap:** dice "cero parámetros libres" pero las 3 medias + 3 sds baseline son **6 momentos estimados**; y su gate `I_cap>I*` agrega un umbral. `C_sync` con ventana de **6 velas** y N≈54 activos tiene covarianza rango≤6: `λ1/Σλ` **no es estimable** (Ledoit-Wolf no lo salva). MDE de Spearman ≈0.37 (1 cola).
+- **MDE del efecto-día jerárquico 1.16 pp:** real `2.802·7.36/√49 = 2.94 pp`. El pooling intra-día no reduce el SE del día; con ICC=0.62 casi todo es entre-días.
+
+**(c) Qué adoptaría / descartaría.**
+*Adopto tal cual:* la descomposición jerárquica con componentes de varianza (ahora medida: es el argumento correcto de que el par no es estimable), el universo point-in-time con deslistados, la barrera superior de take-profit con stop fijo y ancho, y el CUSUM/e-process **como gobernador** (propiedad de Lorden).
+*Descarto:* la calibración numérica del CUSUM, `θ=0.038`, el `b*(t)` del código, la cita Baker-McHale/2508.18868, `C_sync(6 velas)`, y los MDE pareados con ρ y σ supuestos. Del mío: descarto B1-CIX como señal (muere por potencia y `C_sync` con T=6<N), y B2 como filtro (sobrevive como medición).
+
+## 3) Diseño final consensuado (solo lo identificable con 49 días, τ=7.3 pp, ICC=0.62)
+
+Modelo mínimo: `r_{i,d} = u_d + ψ·spring_{i,d} + θ·D_{i,d} + e_{i,d}`, con `u_d~N(μ,τ²)`, `e~t_ν`. **Solo `μ` y a lo sumo 1 grado de libertad de índice son contrastables.**
+
+| Construcción | Unidad / n_eff | σ real | MDE real | Veredicto |
+|---|---|---|---|---|
+| Efecto-día μ (canasta vs 0) | día / 49 | 7.36 pp | **2.9 pp** | **VIVA** (t≈2.1); decide signo |
+| Canasta vs BTC/ETH | día / 49 | 7.36 | 2.9 pp | muerta (efecto ~2.0 pp) |
+| CIX/I_cap continuo (Spearman) | día / 49 | rangos | **ρ≥0.37** | **MUERTA por potencia**; queda como principio de diseño |
+| Selección por par (α_i) | par / 147 | τ_par≈0 | — | **MUERTA** (6 episodios/símbolo) |
+| Ponderar por daño vs equi | día pareado / 49 | `7.36√(2(1−ρ))` | 0.93–2.95 pp | **exige medir ρ**; solo forward-test |
+| Salida dinámica vs 72 h fijo | día pareado / 49 | idem | 0.93–2.95 pp | idem; no decidible hoy |
+| Horizonte 24/48 vs 72 h | día pareado / 49 | idem | idem | idem |
+| CUSUM de degradación | episodio / ~100 | 7.36 | ~100 ep ≈ 9.6 años | **MUERTA por tiempo**; gobierno, no señal |
+| Kelly / tope de pérdida | — | — | — | **gobierno de riesgo**, no señal |
+
+Criterio de aprobación congelado: signo de μ consistente IS/OOS, IC95 por *day-block bootstrap* que excluya 0, y ≥15 días por período. **Placebos:** permutación de etiquetas de día (todos los tests diarios); horizonte/tiempo aleatorio para OU; reasignación de `D` dentro del día; y para H3, permutar BTC-relative. Los tests pareados solo se aprueban con **ρ medida** y MDE recalculado; si el efecto esperado < MDE, se reportan como *exploratorios*.
+
+## 4) Matemática honesta para el operador
+
+**(i) Predictiva.** Mezcla calibrada a los cuantiles medidos (p10 −9.45, p50 +0.57, p90 +12.0; 45% negativo): `r = π·N(μ_R, σ_R²) + (1−π)·N(μ_F, σ_F²)`, con π≈0.30, μ_R≈+6%, σ_R≈5%, μ_F≈−1%, σ_F≈7%; o una **skew-t** (Fernández-Steel) con ξ≈0.57, ν≈4, skew positivo (media>mediana). Reportar siempre p10/mediana/p90 y P(r<0).
+
+**(ii) Probabilidad y cuantiles.** `P(ganar) = P(r>0) ≈ 55%`; Wilson 95% con n=49 ⇒ **[41%, 69%]**. Mostrar en el aviso: "mediana +0.6%, pero 45% de los días cierra en rojo; rango típico [−9%, +12%]".
+
+**(iii) Tamaño derivado (no heurístico).** Con la predictiva `r̃` (mixtura/skew-t) y la incertidumbre de μ (`s_μ²=σ²/n_eff`, n_eff≈49), resolver numéricamente `g'(f)=E[r̃/(1+f·r̃)]=0`, y acotar por pérdida diaria: `f ≤ L_max/|q_1%|` con `P(f·r̃ < −L_max) ≤ 1%`; tope duro de 3 posiciones. La forma cerrada `f*≈μ̂/(σ̂²+s_μ²)` es solo el caso gaussiano; **no** usar multiplicadores fijos (0.4476) como si fueran óptimos: son una heurística de un modelo mal parametrizado.
+
+**(iv) Horizonte.** Test formal: por episodio, ajustar `R_e(h)=A_e(1−e^{−θ_e h})` (o la recuperación acumulada) y estimar `h50_e = ln2/θ_e`; con episodios que nunca recuperan, **Kaplan-Meier/AFT con censura**. Contrastar `H0: h50 ≤ 24h` vs `H1: h50 > 24h`; y comparación pareada 72 vs 24/48 h con ρ medida. Esto separa los dos relojes: **88% del flujo forzado cesa en 30 min, pero la resiliencia del precio puede tardar mucho más**. Si `h50 ≫ 0.5 h`, el rebote lo gobierna la reposición de liquidez, no la cascada.
+
+## 5) Límite honesto (una frase)
+
+Con 49 días y τ=7.4 pp solo se identifica el efecto-día (≈2.9 pp): de la mejora total sobre "canasta equi-ponderada 72 h con stop −10%", **quizá un tercio** (el signo y la magnitud gruesa del rebote de beta) es alcanzable hoy; los otros **dos tercios** (selección/horizonte/finos ajustes de <1.5 pp, y sobre todo si el edge decae por crowding) **solo se sabrán con años de datos en vivo** (≈100 episodios ≈ 10 años para un CUSUM con control de falsas alarmas).

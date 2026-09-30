@@ -1,0 +1,27 @@
+dias: 49 | media +1.76% | mediana +0.57% | sd 7.36% | peor -10.10% | mejor 19.49% | % dias negativos 45%
+
+Kelly empirico (todos los dias): f* = 3.45x del capital; crecimiento log por episodio a f*: +3.01%  (a f=0.25: +0.42%, f=0.5: +0.81%, f=1: +1.49%)
+incertidumbre (bootstrap por dia, 4000): f* mediana 3.50 | p10 0.93 | p25 2.16 | p75 4.78 | p90 5.97 | P(f*=0) 5%
+  fraccion robusta (p25 del bootstrap) = 2.16x
+
+VALIDACION: f* con 2022-24 (27 dias) = 4.34x -> crecimiento log en 2025-26 (22 dias): +0.31% por episodio (f*=0.25: +0.29%, f=0.5: +0.54%); media OOS +1.22%
+  (informativo) f* calibrado con 2025-26 = 2.33x
+
+TOPES POR PERDIDA (fraccion del capital asignada a la canasta):
+  perdida aceptada 1% del capital: en un dia p10 (R=-9.4%) -> f <= 0.11x | en el peor dia visto (R=-10.1%) -> f <= 0.10x
+  perdida aceptada 2% del capital: en un dia p10 (R=-9.4%) -> f <= 0.21x | en el peor dia visto (R=-10.1%) -> f <= 0.20x
+  perdida aceptada 3% del capital: en un dia p10 (R=-9.4%) -> f <= 0.32x | en el peor dia visto (R=-10.1%) -> f <= 0.30x
+  perdida aceptada 5% del capital: en un dia p10 (R=-9.4%) -> f <= 0.53x | en el peor dia visto (R=-10.1%) -> f <= 0.50x
+
+MONTE CARLO 100 episodios (~10 anios), 20000 trayectorias, dias remuestreados con reemplazo:
+      f | riqueza final p5  mediana      p95 | P(final<1) | max DD p50    p95 | P(DD>30%)
+   0.10 |             1.06     1.19     1.34 |       0.7% |       3.5%   6.6% |      0.0%
+   0.20 |             1.11     1.41     1.78 |       0.9% |       7.0%  12.8% |      0.0%
+   0.25 |             1.14     1.53     2.06 |       0.9% |       8.7%  15.9% |      0.0%
+   0.30 |             1.16     1.65     2.36 |       1.0% |      10.4%  18.8% |      0.1%
+   0.50 |             1.25     2.25     4.06 |       1.1% |      17.0%  29.8% |      4.8%
+   2.16 |             1.11    13.38   163.12 |       4.3% |      60.2%  83.6% |     99.8%
+   1.00 |             1.37     4.43    14.43 |       1.7% |      32.1%  52.1% |     58.7%
+
+NOTA: cada episodio del Monte Carlo es un dia con la CANASTA COMPLETA (~22 springs); el operador a mano tomara ~3, lo que suma varianza dentro del dia:
+  var(media de 3) = tau^2 + sigma^2/3 = 53.0 + 32.9/3 = 64.0 (sd 8.0 pp) contra var(canasta de ~22) = 54.5 (sd 7.4 pp).

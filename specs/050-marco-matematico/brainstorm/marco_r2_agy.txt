@@ -1,0 +1,155 @@
+# Posición Teórica de `agy` (Gemini): Debate-Brainstorm (Ronda 2 de 2)
+
+Los datos medidos por Claude en [resultado_varianza_componentes.txt](file:///specs/044-amplitud-capitulacion/resultado_varianza_componentes.txt) transforman el debate: el problema no es modelar 1,478 eventos independientes, sino administrar **49 días altamente correlacionados** ($ICC = 0.62$, $\tau = 7.28\text{ pp}$, $\text{sd}_{dia} = 7.36\text{ pp}$). La mediana por día es $+0.57\%$, el **45% de los días pierde**, y el MDE real entre días es $\approx 2.94\text{ pp}$. Cualquier sofisticación matemática que ignore esta estructura es sobreajuste destructivo.
+
+---
+
+## 1. RESPUESTA A LAS 3 PREGUNTAS DE OPENCODE
+
+### P1. Identificabilidad de $\sigma_u$ (día) vs $\sigma_e$ (par), contracción y priors
+Con los datos reales medidos:
+- Varianza entre días $\tau^2 = 53.0$ ($\text{sd} = 7.28\text{ pp}$); varianza dentro del día $\sigma^2 = 32.9$ ($\text{sd} = 5.74\text{ pp}$).
+- Con mediana de $n_d = 22$ springs/día, el factor de contracción Empirical Bayes del día es:
+  $$B_d = \frac{n_d \tau^2}{n_d \tau^2 + \sigma^2} = \frac{22 \cdot 53.0}{22 \cdot 53.0 + 32.9} \approx 0.973 \quad (\text{p10: } 0.95, \; \text{p90: } 0.99)$$
+  **El efecto-día $u_d$ apenas se contrae:** la media muestral del día $\bar{r}_d$ es suficiente. Toda la incertidumbre reside *entre* días.
+- En contraste, los símbolos tienen una mediana de solo 6 episodios en 4.7 años. La contracción del efecto-par $\alpha_i$ colapsa analíticamente hacia cero frente a $\sigma^2 = 32.9$. **El efecto idiosincrático por par NO es identificable.**
+- **Prior y sensibilidad:** Un prior honesto para $\tau$ es $\text{Half-Student-}t(\nu=4, s=7.0\text{ pp})$. Debido a que $B_d \approx 0.97$, la estimación del día es casi insensible al prior, pero cualquier ordenamiento individual de pares colapsa a la media. La consecuencia matemática es ineludible: **se opera la canasta equi-ponderada**, no hay stock-picking identificable.
+
+### P2. Por qué gana 72h si el 88% de la venta forzada termina en 30 min
+Coexisten dos escalas temporales con físicas distintas:
+1. **Escala de microestructura mecánica ($t \le 30\text{ min}$):** Garcia Seuma (2026, [arXiv:2608.03616](https://arxiv.org/abs/2608.03616)) mide el impacto directo del colapso del libro y el backstop. Kitron & Wengrowicz (2026, [arXiv:2608.21888](https://arxiv.org/abs/2608.21888)) prueban que el rebote bruto a 15m es de apenas $\sim 1.3\text{ bp}$, incapaz de cubrir los $5\text{ bp}$ de comisiones.
+2. **Escala de restitución de liquidez y balance de inventario ($t = 24-72\text{ h}$):** (Brunnermeier & Pedersen, 2009; Coval & Stafford, 2007). Tras liquidaciones masivas, los creadores de mercado quedan con inventarios distorsionados y requerimientos de margen exhaustos. La prima lenta es la recompensa por absorber ese inventario mientras el capital especulativo regresa al ecosistema.
+- **Falsación formal de 72h:** Estimar la curva de retorno pareada acumulada $\mathbb{E}[R_d(t)]$ en $t \in \{12, 24, 48, 72\}\text{h}$. Si $\bar{\Delta}_{(72-24)} = R_{72} - R_{24}$ no supera el umbral de significancia pareada o si el ratio de Sharpe decae tras 24h, 72h queda falsado.
+
+### P3. ¿Prima o crowding? ¿Qué mide el CIX?
+- Es **prima de seguro de catástrofe de liquidez**.
+- **Distinción observable:** Con prima viva, el salto en sincronía ($C_{sync}$) viene acompañado de un colapso en el Open Interest (desapalancamiento genuino) y retornos asimétricos hacia la derecha ($\text{skew} > 0$). Con aglomeración (*crowding*), el rebote se anticipa a la confirmación técnica y la cola derecha se extingue (la media diaria colapsa hacia la mediana $\approx 0\%$).
+- **Qué mide el CIX:** Mide estrés contemporáneo cross-sectional, no aglomeración.
+
+---
+
+## 2. CRÍTICA CRUZADA
+
+### a. Verificación empírica de referencias
+Abrí y verifiqué directamente en la web cada una de las citas requeridas:
+1. **`arXiv:2508.18868` — CITACIÓN ESPURIA DETECTADA:** En la ronda 1 de `agy` se citó erróneamente como *"Baker & McHale (2013)"*. Al abrir la URL real, el artículo es de **Fabrizio Lillo, Piero Mazzarisi e Ioanna-Yvonni Tsaknaki (agosto 2025)**, titulado *"Tackling estimation risk in Kelly investing using options"*. Baker & McHale (2013) es un paper de apuestas/retornos desconocidos que no existe en arXiv. Además, Lillo et al. utilizan opciones europeas para robustecer Kelly; **no derivan la multiplicación de factores de R1**. Rectifico el error: la referencia cruzada fue una alucinación atributiva.
+2. **`arXiv:1411.5062` (Leung & Li, 2014):** **VERIFICADO.** *"Optimal Mean Reversion Trading with Transaction Costs and Stop-Loss Exit"*. Deduce formalmente las fronteras de parada óptima sobre OU con costos y stop-loss.
+3. **`arXiv:2003.10502` (Lipton & Lopez de Prado, 2020):** **VERIFICADO.** *"A closed-form solution for optimal mean-reverting trading strategies"*. Solución analítica con potenciales térmicos para niveles óptimos de salida en OU.
+4. **`arXiv:1904.06019` (Tibshirani et al., 2019):** **VERIFICADO.** *"Conformal Prediction Under Covariate Shift"*. Intervalos predictivos conformes bajo variación de covariables.
+5. **`arXiv:2608.03616` (Garcia Seuma, 2026):** **VERIFICADO.** *"Measuring the engine of a liquidation cascade..."*. Documenta $\hat{\lambda} \approx 0.1-0.2$, 88% de ventas en 30 min, 63% absorbido fuera de libro y acoplamiento cross-sectional.
+6. **`arXiv:2608.21888` (Kitron & Wengrowicz, 2026):** **VERIFICADO.** *"Short-horizon mean reversion in cryptocurrency markets..."*. Mide reversión en 183 pares a 15m con edge bruto de 1.3 bp vs 5 bp de costo.
+
+### b. Errores matemáticos y supuestos no medidos corregidos
+1. **ARL1 del CUSUM (Error severo de R1):** En R1 afirmé un $ARL_1 = 4.2$ episodios asumiendo $\sigma = 4.0\%$. Con la desviación real de la canasta $\sigma = 7.36\text{ pp}$ y $k = 1.115\text{ pp}$:
+   $$h = \frac{7.36^2}{2.23} \ln(100) = \frac{54.17}{2.23} \times 4.605 = 111.9\text{ pp}$$
+   Bajo edge muerto ($\mu = 0$), la deriva es $k = 1.115\text{ pp}$ por episodio. El tiempo determinista mínimo sin ruido hasta sonar la alarma es:
+   $$t_{alarma} = \frac{111.9}{1.115} \approx 100.3\text{ episodios}$$
+   A razón de ~10 episodios por año, **el CUSUM tarda 10 años en detectar la muerte del edge**. Presentarlo como alarma operativa rápida fue un error grave.
+2. **$\theta = 0.038\text{ h}^{-1}$ y media-vida 18h:** Fueron valores ilustrativos asumidos sin calibración empírica en los 49 días. OpenCode además extrapoló indebidamente la relajación de 30m del libro de órdenes hacia el horizonte de liquidación de días.
+3. **Factores del Bayesian Kelly (Heurística ad-hoc, no derivación):** Multiplicar $\frac{N-3}{N-1}$, $\frac{1}{1 + 1/(N \cdot SR^2)}$ y $\frac{\nu-2}{\nu}$ fue una combinación heurística de tres literaturas distintas. Con los datos reales ($\sigma = 7.36\text{ pp}$, $\mu = 2.23\%$), el Kelly crudo es $f^* = \frac{0.0223}{0.0736^2} \approx 4.12x$ (no 14x).
+4. **MDE de pruebas pareadas asumiendo $\rho = 0.85$:** Si $\sigma_{dia} = 7.36\text{ pp}$, la desviación de la diferencia pareada es $\sigma_\Delta = \sqrt{2 \sigma^2 (1 - \rho)}$. Si la correlación real entre horizontes fuese $\rho = 0.60$, $\sigma_\Delta = 6.58\text{ pp}$, elevando el MDE a $2.63\text{ pp}$ (no $0.66\text{ pp}$). La correlación debe ser medida, jamás supuesta.
+
+### c. Adopciones y descartes
+- **ADOPTO de OpenCode:**
+  1. Su reformulación de elasticidad de daño (B4) evaluada **estrictamente intra-día** (restando la media diaria $\bar{r}_d$), lo que elimina la varianza entre días $\tau^2 = 53.0$ y otorga potencia real al test.
+  2. El encuadre del monitoreo secuencial como **gobernador pasivo de riesgo de largo plazo** y no como filtro activo de trading.
+- **DESCARTO de OpenCode:**
+  1. **B1 (CIX continuo multivariado):** Con 49 días, 45% de días negativos y medidas pre-cascada incapaces de predecir severidad (Garcia Seuma, 2026), ajustar ponderadores continuos induce sobreajuste inevitable.
+  2. **B2 (Horizonte deducido por Hawkes a nivel micro):** Confunde la absorción mecánica de liquidaciones con la prima macro de inventario.
+
+---
+
+## 3. DISEÑO FINAL: MARCO REDUCIDO E IDENTIFICABLE
+
+Con $N = 49$ días, $\text{sd}_{dia} = 7.36\text{ pp}$, el MDE incondicional es $2.8 \times \frac{7.36}{\sqrt{49}} = 2.94\text{ pp}$. Todo efecto entre días $< 2.9\text{ pp}$ es ruido.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ CAPA 1: RÉGIMEN BINARIO (AMPLITUD >= 20% EN UNIVERSO POINT-IN-TIME)   │
+│ Condición: Amplitud sobre pares elegibles >= 0.20. Gate binario fijo.  │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼────────────────────────────────────┐
+│ CAPA 2: SELECCIÓN DE CANASTA EQUI-PONDERADA (O PONDERADA POR DAÑO)     │
+│ Canasta equi-ponderada de alts en spring (o top tercil por daño Δr)   │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼────────────────────────────────────┐
+│ CAPA 3: SALIDA FIJA / HORIZONTE EMPÍRICO CON STOP POR PAR (-10%)       │
+│ Horizonte (24h vs 72h) calibrado por contraste pareado directo.        │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼────────────────────────────────────┐
+│ CAPA 4: ASIGNACIÓN DE CAPITAL CON TOPE DURO (KELLY MEZCLA EMPÍRICA)    │
+│ Exposición total en canasta <= 30-35% de cuenta (1x sin apalancamiento)│
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Construcciones supervivientes vs muertas:
+
+1. **Gate de Amplitud Binaria ($\ge 20\%$):**
+   - *(a) Fórmula:* $I_d = \mathbf{1}_{\{ \text{springs}_d / K_d \ge 0.20 \}}$.
+   - *(b) Medición:* Conteo sobre universo point-in-time con deslistados ([spec 043](file:///specs/043-sesgo-supervivencia/spec.md)).
+   - *(c) MDE:* $2.94\text{ pp}$. El edge medido es $+2.91\%$ ($t \approx 2.1$).
+   - *(d) Criterio:* Media global $> 0$ ($p < 0.05$).
+   - *(e) Control:* Permutación de etiquetas de días.
+   - *Veredicto:* **SOBREVIVE SOLO COMO REGLA BINARIA CONGELADA.** El índice continuo CIX queda descartado por falta de potencia.
+
+2. **Elasticidad de Daño Intra-Día (B4 de OpenCode reformulado):**
+   - *(a) Fórmula:* $r_{i,d} - \bar{r}_d = \beta (D_{i,d} - \bar{D}_d) + \epsilon_{i,d}$, con $D_{i,d} = \text{ret48h}_{i} - \text{ret48h}_{BTC}$.
+   - *(b) Medición:* Retornos relativos estandarizados demeaned por día.
+   - *(c) MDE:* Varianza residual $\sigma^2 = 32.9$ ($\text{sd} = 5.74\text{ pp}$). Con 1,478 observaciones agrupadas en 49 bloques, el MDE para $\beta$ equivale a $\approx 0.9\text{ pp}$.
+   - *(d) Criterio:* $\hat{\beta} > 0$ con $p < 0.05$ bajo cluster bootstrap por día en IS y OOS.
+   - *(e) Control:* Barajar $D_{i,d}$ dentro del mismo día.
+   - *Veredicto:* **SOBREVIVE PARA DECIDIR SI PONDERAR POR DAÑO O EQUI-PONDERAR.**
+
+3. **Curva Pareada de Retorno por Horizonte:**
+   - *(a) Fórmula:* $\Delta_d = R_d(72\text{h}) - R_d(24\text{h})$.
+   - *(b) Medición:* Claude medirá directamente $s_\Delta = \text{sd}(\Delta_d)$ sobre los 49 episodios.
+   - *(c) MDE:* $\text{MDE} = 2.8 \times \frac{s_\Delta}{\sqrt{49}}$. Si $s_\Delta = 3.5\text{ pp}$, $\text{MDE} = 1.4\text{ pp}$.
+   - *(d) Criterio:* Retener 72h solo si $\bar{\Delta} \ge \text{MDE}$ con IC95 bootstrap $> 0$.
+   - *(e) Control:* Permutar el vector temporal de retornos intra-episodio.
+   - *Veredicto:* **SOBREVIVE COMO TEST CONFIRMATORIO.**
+
+4. **CUSUM / Monitoreo Secuencial:**
+   - *Veredicto:* **MUERTO POR POTENCIA COMO SEÑAL OPERATIVA.** Requiere 10 años para emitir alarma. Permanece exclusivamente como **principio de gobierno pasivo de riesgo**.
+
+---
+
+## 4. MATEMÁTICA ÚTIL PARA EL OPERADOR
+
+La realidad empírica es contundente: **la mediana es $+0.57\%$, y el 45% de los días pierde**. El edge se sustenta en una cola derecha asimétrica ($p90 = +12.00\%$).
+
+### (i) Distribución predictiva honesta
+Modelamos la media diaria mediante una mezcla empírica discretizada por cuantiles reales:
+$$\hat{q}_{0.10} = -9.45\%, \quad \hat{q}_{0.25} \approx -3.8\%, \quad \hat{q}_{0.50} = +0.57\%, \quad \hat{q}_{0.75} \approx +6.2\%, \quad \hat{q}_{0.90} = +12.00\%$$
+
+### (ii) Formato de alerta para el operador
+Queda prohibido anunciar: *"Edge esperado: +2.9%"*. El aviso en Telegram debe estructurarse así:
+```
+🚨 ALERTA: CAPITULACIÓN AMPLIA (CANASTA POINT-IN-TIME)
+• Condición: >= 20% pares en spring.
+• Probabilidad de ganar: 55% | Probabilidad de perder: 45%
+• Mediana esperada: +0.57% (perfil asimétrico)
+• Rango típico (p10 a p90): [-9.45% , +12.00%]
+• Riesgo: 1 de cada 10 episodios sufre caídas de ~9.5%.
+• Ejecución: Stop -10% individual por par. Horizonte fijo pre-registrado.
+```
+
+### (iii) Tamaño de posición derivado bajo mezcla empírica
+Buscamos la fracción $f^*$ que maximiza la tasa esperada de crecimiento logarítmico sobre la muestra empírica:
+$$\max_f g(f) = \frac{1}{49} \sum_{d=1}^{49} \ln(1 + f R_d) \quad \text{sujeto a} \quad f \cdot |R_{p10}| \le \text{Drawdown Máximo Aceptable}$$
+Fijando una tolerancia de riesgo de pérdida por episodio del $3.0\%$ de la cuenta ante un día malo ($R_{p10} = -9.45\%$):
+$$f_{seguro} = \frac{0.030}{0.0945} \approx 0.317$$
+**Regla unívoca:** Asignar como máximo **30% a 35% del capital total de la cuenta a la canasta completa** (dividido equi-ponderadamente entre las posiciones, $\sim 10-12\%$ por par, sin apalancamiento).
+
+### (iv) Test formal para resolver el horizonte (24h vs 72h)
+Claude medirá en el repositorio la serie de retornos acumulados de la canasta $R_d(t)$ para $t \in [4\text{h}, \dots, 72\text{h}]$. Se computa la diferencia pareada $\Delta_d = R_d(72\text{h}) - R_d(24\text{h})$ y su desviación estándar muestral $s_\Delta$.
+- Si $\bar{\Delta} > 0$ y su intervalo de confianza al 95% por bootstrap de 10,000 bloques excluye el 0, se mantiene 72h como captura de la prima de inventario lenta.
+- Si el IC95 cruza el cero o la ganancia es menor al incremento marginal de riesgo ($\bar{\Delta} < 1.0\text{ pp}$), **se recorta inmediatamente el horizonte a 24h**, reduciendo drásticamente el tiempo de exposición a la volatilidad residual.
+
+---
+
+## 5. LÍMITE HONESTO
+
+> **"Con 49 días históricos podemos fijar con certeza el régimen binario macro, descartar el stock-picking individual y dimensionar el capital para no quebrar ante un 45% de días perdedores; pero verificar si el horizonte óptimo es 24h o 72h, validar un índice continuo o detectar la degradación del edge requerirá inevitablemente entre 5 y 10 años de datos en vivo."**
