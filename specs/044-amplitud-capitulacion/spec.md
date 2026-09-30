@@ -54,3 +54,29 @@ Variable: fracción de los pares elegibles con spring en la misma vela (mismo si
    El bot registra también `watched_pairs` para validarlo hacia adelante.
 2. El plan del mensaje incluye la advertencia de supervivencia (spec 043).
 3. Pendiente de la sesión de apoyo mutuo (ver 045): OI y ratio long/short históricos; entrada secundaria; funding agregado; Gemini como disyuntor de riesgo.
+
+## Resultado 3: ¿qué instrumento en los días de capitulación amplia? (`instrumento.py`, exploratorio)
+Idea de opencode (E2) y agy: en esos días operar BTC/ETH o una canasta en vez de cada par. 47 episodios no solapados de capitulación
+amplia (>= 20% de los pares con spring; 27 en 2022-24 y 20 en 2025-26), mismas reglas (72 h, stop -10%, 0.1% comisión):
+
+| Instrumento | 2022-24 | 2025-26 | unido |
+|---|---|---|---|
+| **Canasta de los springs de esa vela** | **+2.41%** (59%) | **+1.97%** (55%) | **+2.23%** (57%), IC95 por día [+0.11, +4.28] |
+| BTC solo | +0.02% | +0.53% | +0.24% (62%, 15% stops); exceso vs cualquier vela +0.20 pp [-1.44, +1.78] |
+| ETH solo | -0.05% | +0.83% | +0.33% (53%, 19% stops); exceso +0.39 pp [-1.70, +2.59] |
+| BTC+ETH | -0.01% | +0.68% | +0.28% |
+
+**BTC y ETH no aportan nada en esos días (media ~0, igual que una vela cualquiera): el edge es de REBOTE DE LAS ALTS, no de "el mercado
+rebota".** Descarta "operar BTC/canasta grande cuando el mercado capitula". La canasta de springs de las alts sí rinde +2.23% con signo igual
+en ambos períodos (27 y 20 episodios: cada período por separado tiene un IC que incluye 0 por el n chico; unido excluye 0).
+Regla práctica: en un día de capitulación amplia conviene tomar VARIOS springs (no elegir uno ni irse a BTC): el resultado es de la canasta.
+
+## Cierre de la sesión de apoyo mutuo (ronda 2 en `brainstorm/`)
+- agy y opencode coincidieron en las críticas útiles: contar días/bloques independientes (no eventos), universo point-in-time con deslistados,
+  umbrales congelados con 2022-24, y medir contribución INCREMENTAL sobre la amplitud. Ambos concluyen que el cuello de botella son los pocos días
+  independientes de capitulación (decenas), no las señales.
+- Probado en esta sesión (todo con criterio fijado antes o declarado exploratorio): amplitud de mínimos (no), amplitud de springs (graduada, modesta),
+  OI/long-short históricos (no, spec 045), instrumento BTC/ETH (no), funding agregado y horarios (no, specs 037/041), sesgo de supervivencia (spec 043).
+- Sin probar aún (candidatos ordenados): (1) entrada secundaria / retest tipo Fase C con stop ceñido; (2) desliste anunciado por Binance como catalizador
+  (los 177 deslistados permiten backtestear, falta la fecha de anuncio); (3) Gemini como "disyuntor" ante hack/insolvencia/desliste inminente del token;
+  (4) funding agregado como confirmación incremental de la amplitud; (5) resumen matutino en hora de Santiago.

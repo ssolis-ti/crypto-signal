@@ -1,0 +1,84 @@
+### 1. Crítica cruzada de las 5 ideas mejor rankeadas de opencode
+
+*   **Idea 1 — Amplitud de capitulación directa:**
+    *Fallo más probable:* **Sesgo de supervivencia del universo y solapamiento temporal.** Calcular la amplitud sobre "49 perps actuales" introduce look-ahead de supervivencia. Al incorporar los 177 deslistados de [`specs/043-sesgo-supervivencia/spec.md`](file:///C:/Users/Proyecto%20Z/Desktop/github/agy/crypto-signal/specs/043-sesgo-supervivencia/spec.md), el retorno OOS (2025-26) del rebote colapsa de $+1.64\%$ a $+0.35\%$ (y en pares con volumen $<3\text{M}$ es $-1.21\%$). Además, un crash dura varias velas de 4h consecutivas; medir forward 72h vela a vela genera autocorrelación severa y un $n$ aparente inflado $4\times$.
+*   **Idea 2 — Instrumento en día de clúster (BTC vs canasta vs rezagado):**
+    *Fallo más probable:* **Sesgo de selección mortal en "el rezagado" y potencia estadística nula.** En un crash, el activo "más caído" suele tener un fallo terminal idiosincrático (estilo LUNA, FTT o tokens deslistados con tasa de stop de $33.5\%$). Asimismo, con solo $\sim 35\text{--}40$ días de clúster en 4.5 años, fragmentar la muestra para comparar 4 alternativas destruye la potencia estadística: el intervalo de confianza bootstrap incluirá el cero bajo cualquier corrección rigurosa.
+*   **Idea 3 — OI flush histórico (liquidation cascade):**
+    *Fallo más probable:* **Umbrales elegidos mirando los datos (p-hacking) y riesgo de desapalancamiento continuo.** Exigir caída de precio $\ge X\%$, contracción de OI $\le -Y\%$ y z-scores a 30d introduce 4 hiperparámetros continuos. En tendencias bajistas estructurales (como mayo-junio 2022), el OI se desploma y el precio continúa cayendo días enteros; sin confirmación de absorción de volumen, el "flush" es solo el inicio de la sangría.
+*   **Idea 4 — Régimen de funding agregado:**
+    *Fallo más probable:* **Solapamiento masivo de ventanas (pseudoreplicación).** El funding de 8h tiene altísima persistencia serial. En estrés sistémico, permanece en el decil inferior durante 6 a 12 cortes sucesivos (2 a 4 días). Contar cada corte con forward 72h solapa ventanas en un $89\%$. Reduciéndolo a episodios macro independientes, el $n$ real cae a $<25$ eventos en 4 años.
+*   **Idea 5 — % del universo bajo su MA200:**
+    *Fallo más probable:* **Mecanismo débil y timing nulo para operaciones de 72h.** En cripto, el $85\text{--}90\%$ del mercado puede residir bajo la MA200 durante 9 meses continuos mientras el precio cae otro $50\%$. Mide tendencia secular, no agotamiento de liquidez forzada. Además, exige 200 días de historial previo, excluyendo tokens nuevos o introduciendo sesgo de supervivencia en los activos evaluados.
+
+---
+
+### 2. Lo que adoptaría de opencode
+
+1.  **Ingesta de `sum_open_interest` desde `data.binance.vision`:** En mi R1 asumí que el OI histórico solo cubría 30 días vía API. La verificación de que existen métricas a 5 min desde 2021 desbloquea el backtest riguroso de desapalancamiento tanto en IS (2022-24) como en OOS (2025-26) sin depender únicamente de validación hacia adelante.
+2.  **Desacoplar la señal del activo (BTC/Canasta en días de pánico):** El hallazgo de [`specs/043-sesgo-supervivencia/spec.md`](file:///C:/Users/Proyecto%20Z/Desktop/github/agy/crypto-signal/specs/043-sesgo-supervivencia/spec.md) probó que las altcoins ilíquidas destruyen el edge en OOS. Operar BTC o una cesta de gran liquidez cuando el mercado capitula elimina el riesgo de cola de microcaps y resuelve la restricción operativa del usuario (pocas posiciones).
+3.  **Métrica de energía de pánico ($\sum \text{retorno} \times \text{volumen}$):** Cuantifica la masa crítica del estrés microestructural combinando amplitud y agresión de volumen, superando el conteo puramente binario.
+
+---
+
+### 3. Consenso: Ranking de los 6 experimentos viables
+
+| # | Experimento | Costo | Justificación / Mecanismo |
+|---|---|---|---|
+| **1** | **Amplitud de capitulación en universo point-in-time líquido** | 3 h | Señal de régimen primaria; captura el edge sistémico probado. |
+| **2** | **Instrumento óptimo en clúster (BTC vs Cesta Líquida vs Alt)** | 2 h | Reduce varianza y riesgo de desliste; simplifica la ejecución manual. |
+| **3** | **OI Flush histórico agregado a 4h (Binance Metrics)** | 6 h | Limpieza de apalancamiento forzado verificable desde 2021. |
+| **4** | **Secondary Test Wyckoff (Retest Fase C en 4h)** | 4 h | Permite entradas con stop ceñido ($\sim -4.5\%$) reduciendo el drawdown. |
+| **5** | **Régimen de funding agregado cross-sectional** | 2 h | Confirma abarrotamiento de cortos sistémicos a nivel macro. |
+| **6** | **Asimetría bajista event-driven (Deslistes de Binance)** | 4 h | Hecho institucional determinista con caída documentada en spec 043. |
+
+*Costo total estimado:* 21 horas.
+
+#### Protocolos pre-registrados para los 3 primeros experimentos
+
+#### Protocolo Exp 1: Amplitud de Capitulación de Mercado
+*   **Definición:** Fracción de pares en la vela 4h que cumplen: `low <= rolling_min(low, 20)` y `volume >= 2.0 * sma(volume, 20)`. Gatillo si $\text{Breadth} \ge 0.25$.
+*   **Universo:** Point-in-time rolling de los 30 perpetuos con mayor volumen en USD en las 24h previas (con filtro estricto $\ge 20\text{M}$ USD/día derivado de [`specs/043-sesgo-supervivencia/spec.md`](file:///C:/Users/Proyecto%20Z/Desktop/github/agy/crypto-signal/specs/043-sesgo-supervivencia/spec.md)), incluyendo los 177 deslistados mientras cotizaron.
+*   **Umbrales:** Congelados en IS (2022-24): $\theta = 0.25$, horizonte 72h.
+*   **Unidad de análisis:** Bloques no solapados de 72h (blackout obligatorio de 18 velas tras disparo). Retorno de la canasta equiponderada del universo líquido (neto de $0.10\%$ fee).
+*   **Corrección:** Familia macro ($M=3$, Holm-Bonferroni, $\alpha = 0.0167$).
+*   **Efecto mínimo:** Retorno medio $\ge +1.5\%$.
+*   **Aprobación:** Retorno medio $\ge +1.5\%$ en IS y $\ge +1.2\%$ en OOS; IC98.3% bootstrap por bloques $> 0$; $\ge 25$ bloques independientes.
+*   **Rechazo:** Retorno medio OOS $< +0.8\%$, IC incluye 0 o tasa de stop ($-10\%$) $> 25\%$.
+*   **Control placebo:** Permutación de Monte Carlo (1,000 iteraciones barajando marcas temporales aleatorias); exigir $p < 0.01$.
+
+#### Protocolo Exp 2: Instrumento de Ejecución en Capitulación
+*   **Definición:** Condicionado al disparo de Exp 1, comparar retornos a 72h entre: (A) BTC, (B) ETH, (C) Cesta Top-5 volumen, (D) Par con Spring Wyckoff más profundo.
+*   **Universo:** Mismo universo point-in-time líquido de Exp 1.
+*   **Umbrales:** Congelados de Exp 1; sin parámetros libres adicionales.
+*   **Unidad de análisis:** Mismos bloques emparejados de 72h.
+*   **Corrección:** Comparaciones múltiples pareadas ($K=4$, Tukey HSD / Bonferroni).
+*   **Efecto mínimo:** La opción seleccionada debe superar el Sharpe del par individual y reducir la tasa de stop en $\ge 5$ pp.
+*   **Aprobación:** Retorno medio neto $\ge +1.2\%$ en IS y OOS; tasa de stop $\le 15\%$ (frente al $>25\%$ de alts).
+*   **Rechazo:** Si la alternativa líquida rinde $< +0.8\%$ en OOS o empeora el Sharpe del Spring base.
+*   **Control placebo:** Medir las mismas diferencias en 50 bloques de 72h tomados al azar en días de régimen normal.
+
+#### Protocolo Exp 3: OI Flush Agregado en 4h
+*   **Definición:** $\Delta OI_{\text{agg}, t} = \frac{\sum \text{OI}_{i,t} - \sum \text{OI}_{i,t-1}}{\sum \text{OI}_{i,t-1}}$ a 4h (Binance Metrics). Gatillo: vela 4h con caída media del mercado $\le -2.5\%$ y $\Delta OI_{\text{agg}} \le \text{Percentil 5 del IS}$.
+*   **Universo:** Todos los contratos USDT disponibles en Binance Vision (incluyendo deslistados), excluyendo pares con volumen 24h $< 20\text{M}$ USD.
+*   **Umbrales:** Percentil 5 de $\Delta OI_{\text{agg}}$ calibrado en IS (2022-24) y congelado para OOS (2025-26).
+*   **Unidad de análisis:** Bloques no solapados de 72h; retorno de la canasta líquida.
+*   **Corrección:** Familia macro ($M=3$, $\alpha = 0.0167$).
+*   **Efecto mínimo:** Retorno forward 72h $\ge +1.8\%$ neto.
+*   **Aprobación:** Retorno positivo en IS y OOS; IC98.3% bootstrap $> 0$; $\ge 20$ eventos independientes.
+*   **Rechazo:** Retorno medio OOS $< +0.9\%$ o diferencia no significativa respecto a caídas sin caída de OI.
+*   **Control placebo:** Evaluar caídas idénticas de precio con *aumento* de OI (Percentil $\ge 90$); debe confirmar un rendimiento inferior o nulo.
+
+---
+
+### 4. Lo que ninguna de las dos listas cubrió
+
+1.  **Capitulación de Cuentas Minoristas (`count_long_short_ratio` a 5 min):** Disponible desde 2021. Las liquidaciones concluyen cuando el minorista capitula. Si el precio cae pero el ratio de cuentas largas colapsa a mínimos históricos (el retail cierra en pérdidas), la absorción es institucional y el rebote es inminente; si el ratio sube, el minorista está promediando a la baja y el cuchillo sigue cayendo.
+2.  **Veto Estructural de Contraparte (MCP Twitter/Reddit + Gemini):** [`specs/043-sesgo-supervivencia/spec.md`](file:///C:/Users/Proyecto%20Z/Desktop/github/agy/crypto-signal/specs/043-sesgo-supervivencia/spec.md) probó que los desastres provienen de tokens en espiral de muerte (LUNA, FTT). Gemini no debe generar señales técnicas continuas, sino actuar como un **disyuntor binario**: ante una alerta técnica, clasifica el flujo social para descartar hack, insolvencia del emisor o desliste inminente.
+3.  **Aceleración de Liquidaciones (Derivada Segunda del OI a 5 min):** En caídas masivas, las liquidaciones ocurren en ráfagas de 15 a 30 minutos. Monitorear la desaceleración del vaciado de OI ($\frac{d^2 OI}{dt^2} > 0$) a nivel de 5 min identifica el final exacto de la cascada forzada, evitando comprar antes de tiempo.
+
+---
+
+### 5. Frase final
+
+> El mayor riesgo es que la ventaja del rebote sistémico se haya extinguido estructuralmente en 2025-2026 debido a la fragmentación de liquidez y al dominio del spot pasivo (ETFs) sobre los derivados; lo detectaremos temprano si el retorno promedio OOS a 72h de la canasta líquida en eventos de capitulación permanece indistinguible de cero tras las primeras 10 alertas independientes registradas.

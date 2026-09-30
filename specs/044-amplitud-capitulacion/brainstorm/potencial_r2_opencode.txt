@@ -1,0 +1,72 @@
+[0m
+> plan · deepseek-flash
+[0m→ [0mRead r1_agy.txt 
+[0m→ [0mRead README.md 
+[0m→ [0mRead r1_opencode.txt 
+[0m→ [0mRead docs/ESTADO_Y_PENDIENTES.md 
+> plan · deepseek-flash
+[0m→ [0mRead specs/043-sesgo-supervivencia/spec.md 
+> plan · deepseek-flash
+Las dos rondas convergen en el diagnóstico (el edge es de régimen de mercado, no de par) y en tres ideas; el aporte útil de la ronda 2 es romper con el test de "¿esto mejora el spring?" y pasar a medir **contribución incremental** sobre la amplitud, con universo point-in-time. Eso es lo que falta en ambas listas.
+
+## 1) Crítica cruzada (top 5 de agy)
+
+**#1 Amplitud de capitulación (≥25% = 8/30 con vol ≥2x).** Fallo más probable: **sesgo de supervivencia del universo + umbral a ojo**. Calcula breadth 2022 con los 30 pares que siguen listados en 2026 y con N fijo; los pares que capitularon y murieron (justo el evento) quedan fuera, y el "retorno de mercado" es la canasta de esos mismos supervivientes → look-ahead doble. Secundario: el forward 72h se solapa y "≥35 eventos" no son 35 días independientes.
+
+**#2 Secondary Test.** Fallo: **subconjunto correlacionado/underpower + stop ceñido**. Ventana 2–8 velas, tolerancia 1.5%, vol 0.85x es grid; el test sale del mismo pool de springs y cae en los mismos pocos días de pánico, así que el bootstrap pareado tiene n real chico. Peor: con stop −4.5% y lo que muestra 043 (el stop es siempre el peor caso: 33.5% de stops en deslistados 2025-26), el stop rate sube y el OOS lo mata.
+
+**#3 SOS+LPS.** Fallo: **familia ya rechazada + grid amplio**. Es un breakout con volumen, y 024 (ma_crossover/sqzmom) no confirmó nada; 025 mostró que solo 4h tiene poder. Vol 2.5x + cierre en tercio superior + retroceso ±1% en 1–5 velas + cierre verde son 4–5 umbrales elegidos mirando datos; con n grande cualquier combinación parece funcionar.
+
+**#4 Líderes de absorción.** Fallo: **comparación múltiple + supervivencia**. Elegir la alt que "se niega a caer" entre 29 es tomar el máximo de 29 ∨ infla el efecto; y los líderes que quedan en el pool son justo los que no murieron. No define OOS ni umbral congelado (retorno BTC ≤ −2.5%, alt > +0.2% son a ojo), y el "control vs promedio de alts" no corrige esa selección.
+
+**#5 Funding extremo cross-sectional.** Fallo: **solapamiento con capitulación + umbral a ojo**. No hay split IS/OOS (solo "coherente año por año"); −0.03% y ≥30% de pares son arbitrarios. Lo grave: los días de funding muy negativo SON los días de clúster, así que sin medir **contribución incremental sobre #1** "aprueba" por identidad, no por información nueva (y 037/041 ya probaron funding).
+
+## 2) Lo que adoptaría de agy
+
+1. **Alerta sistémica única** ("Capitulación Colectiva Nivel n") con tabla de los 3 mejores rechazos (mecha/taker), en vez de N avisos repetidos. Ataca el 31% de avisos nocturnos de 041 y convierte mi #1 en producto operable.
+2. **Operacionalización precisa del Secondary Test** (volumen seco ≤0.85x + cierre verde + stop bajo el mínimo): mi #6 era vaga; esto es una regla ejecutable que adopto con umbrales congelados.
+3. **El desliste como catalizador determinista** (su #11) enganchado a los 177 perpetuos de 043: se puede *backtestear*, no solo esperar forward. Mi #16 (contenido de noticias) era más caro e inverificable.
+
+## 3) Consenso: 6 experimentos en orden
+
+1. **Amplitud de capitulación PIT con deslistados** — 6–8 h.
+2. **Instrumento del clúster: BTC vs canasta vs rezagado** — 2 h.
+3. **OI flush + funding agregado como confirmación incremental** — 8–10 h (ingesta) + 2 h.
+4. **Secondary Test con stop ceñido** — 4 h.
+5. **Event-driven de deslistes (anuncio Binance + 177 símbolos)** — 4–6 h.
+6. **SOS+LPS** — 5 h (último: prior débil y familia 024 ya rechazada).
+
+**Protocolo E1 — Amplitud**
+- *Definición:* velas 4h; `breadth_down` = fracción con ret4h ≤ −4%; `breadth_low` = fracción con low ≤ min(low,20) y rel_vol ≥ 2x; `energy` = Σ max(0,−ret4h)·min(rel_vol,5). Alarma si `breadth_low` ≥ P. Long canasta 72h, stop −10%.
+- *Universo PIT:* en cada fecha, los 30 perpetuos USDT-M de mayor volumen medio USD de 30 días previos, **incluyendo los 177 deslistados con su fecha de listado/desliste**; rebalanceo mensual; volumen ≥3M USD/24h.
+- *Umbrales congelados:* P = percentil 93 de `breadth_low` en IS 2022-24, fijado una vez; OOS 2025-26 intacto.
+- *Unidad:* bloques de 72h **no solapados** (primer día del clúster, se saltean 3 días). n = bloques, nunca eventos.
+- *Corrección:* Holm α=0.05 sobre la familia {breadth_down, breadth_low, energy, funding, OI, instrumento} = 6.
+- *Efecto mínimo:* ≥ +1.0% neto por bloque (baseline días al azar ≈ 0) y acierto ≥55%.
+- *Aprueba:* signo + en IS y OOS, IC99 bootstrap por bloque > 0 tras Holm, ≥25 bloques por período y supera el baseline aleatorio. *Rechaza:* IC incluye 0, o solo aparece en OOS (patrón 021/027), o <25 bloques.
+- *Anticolisión:* permutación de fechas 1000x preservando régimen de volatilidad (mismos nº de días y vol media); canasta PIT, jamás los 30 de hoy.
+
+**Protocolo E2 — Instrumento**
+- *Definición:* en las velas de E1, forward 72h de (a) BTC, (b) canasta PIT equiponderada, (c) canasta del clúster, (d) el par más caído; y "top-3 del clúster" (operable a mano).
+- *Universo/umbrales:* hereda E1; no se agregan parámetros.
+- *Unidad:* mismo bloque no solapado. *Corrección:* Holm dentro de 5 instrumentos × 2 períodos.
+- *Efecto mínimo:* diff de medias ≥ +0.5 pp. *Aprueba:* diff > 0 en IS y OOS con IC95 por bloque excluyendo 0. *Rechaza:* si el instrumento ganador cambia entre IS y OOS = ruido.
+- *Anticolisión:* exigir que el ganador sea operable (BTC/ETH/top-3); si solo gana la canasta de 30, no sirve para el operador.
+
+**Protocolo E3 — Posicionamiento (OI + funding)**
+- *Definición:* metrics 5min de `data.binance.vision` → 4h (deduplicar filas; last/max según campo). ΔOI_24h z-score vs 30d; señal = caída de precio y ΔOI ≤ z(P). Funding = media cross-sectional PIT, decil inferior.
+- *Universo:* PIT, incluidos deslistados (ya verificado que hay OI). *Congelar* en IS los umbrales de ΔOI y decil.
+- *Unidad/corrección:* bloques 72h no solapados; Holm junto a E1/E2.
+- *Efecto mínimo:* **incremental** sobre E1 (breadth como control) ≥ +0.5 pp, no el efecto bruto.
+- *Aprueba:* incremental ≥0.5 pp en IS y OOS con IC por bloque > 0. *Rechaza:* si la correlación OI-breadth > 0.7 → colineal, no aporta.
+- *Anticolisión:* permutar el OI dentro de los días de capitulación (rompe vínculo OI-precio conservando el clúster): si el efecto se mantiene, el OI no hacía nada.
+
+## 4) Ángulos que ninguna lista cubrió
+
+1. **Velocidad intra-vela de liquidación** con los metrics de 5 min: OI cae >3% en 30 min con precio plano = absorción; sirve para *timing* de entrada, no para régimen. Nadie usó la resolución de 5 min.
+2. **La tasa de deslistes como gate de régimen.** Convertir los 177 deslistes + caída de liquidez (<20M) en un índice trimestral de estrés: si sube, suben los stops del edge. Es usar la corrección de 043 como señal forward-testeable, no solo como control.
+3. **Relative-value market-neutral del clúster:** long canasta / short BTC, o long rezagado vs líder, para separar el alfa de capitulación del beta de mercado. Baja el riesgo direccional del operador y ninguna lista lo miró.
+
+## 5) Frase final
+
+El mayor riesgo es que el cuello de botella no sean las señales sino los **días independientes de capitulación** (~pocas decenas de bloques en 4.5 años), así que seguiremos "aprobando" ruido con n inflado; se detecta temprano contando, **antes** de implementar, cuántos bloques no solapados tendría el test y exigiendo que toda mejora supere Holm *y* al baseline de amplitud en OOS.

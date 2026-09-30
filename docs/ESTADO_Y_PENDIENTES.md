@@ -33,8 +33,14 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
   reloj del exchange para decidir velas cerradas, ciclo alineado al reloj de pared, logs con hora UTC, un solo worker con Wyckoff activo.
   El 31% de los avisos llega entre 00:00 y 07:00 hora de Santiago.
 
+- **042-045** Robustez con checklist externa (5/5 años positivos, resiste estrés de ejecución); **sesgo de supervivencia medido** con 177 deslistados (el edge fuera de muestra baja de +1.64% a +0.35%);
+  sesión de apoyo mutuo con opencode y agy: la amplitud de mínimos no funciona, la de springs confirmados sí es graduada (>= 20% de los pares: +3.8% en 2022-24, +1.5% en 2025-26),
+  OI/long-short históricos no aprueban, y en días de capitulación amplia BTC/ETH no aportan (la canasta de alts sí: +2.23%). El aviso ya muestra fracción de pares, liquidez y hora UTC/Santiago.
+
 ## Pendiente
 
+0. Candidatos sin probar de la sesión de apoyo mutuo (ver specs/044): entrada secundaria (retest), desliste anunciado como catalizador, Gemini como disyuntor de riesgo,
+   funding agregado como confirmación incremental, resumen matutino en hora de Santiago.
 1. Esperar >= 50 alertas reales maduras (>= 72 h) y correr `specs/040-validacion-hacia-adelante/validate_forward.py`
    (hoy hay 6, todas Upthrust). Decidir ahí si la barrida >= 1% u otro dato pasa de "mostrar" a "filtrar".
 2. **Sesgo de supervivencia (spec 042, hueco principal):** repetir el backtest incluyendo perpetuos deslistados de Binance; hoy los 29 pares
