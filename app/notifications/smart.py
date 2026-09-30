@@ -234,113 +234,61 @@ class SmartNotificationManager:
     
     def build_summary_message(self) -> str:
         """
-        Construye el mensaje de resumen consolidado.
-        
-        Returns:
-            Mensaje HTML listo para Telegram
-        
-        Format:
-            🔔 <b>5 señales detectadas</b>
-            
-            🔴 BTC Bajista (-2.5%)
-            
-            ⭐⭐ A  SUI/USDT   RSI 25  🟢
-            ⭐   B  ENA/USDT   RSI 22  🟢
-            ...
+        Resumen consolidado de RSI/MACD, en lenguaje sencillo y SIN prometer fuerza que no existe.
+
+        Estos indicadores no predijeron el precio en las pruebas del proyecto (specs/007 y 011: el puntaje 0-100 no
+        separa buenas de malas senales), asi que el mensaje es informativo y remite a la senal principal del bot
+        (la alerta de OPORTUNIDAD DE COMPRA). Ya no se muestran estrellas ni letras de calidad.
         """
         if not self.summaries:
             return ""
-        
-        # Ordenar por score descendente
+
         sorted_signals = sorted(self.summaries, key=lambda x: x.score, reverse=True)
-        
-        # ─────────────────────────────────────────
-        # [C] Aplicar límite de señales C
-        # ─────────────────────────────────────────
         max_c = self.config.get('max_c_signals', 5)
         high_quality = [s for s in sorted_signals if s.quality in ['A+', 'A', 'B']]
         low_quality = [s for s in sorted_signals if s.quality == 'C']
-        
-        # Limitar señales C
-        limited_c = low_quality[:max_c]
-        truncated_count = len(low_quality) - len(limited_c)
-        
-        # Combinar (alta calidad primero, luego C limitadas)
-        display_signals = high_quality + limited_c
-        
-        lines = []
-        
-        # ─────────────────────────────────────────
-        # [B] Semántica de Trader Senior
-        # ─────────────────────────────────────────
-        total_count = len(sorted_signals)
-        has_actionable = len(high_quality) > 0
-        all_c = len(high_quality) == 0
-        
-        # Header contextual
-        if all_c and self.btc_context.get('trend') == 'bearish':
-            # Modo Market Scan - no hay señales operables
-            lines.append("📊 <b>MARKET SCAN</b> | Sin señales operables")
-            lines.append(f"<i>{total_count} condiciones detectadas</i>")
-        elif has_actionable:
-            lines.append(f"🔔 <b>{len(high_quality)} SEÑALES OPERABLES</b>")
-            if low_quality:
-                lines.append(f"<i>+ {len(low_quality)} en watchlist</i>")
-        else:
-            lines.append(f"📋 <b>{total_count} condiciones de mercado</b>")
-        
-        lines.append("")
-        
-        # Contexto BTC (más profesional)
+        display_signals = high_quality + low_quality[:max_c]
+        hidden = len(sorted_signals) - len(display_signals)
+
+        lines = [
+            "📋 <b>Radar RSI/MACD</b> (solo informativo)",
+            "Marca monedas \"muy vendidas\" o \"muy compradas\", pero <b>en nuestras pruebas estos indicadores no "
+            "predijeron el precio</b>. No entres solo por esto: la señal principal del bot es «OPORTUNIDAD DE COMPRA».",
+            "",
+        ]
+
         if self.btc_context:
             trend = self.btc_context.get('trend', 'neutral')
             change = self.btc_context.get('change', 0)
-            sentiment = self.btc_context.get('sentiment', 'neutral')
-            
             if trend == 'bullish':
-                lines.append(f"🟢 BTC +{change:.1f}% | Risk On")
+                lines.append(f"BTC hoy: 🟢 sube {abs(change):.1f}% en 24 h")
             elif trend == 'bearish':
-                lines.append(f"🔴 BTC {change:.1f}% | Risk Off")
+                lines.append(f"BTC hoy: 🔴 baja {abs(change):.1f}% en 24 h (mercado a la baja)")
             else:
-                lines.append("⚪ BTC Lateral | Neutral")
+                lines.append("BTC hoy: ⚪ lateral")
             lines.append("")
-        
-        # Lista de señales/condiciones
-        for sig in display_signals:
-            # Estrellas de calidad
-            if sig.quality == 'A+':
-                prefix = "⭐⭐⭐"
-            elif sig.quality == 'A':
-                prefix = "⭐⭐ "
-            elif sig.quality == 'B':
-                prefix = "⭐  "
-            else:
-                prefix = "   "
-            
-            # Emoji de dirección
-            direction = "🟢" if sig.signal_type == 'hot' else "🔴"
-            
-            # RSI formateado
-            rsi_str = f"RSI {sig.rsi_value:.0f}" if sig.rsi_value > 0 else sig.indicator[:8]
-            
-            # Línea formateada
-            line = f"{prefix} {sig.quality}  {sig.symbol:12} {rsi_str:8} {direction}"
-            lines.append(line)
-        
-        # Indicar si se truncaron
-        if truncated_count > 0:
-            lines.append(f"<i>... +{truncated_count} más en watchlist</i>")
-        
-        lines.append("")
-        
-        # Footer contextual
-        if has_actionable:
-            lines.append("<i>📎 Detalles + charts para A+/A</i>")
-        elif all_c:
-            lines.append("<i>⏸️ Sin acción recomendada - Modo observación</i>")
-        
-        return "\n".join(lines)
-    
+
+        def describe(sig):
+            if sig.rsi_value > 0:
+                level = "muy bajo" if sig.rsi_value <= 35 else ("muy alto" if sig.rsi_value >= 65 else "")
+                return f"RSI {sig.rsi_value:.0f}" + (f" ({level})" if level else "")
+            return sig.indicator[:14]
+
+        ups = [s for s in display_signals if s.signal_type == 'hot']
+        downs = [s for s in display_signals if s.signal_type != 'hot']
+        if ups:
+            lines.append("🟢 <b>Alcistas</b> (muy vendidas: podrían rebotar, sin garantía)")
+            lines += [f"• {s.symbol} — {describe(s)}" for s in ups]
+            lines.append("")
+        if downs:
+            lines.append("🔴 <b>Bajistas</b> (muy compradas: podrían corregir, sin garantía)")
+            lines += [f"• {s.symbol} — {describe(s)}" for s in downs]
+            lines.append("")
+        if hidden > 0:
+            lines.append(f"<i>… y {hidden} más que no se muestran</i>")
+
+        return "\n".join(lines).rstrip()
+
     def finalize_cycle(self, send_func, send_chart_func) -> Dict[str, int]:
         """
         Finaliza el ciclo y envía notificaciones.

@@ -21,11 +21,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
 import pandas as pd
-import pytz
 import structlog
 
 from analyzers.utils import IndicatorUtils
 from analyzers.indicators.wyckoff import WyckoffPrimitives
+from analysis.alert_text import (AlertItem, build_group_buy, build_info_bearish, build_radar, build_single_buy)
 from analysis.market_microstructure import MarketMicrostructure
 from analysis.twitter_sentiment import TwitterSentimentAnalyzer
 
@@ -33,57 +33,20 @@ DEFAULT_RECORD_PATH = 'agent_state/rumor_radar.jsonl'
 DEFAULT_RADAR_MIN_RATIO = 2.0
 RADAR_MAX_FAILURES = 3
 SEND_MAX_FAILURES = 12  # ciclos de 5 min: ~1h reintentando si Telegram no responde
-SHALLOW_SWEEP_PCT = 1.0
-# Spec 044: el efecto de "varios springs a la vez" se mide como FRACCION de los pares vigilados (el numero absoluto
-# depende del tamano del universo). >= 20% = capitulacion amplia. DEFAULT_WATCHED se usa si no se conoce el universo.
-WIDE_CLUSTER_FRACTION = 0.20
+# DEFAULT_WATCHED: universo supuesto si no se conoce (la fraccion de pares con spring se mide contra el universo vigilado;
+# el umbral de "capitulacion amplia" (20%) vive en analysis/alert_text.py).
 DEFAULT_WATCHED = 30
-STALE_ALERT_SECONDS = 2 * 3600
 CANDLE_SECONDS = 4 * 3600
 # Springs confirmados mientras el bot estuvo apagado: se avisan hasta 3 velas (12h) despues. Medido en el
 # laboratorio (specs/039): cada 4h de demora cuesta ~0.5 pp; a 12h el promedio sigue positivo pero el acierto
 # baja a ~47-52%. Mas viejo que eso ya no se avisa.
 MAX_LATE_CANDLES = 3
-# Spec 043 (sesgo de supervivencia): con perpetuos deslistados el edge se debilita en monedas poco liquidas.
-LOW_LIQUIDITY_USD = 20_000_000
-WEEKDAYS_ES = ('lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom')
 
 VALIDATED_CANDLE_PERIOD = '4h'
 LOOKBACK = 20
 CONFIRM_WINDOW = 3
 EXTREME_VOLUME_THRESHOLD = 2.5
 MAX_DEDUP_SIGNATURES = 500
-
-# Numeros del backtest en Freqtrade (specs/032-freqtrade-lab-wyckoff/), auditados contra los
-# trades crudos (QA de resultados, 2026-09-29): Binance futuros, 29 pares, comisiones y funding
-# reales, IS 2022-2024 / OOS 2025-2026, sin sesgo de lookahead. Cada cifra dice de QUE formato
-# sale: "todas las senales" (sin tope de posiciones) NO es lo mismo que "maximo 3 posiciones".
-# OJO: el tope de 3 posiciones es el de la config de PRUEBA del laboratorio Freqtrade, no el
-# capital ni el tamano de posicion del operador de crypto-signal (bot solo de alertas; opera a mano).
-SPRING_PLAN = (
-    "📈 <b>Plan: long, mantener ~3 dias (72h), stop -10% en precio (mark)</b>\n"
-    "Tomando TODAS las señales a 1x (con comisiones y funding): acierto 56-58%, "
-    "ganancia media +1.5% a +1.8% por trade (monedas grandes que siguen listadas).\n"
-    "⚠️ Incluyendo monedas que despues se deslistaron, en 2025-26 baja a ~+0.35% (acierto 45%): "
-    "el edge vive en las monedas grandes y liquidas.\n"
-    "⚠️ Si solo podes tener 3 posiciones abiertas a la vez rinde menos: ~+1% medio y 50-56% "
-    "de acierto, porque cuando saltan varias señales juntas quedan afuera las mejores. "
-    "Caida maxima vista del capital 19-27% (en una mala racha puede ser mayor); "
-    "44-50% de los trades pierde y hubo rachas de 6 a 10 perdidas seguidas.\n"
-    "⚠️ Con 3x la caida maxima del capital llego a 46%: no es prudente.\n"
-    "⚠️ Operar de 1-2h NO funciona: 44-49% de acierto y pierde con comisiones\n\n"
-    "🕐 <b>Ejecucion</b> (medido en ~1.270 springs con velas de 1 minuto):\n"
-    "• Entrar en los primeros ~15 min da lo mismo que a la apertura; esperar 1-2 h cuesta ~0.3-0.4%.\n"
-    "• Orden limite o esperar confirmacion no mejora: te perdes los que despegan.\n"
-    "• No muevas el stop a break-even ni cortes por retrocesos chicos: 3 de cada 10 trades "
-    "retroceden 0.5% en 15 min y se recuperan; con break-even el acierto cae de ~58% a ~13%."
-)
-UPTHRUST_PLAN = (
-    "⚠️ <b>Short con edge debil</b>\n"
-    "Acierta la caida 57-61% de las veces, pero en 2022-24 los rebotes (squeezes) se comieron "
-    "la ganancia; en 2025-26 fue positivo (+0.6% por trade a 72h).\n"
-    "Si lo operas: tamaño chico y stop ajustado."
-)
 
 
 class WyckoffAlerter:
@@ -144,39 +107,44 @@ class WyckoffAlerter:
     def check_and_alert(self, exchange: str, market_pair: str, candle_period: str,
                          historical_data) -> None:
         """
-        Revisa un par/periodo especifico. No hace nada si el feature esta deshabilitado,
+        Revisa un par/periodo especifico y avisa. No hace nada si el feature esta deshabilitado,
         el periodo no es el validado (4h), o no hay suficiente historia. Cualquier error
         de deteccion se loguea y se ignora -- nunca debe interrumpir el ciclo de analisis
         (Principio: degradar seguro, nunca romper el pipeline).
         """
+        self._deliver(self._collect_pair(exchange, market_pair, candle_period, historical_data))
+
+    def _collect_pair(self, exchange: str, market_pair: str, candle_period: str, historical_data) -> list:
+        """Detecta los avisos pendientes de un par (sin enviarlos todavia)."""
         if not self.enabled or candle_period != VALIDATED_CANDLE_PERIOD:
-            return
+            return []
         self._current_exchange = exchange
-
         if not historical_data or len(historical_data) < self._min_history():
-            return
-
+            return []
         try:
-            self._check_and_alert_unsafe(exchange, market_pair, historical_data)
+            return self._collect(exchange, market_pair, historical_data)
         except Exception as e:
             self.logger.error(f"[WYCKOFF] Error checking {market_pair} on {exchange}: {e}")
+            return []
 
     def check_cycle(self, exchange: str, pairs_data: Dict[str, list]) -> None:
         """
         Revisa todos los pares de un exchange en un ciclo. Primero cuenta cuantos pares tienen
-        evento en la MISMA vela: el edge viene de capitulaciones de todo el mercado (backtest:
-        springs aislados sin ventaja clara; 5+ pares a la vez, +2.5% medio), y ese dato solo se
-        conoce mirando todos los pares antes de avisar.
+        evento en la MISMA vela: el edge viene de capitulaciones de todo el mercado (springs aislados
+        casi sin ventaja; >= 20% de los pares a la vez, mucho mejor), y ese dato solo se conoce mirando
+        todos los pares antes de avisar. Los avisos de una misma vela salen juntos en UN mensaje.
         """
         if not self.enabled:
             return
         self._concurrent = self._count_concurrent(exchange, pairs_data)
         self._watched = len(pairs_data)
+        pending = []
         for market_pair, historical_data in pairs_data.items():
             try:
-                self.check_and_alert(exchange, market_pair, VALIDATED_CANDLE_PERIOD, historical_data)
+                pending += self._collect_pair(exchange, market_pair, VALIDATED_CANDLE_PERIOD, historical_data)
             except Exception as e:  # un par que falla nunca debe impedir revisar los demas
                 self.logger.error(f"[WYCKOFF] Exception checking pair {market_pair} on {exchange}: {e}")
+        self._deliver(pending)
 
     def _count_concurrent(self, exchange: str, pairs_data: Dict[str, list]) -> Dict[tuple, int]:
         counts: Dict[tuple, int] = {}
@@ -265,7 +233,7 @@ class WyckoffAlerter:
                 depth = abs(level - (lows[i0] if direction == 'hot' else highs[i0])) / level * 100
         return depth
 
-    def _check_and_alert_unsafe(self, exchange: str, market_pair: str, historical_data) -> None:
+    def _collect(self, exchange: str, market_pair: str, historical_data) -> list:
         df = IndicatorUtils().convert_to_dataframe(historical_data)
         events = self._recent_events(df)
 
@@ -273,31 +241,87 @@ class WyckoffAlerter:
         if self.rumor_radar_enabled and not any(event[2] == last_timestamp for event, _ in events):
             self._check_rumor_radar(exchange, market_pair, df, last_timestamp)
 
+        pending = []
         for (direction, break_relative_volume, timestamp), sub in events:
             signature = f"{exchange}:{market_pair}:{direction}:{timestamp.isoformat()}"
             if signature in self._alerted_signatures:
                 continue
-
             try:
                 sweep_depth = self._sweep_depth(sub, direction)
             except Exception as e:
                 self.logger.error(f"[WYCKOFF] No se pudo medir la barrida de {market_pair}: {e}")
                 sweep_depth = None
-            concurrent = self._concurrent.get((exchange, direction, timestamp.isoformat()))
+            pending.append({
+                'signature': signature, 'exchange': exchange, 'pair': market_pair, 'direction': direction,
+                'break_rv': float(break_relative_volume), 'timestamp': timestamp, 'sweep_depth': sweep_depth,
+                'concurrent': self._concurrent.get((exchange, direction, timestamp.isoformat())),
+                'change_24h': self._change_24h(sub), 'dvol24h': self._dollar_volume_24h(sub),
+                'price': float(sub['close'].iloc[-1]),
+            })
+        return pending
 
-            delivered = self._send_alert(exchange, market_pair, direction, break_relative_volume, timestamp,
-                                         change_24h=self._change_24h(sub), sweep_depth=sweep_depth,
-                                         concurrent=concurrent, dvol24h=self._dollar_volume_24h(sub))
-            if delivered is False:
-                # Telegram no respondio: NO se da por enviada, se reintenta en el ciclo siguiente.
-                failures = self._send_failures.get(signature, 0) + 1
-                self._send_failures[signature] = failures
+    def _deliver(self, pending: list) -> None:
+        """Agrupa los avisos por vela y direccion, y manda UN mensaje por grupo."""
+        groups: Dict[tuple, list] = {}
+        for item in pending:
+            groups.setdefault((item['direction'], item['timestamp']), []).append(item)
+        for (direction, timestamp), group in groups.items():
+            try:
+                self._deliver_group(direction, timestamp, group)
+            except Exception as e:
+                self.logger.error(f"[WYCKOFF] No se pudo enviar el aviso de {[g['pair'] for g in group]}: {e}")
+
+    def _deliver_group(self, direction: str, timestamp, group: list) -> None:
+        watched = self._watched or DEFAULT_WATCHED
+        items = [AlertItem(pair=g['pair'], direction=direction, price=g['price'], volume_x=g['break_rv'],
+                           candle_open=timestamp, concurrent=g['concurrent'], watched=watched,
+                           dvol24h=g['dvol24h'], change_24h=g['change_24h']) for g in group]
+        elapsed = self._elapsed_hours(timestamp)
+        twitter_result = None
+        if direction == 'hot' and len(group) == 1:
+            ticker = group[0]['pair'].split('/')[0]
+            twitter_result = self.twitter_sentiment.analyze(ticker, direction)
+            items[0].twitter_section = TwitterSentimentAnalyzer.format_section(twitter_result)
+        if direction == 'hot':
+            text = (build_single_buy(items[0], self.timezone_str, elapsed) if len(items) == 1
+                    else build_group_buy(items, self.timezone_str, elapsed))
+        else:
+            text = build_info_bearish(items, self.timezone_str, elapsed)
+
+        if self.notifier.send_direct_text(text) is False:
+            # Telegram no respondio: NO se da por enviado, se reintenta en el ciclo siguiente.
+            for g in group:
+                failures = self._send_failures.get(g['signature'], 0) + 1
+                self._send_failures[g['signature']] = failures
                 if failures < SEND_MAX_FAILURES:
-                    self.logger.error(f"[WYCKOFF] Alerta de {market_pair} sin entregar (intento {failures}); se reintenta")
-                    continue
-                self.logger.error(f"[WYCKOFF] Alerta de {market_pair} descartada tras {failures} intentos fallidos")
-            self._send_failures.pop(signature, None)
-            self._remember(signature)
+                    self.logger.error(f"[WYCKOFF] Aviso de {g['pair']} sin entregar (intento {failures}); se reintenta")
+                else:
+                    self.logger.error(f"[WYCKOFF] Aviso de {g['pair']} descartado tras {failures} intentos fallidos")
+                    self._remember(g['signature'])
+                    self._send_failures.pop(g['signature'], None)
+            return
+
+        for g in group:
+            self._send_failures.pop(g['signature'], None)
+            self._remember(g['signature'])
+            self.logger.info(f"[WYCKOFF] Alert sent: {g['pair']} {direction} (break_relative_volume={g['break_rv']:.2f}x, "
+                             f"grupo de {len(group)})")
+            self._record({
+                'type': 'wyckoff', 'direction': direction, 'exchange': g['exchange'], 'pair': g['pair'],
+                'candle': timestamp.isoformat() if timestamp is not None else None,
+                'relative_volume': round(g['break_rv'], 2),
+                'sweep_depth_pct': None if g['sweep_depth'] is None else round(float(g['sweep_depth']), 3),
+                'concurrent_pairs': g['concurrent'],
+                'watched_pairs': self._watched,
+                'weekend_close': self._is_weekend_close(timestamp),
+                'dvol24h_usd': None if g['dvol24h'] is None else round(g['dvol24h'], 0),
+                'change_24h_pct': None if g['change_24h'] is None else round(float(g['change_24h']), 2),
+                'mentions_now': (twitter_result or {}).get('current'),
+                'mentions_7d_ago': (twitter_result or {}).get('baseline'),
+                'ratio': (twitter_result or {}).get('ratio'),
+                'sentiment': (twitter_result or {}).get('sentiment_extreme'),
+                'micro': self._safe_microstructure(g['exchange'], g['pair']),
+            })
 
     def _check_rumor_radar(self, exchange: str, market_pair: str, df, timestamp) -> None:
         """
@@ -350,19 +374,9 @@ class WyckoffAlerter:
     def _send_radar_alert(self, exchange: str, market_pair: str, rel_vol: float,
                           candle_change: float, twitter_result,
                           change_24h: Optional[float] = None, timestamp=None) -> None:
-        color = "verde" if candle_change >= 0 else "roja"
-        change_line = f" | 24h: {change_24h:+.1f}%" if change_24h is not None else ""
-        message = (
-            f"🛰️ <b>RADAR VOLUMEN + RUMOR</b> (sin dirección)\n"
-            f"{self._stale_notice(timestamp)}"
-            f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
-            f"{self._candle_label(timestamp)}"
-            f"Volumen: {rel_vol:.1f}x el promedio | vela {color} {candle_change:+.1f}%\n\n"
-            f"{TwitterSentimentAnalyzer.format_section(twitter_result)}\n\n"
-            f"⚠️ <i>Señal NO validada (specs/033): no es el edge Wyckoff. "
-            f"Aviso para mirar el gráfico, no una entrada automática.</i>"
-        )
-        self.notifier.send_direct_text(message)
+        text = build_radar(market_pair, rel_vol, candle_change, timestamp, self.timezone_str,
+                           self._elapsed_hours(timestamp), TwitterSentimentAnalyzer.format_section(twitter_result))
+        self.notifier.send_direct_text(text)
         self.logger.info(f"[RADAR] Alert sent: {market_pair} (rel_vol={rel_vol:.2f}x)")
 
     def _record(self, event: dict) -> None:
@@ -406,43 +420,11 @@ class WyckoffAlerter:
         value = float((recent['volume'].astype(float) * recent['close'].astype(float)).sum())
         return value if value == value else None  # descarta NaN
 
-    @staticmethod
-    def _liquidity_notice(dvol24h: Optional[float]) -> str:
-        if dvol24h is None or dvol24h >= LOW_LIQUIDITY_USD:
-            return ""
-        return (f"⚠️ <b>Liquidez baja</b>: {dvol24h / 1e6:.1f}M USD en 24h (menos de 20M). Con perpetuos deslistados el "
-                f"backtest rindio menos en estas monedas (~+0.5% por trade y 26% de stops).\n")
-
-    def _candle_label(self, timestamp) -> str:
-        """Linea con el cierre de la vela en UTC y en la hora del operador (con dia de la semana)."""
+    def _elapsed_hours(self, timestamp) -> Optional[float]:
+        """Horas desde el cierre de la vela (con el reloj del exchange si se pudo medir); None si no hay marca de tiempo."""
         if timestamp is None:
-            return ""
-        try:
-            close_utc = pd.Timestamp(timestamp)
-            if close_utc.tzinfo is None:
-                close_utc = close_utc.tz_localize('UTC')
-            close_utc = close_utc + pd.Timedelta(seconds=CANDLE_SECONDS)
-            text = f"{WEEKDAYS_ES[close_utc.dayofweek]} {close_utc:%H:%M} UTC"
-            if self.timezone_str != 'UTC':
-                local = close_utc.tz_convert(pytz.timezone(self.timezone_str))
-                city = self.timezone_str.split('/')[-1].replace('_', ' ')
-                text += f" = {WEEKDAYS_ES[local.dayofweek]} {local:%H:%M} {city}"
-            return f"🕐 Cierre de la vela: {text}\n"
-        except Exception as e:
-            self.logger.error(f"[WYCKOFF] No se pudo armar la hora del cierre: {e}")
-            return ""
-
-    def _stale_notice(self, timestamp) -> str:
-        """Aviso si la vela cerro hace mas de 2h (p. ej. la PC estuvo apagada): el precio ya pudo correr."""
-        if timestamp is None:
-            return ""
-        elapsed = (self._now_utc() - (timestamp + pd.Timedelta(seconds=CANDLE_SECONDS))).total_seconds()
-        if elapsed <= STALE_ALERT_SECONDS:
-            return ""
-        return (f"⏱️ <b>ALERTA RETARDADA</b>: la vela cerró hace {elapsed / 3600:.1f} h (el bot estuvo sin "
-                f"revisar); revisá si el precio ya se movió.\n"
-                f"Medido: cada 4 h de demora cuesta ~0.5 pp; a 12 h el acierto baja a ~47-52% "
-                f"(ganancia media ~+0.4% a +0.9%).\n")
+            return None
+        return (self._now_utc() - (pd.Timestamp(timestamp) + pd.Timedelta(seconds=CANDLE_SECONDS))).total_seconds() / 3600
 
     @staticmethod
     def _is_weekend_close(timestamp) -> bool:
@@ -450,100 +432,6 @@ class WyckoffAlerter:
         if timestamp is None:
             return False
         return (timestamp + pd.Timedelta(seconds=CANDLE_SECONDS)).dayofweek >= 5
-
-    @staticmethod
-    def _quality_lines(direction: str, sweep_depth: Optional[float], concurrent: Optional[int],
-                       weekend: bool = False, watched: Optional[int] = None) -> str:
-        """
-        Contexto de la senal. Son HIPOTESIS del backtest (auditoria de resultados, 2026-09-29),
-        aun sin confirmar en vivo: se muestran, no filtran ninguna alerta (Principio III). Las
-        cifras historicas solo existen para el spring; el upthrust muestra el dato sin cifras.
-        """
-        lines = []
-        if sweep_depth is not None:
-            line = f"Barrida bajo el nivel: {sweep_depth:.1f}%"
-            if direction == 'hot' and sweep_depth < SHALLOW_SWEEP_PCT:
-                line += " ⚠️ superficial: en el backtest las de menos de 1% no rindieron (media -0.1%)"
-            lines.append(line)
-        if concurrent is not None:
-            total = watched or DEFAULT_WATCHED
-            fraction = concurrent / total if total else 0.0
-            line = f"Pares con evento en esta misma vela: {concurrent} de {total} ({fraction * 100:.0f}%)"
-            if direction == 'hot':
-                if fraction >= WIDE_CLUSTER_FRACTION:
-                    line += (" ✅ capitulacion amplia (>= 20% de los pares). Historico por DIA (49 dias, canasta con todos "
-                             "los springs, 72h): mediana +0.6%, media +1.8%, el 45% de los dias termina en rojo, rango tipico "
-                             "(p10-p90) de -9.5% a +12%. Es una apuesta de rebote con dias malos frecuentes, no un rendimiento "
-                             "seguro: toma VARIOS springs (canasta), no uno, y dimensiona pensando en perder ~10% de lo "
-                             "asignado en un dia malo (1 de cada 10)")
-                else:
-                    line += (" ⚠️ poco extendido (< 20% de los pares): en el backtest rindio mucho menos "
-                             "(~+0.5% a +1%, acierto 41-51%)")
-            lines.append(line)
-        if weekend and direction == 'hot':
-            lines.append("Cierre en fin de semana ⚠️ en el backtest los springs de sab/dom rindieron "
-                         "-0.5% de media (solo 38 fines de semana, muestra chica)")
-        if not lines:
-            return ""
-        return "\n".join(lines) + "\n<i>Hipotesis del backtest, aun sin confirmar en vivo.</i>\n"
-
-    def _send_alert(self, exchange: str, market_pair: str, direction: str,
-                     break_relative_volume: float, timestamp=None,
-                     change_24h: Optional[float] = None, sweep_depth: Optional[float] = None,
-                     concurrent: Optional[int] = None, dvol24h: Optional[float] = None) -> bool:
-        if direction == 'hot':
-            headline = "🟢 <b>ALCISTA — posible subida</b>"
-            label = "Wyckoff Spring: rompio el soporte y volvio a entrar (trampa bajista)"
-        else:
-            headline = "🔴 <b>BAJISTA — posible caida</b>"
-            label = "Wyckoff Upthrust: rompio la resistencia y volvio a caer (trampa alcista)"
-
-        plan = SPRING_PLAN if direction == 'hot' else UPTHRUST_PLAN
-        change_line = f" | 24h: {change_24h:+.1f}%" if change_24h is not None else ""
-        message = (
-            f"{headline}\n"
-            f"{self._stale_notice(timestamp)}"
-            f"<b>{market_pair}</b> | {exchange} | 4h{change_line}\n"
-            f"{self._candle_label(timestamp)}"
-            f"{self._liquidity_notice(dvol24h)}"
-            f"{label}\n"
-            f"Volumen en la ruptura: {break_relative_volume:.1f}x el promedio\n"
-            f"{self._quality_lines(direction, sweep_depth, concurrent, self._is_weekend_close(timestamp), self._watched)}\n"
-            f"{plan}\n\n"
-            f"<i>Backtest Freqtrade 2022-2026 (specs/032-freqtrade-lab-wyckoff/). "
-            f"No es asesoria financiera.</i>"
-        )
-
-        ticker = market_pair.split('/')[0]
-        twitter_result = self.twitter_sentiment.analyze(ticker, direction)
-        twitter_section = TwitterSentimentAnalyzer.format_section(twitter_result)
-        if twitter_section:
-            message = f"{message}\n\n{twitter_section}"
-
-        if self.notifier.send_direct_text(message) is False:
-            return False
-        self.logger.info(
-            f"[WYCKOFF] Alert sent: {market_pair} {direction} "
-            f"(break_relative_volume={break_relative_volume:.2f}x)"
-        )
-        micro = self._safe_microstructure(exchange, market_pair)
-        self._record({
-            'type': 'wyckoff', 'direction': direction, 'exchange': exchange, 'pair': market_pair,
-            'candle': timestamp.isoformat() if timestamp is not None else None,
-            'relative_volume': round(float(break_relative_volume), 2),
-            'sweep_depth_pct': None if sweep_depth is None else round(float(sweep_depth), 3),
-            'concurrent_pairs': concurrent,
-            'watched_pairs': self._watched,
-            'weekend_close': self._is_weekend_close(timestamp),
-            'dvol24h_usd': None if dvol24h is None else round(dvol24h, 0),
-            'change_24h_pct': None if change_24h is None else round(float(change_24h), 2),
-            'mentions_now': (twitter_result or {}).get('current'),
-            'mentions_7d_ago': (twitter_result or {}).get('baseline'),
-            'ratio': (twitter_result or {}).get('ratio'),
-            'sentiment': (twitter_result or {}).get('sentiment_extreme'),
-            'micro': micro,
-        })
-        return True
 
     def _safe_microstructure(self, exchange: str, market_pair: str) -> Optional[dict]:
         """Foto de funding/OI/libro para validar hacia adelante; jamas afecta la alerta ya enviada."""

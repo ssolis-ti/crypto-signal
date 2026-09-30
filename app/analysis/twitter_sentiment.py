@@ -193,7 +193,7 @@ class TwitterSentimentAnalyzer:
         """Seccion de Twitter para el mensaje de Telegram, o '' si no hay resultado."""
         if result is None:
             return ''
-        lines = ["🐦 <b>Twitter</b> (informativo, sin validar estadísticamente)"]
+        lines = ["🐦 <b>Qué se dice en Twitter</b> (solo referencia, no está comprobado que sirva)"]
 
         current, baseline, ratio = result.get('current'), result.get('baseline'), result.get('ratio')
         # Los numeros pueden faltar o llegar con un tipo inesperado (salida de un LLM):

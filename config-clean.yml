@@ -166,38 +166,16 @@ notifiers:
       #   rsi_slope, macd_acceleration, vwap_distance, momentum_divergence
       # ─────────────────────────────────────────
       template: |
-        {% if status == 'hot' %}🟢 <b>COMPRA</b>{% else %}🔴 <b>VENTA</b>{% endif %} {% if quality == 'A+' %}⭐⭐⭐{% elif quality == 'A' %}⭐⭐{% elif quality == 'B' %}⭐{% endif %}
-        
-        📊 <b>{{market}}</b> | {{analysis.config.candle_period}}
-        🎯 {{hot_cold_label|default('Señal detectada')}}
-        
-        {% if btc_trend == 'bullish' %}🟢 BTC Alcista (+{{btc_change_24h|round(2)}}%){% elif btc_trend == 'bearish' %}🔴 BTC Bajista ({{btc_change_24h|round(2)}}%){% else %}⚪ BTC Neutral{% endif %}
-        
-        {% if quality == 'A+' %}⚡ <b>A+</b> Señal muy fuerte ({{score|int}}/100){% elif quality == 'A' %}✅ <b>A</b> Señal sólida ({{score|int}}/100){% elif quality == 'B' %}⚠️ <b>B</b> Confirmar ({{score|int}}/100){% else %}❌ <b>C</b> Precaución ({{score|int}}/100){% endif %}
-        
-        {% if context_note %}💡 {{context_note}}{% endif %}
-        
-        ━━━━━━━━━━━━━━━━━━━━
-        <code>
-        [INFO]
-        📅 {{creation_date}}
-        💹 {{exchange}} | {{market}}
-        📈 {{indicator}} #{{indicator_number}}
-        🎚️ {{values}}
-        📊 {{prices}}
-        
-        [CONTEXT]
-        🎯 Quality: {{quality}} | Score: {{score|round(1)}}
-        📉 BTC: {{btc_trend}} ({{btc_change_24h|round(2)}}%)
-        💪 ALT/BTC: {{relative_strength|round(3)}}
-        🌡️ Sentiment: {{market_sentiment}}
-        
-        [THRESHOLDS]
-        🔥 Hot: {{analysis.config.hot|default('N/A')}}
-        ❄️ Cold: {{analysis.config.cold|default('N/A')}}
-        📏 Period: {{analysis.config.period_count|default('N/A')}}
-        </code>
+        {% if status == 'hot' %}🟢 <b>Aviso informativo RSI/MACD: posible rebote</b>{% else %}🔴 <b>Aviso informativo RSI/MACD: posible corrección</b>{% endif %}
 
+        📊 <b>{{market}}</b> ({{analysis.config.candle_period}})
+        {{hot_cold_label|default('Señal detectada')}}
+
+        {% if btc_trend == 'bullish' %}BTC hoy: 🟢 sube {{ (btc_change_24h|default(0))|abs|round(1) }}% en 24 h{% elif btc_trend == 'bearish' %}BTC hoy: 🔴 baja {{ (btc_change_24h|default(0))|abs|round(1) }}% en 24 h{% else %}BTC hoy: ⚪ lateral{% endif %}
+
+        ⚠️ <b>Ojo:</b> en nuestras pruebas, los avisos de RSI/MACD <b>no predijeron el precio</b>. No compres ni vendas solo por esto. La señal principal del bot es «OPORTUNIDAD DE COMPRA».
+
+        🕐 {{creation_date}}
 # ═══════════════════════════════════════════
 # INDICADORES (4H)
 # ═══════════════════════════════════════════
@@ -209,8 +187,8 @@ indicators:
       signal: [rsi]
       hot: 30
       cold: 70
-      hot_label: "🟢 RSI pullback zona sobreventa"
-      cold_label: "� RSI agotamiento zona sobrecompra"
+      hot_label: "🟢 RSI bajo: la moneda está muy vendida (podría rebotar)"
+      cold_label: "🔴 RSI alto: la moneda está muy comprada (podría corregir)"
       indicator_label: "RSI 4h"
       mute_cold: false
       candle_period: 4h
@@ -221,8 +199,8 @@ indicators:
       alert_enabled: true
       alert_frequency: once
       signal: [macd, signal]
-      hot_label: "🟢 MACD cruce ALCISTA"
-      cold_label: "🔴 MACD cruce BAJISTA"
+      hot_label: "🟢 MACD cruzó al alza (impulso alcista)"
+      cold_label: "🔴 MACD cruzó a la baja (impulso bajista)"
       indicator_label: "MACD Cross 4h"
       mute_cold: false
       candle_period: 4h

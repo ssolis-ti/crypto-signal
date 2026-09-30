@@ -12,8 +12,10 @@ from analyzers.utils import IndicatorUtils
 from analyzers.indicators.wyckoff import WyckoffPrimitives
 from analysis.wyckoff_alerts import (
     WyckoffAlerter, EXTREME_VOLUME_THRESHOLD, LOOKBACK,
-    CANDLE_SECONDS, STALE_ALERT_SECONDS, MAX_DEDUP_SIGNATURES,
+    CANDLE_SECONDS, MAX_DEDUP_SIGNATURES,
 )
+
+STALE_ALERT_SECONDS = 2 * 3600  # umbral del aviso tardio (analysis/alert_text.py: mas de 2 h)
 
 
 class RecordingNotifier:
@@ -62,7 +64,7 @@ def _no_event_fixture():
 
 
 class TestWyckoffAlerterSpring:
-    def test_confirmed_spring_sends_validated_plan(self):
+    def test_confirmed_spring_sends_a_plain_language_buy_plan(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
 
@@ -70,15 +72,13 @@ class TestWyckoffAlerterSpring:
 
         assert len(notifier.messages) == 1
         msg = notifier.messages[0]
-        assert msg.startswith('🟢 <b>ALCISTA')
-        assert 'Spring' in msg
-        assert '24h:' in msg
-        assert 'BTC/USDT' in msg
-        assert '72h' in msg
-        assert '56-58%' in msg
-        assert '-10%' in msg
-        assert '1-2h NO funciona' in msg
-        assert '72-78%' not in msg  # encuadre rapido refutado en specs/032
+        assert msg.startswith('🟢 <b>OPORTUNIDAD DE COMPRA: BTC/USDT</b>')
+        assert 'Paso a paso' in msg
+        assert 'stop loss' in msg and '−10%' in msg
+        assert 'a precio de mercado' in msg
+        assert '72 h después' in msg
+        assert 'no promedies a la baja' in msg
+        assert not any(word in msg for word in ('Spring', 'Upthrust', 'Wyckoff', 'backtest', 'Backtest', 'trampa')), 'el aviso no debe traer jerga tecnica'
 
     def test_no_alert_without_extreme_volume(self):
         notifier = RecordingNotifier()
@@ -98,7 +98,7 @@ class TestWyckoffAlerterSpring:
 
 
 class TestWyckoffAlerterUpthrust:
-    def test_confirmed_upthrust_sends_cold_framed_alert(self):
+    def test_confirmed_upthrust_is_informative_and_says_to_do_nothing(self):
         closes, lows, highs, volumes = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
         closes += [103.0, 100.0]
         lows += [102.0, 99.0]
@@ -112,9 +112,10 @@ class TestWyckoffAlerterUpthrust:
         alerter.check_and_alert('binance', 'ETH/USDT', '4h', ohlcv)
 
         assert len(notifier.messages) == 1
-        assert notifier.messages[0].startswith('🔴 <b>BAJISTA')
-        assert 'Upthrust' in notifier.messages[0]
-        assert 'edge debil' in notifier.messages[0]
+        msg = notifier.messages[0]
+        assert msg.startswith('🔴 <b>Aviso informativo (sin acción): ETH/USDT</b>')
+        assert 'Nada.' in msg and 'no dieron ventaja' in msg
+        assert 'Paso a paso' not in msg
 
 
 class TestWyckoffAlerterDedup:
@@ -217,8 +218,8 @@ class TestRumorRadar:
 
         assert len(alerter.notifier.messages) == 1
         msg = alerter.notifier.messages[0]
-        assert 'RADAR VOLUMEN + RUMOR' in msg
-        assert 'NO validada' in msg
+        assert 'Movimiento raro: SOL/USDT' in msg
+        assert 'No hay ventaja comprobada' in msg
         assert 'Rumor de listing.' in msg
         record = json.loads((tmp_path / 'radar.jsonl').read_text().strip())
         assert record['type'] == 'radar' and record['alert_sent'] is True
@@ -313,7 +314,7 @@ class TestDedupPruneAndStale:
         last_open = datetime.fromtimestamp(ohlcv[-1][0] / 1000, tz=timezone.utc)
         with patch.object(WyckoffAlerter, '_now_utc', return_value=last_open + timedelta(hours=4, minutes=5)):
             alerter.check_and_alert('binance', 'BTC/USDT', '4h', ohlcv)
-        assert 'RETARDADA' not in notifier.messages[0]
+        assert 'Aviso tardío' not in notifier.messages[0]
 
     def test_alert_after_long_downtime_is_marked_stale(self):
         notifier = RecordingNotifier()
@@ -322,7 +323,7 @@ class TestDedupPruneAndStale:
         last_open = datetime.fromtimestamp(ohlcv[-1][0] / 1000, tz=timezone.utc)
         with patch.object(WyckoffAlerter, '_now_utc', return_value=last_open + timedelta(hours=8)):
             alerter.check_and_alert('binance', 'BTC/USDT', '4h', ohlcv)
-        assert 'ALERTA RETARDADA' in notifier.messages[0]
+        assert 'Aviso tardío' in notifier.messages[0]
         assert 'hace 4.0 h' in notifier.messages[0]
 
 
@@ -336,7 +337,7 @@ class TestSignalQualityContext:
         depth = WyckoffAlerter._sweep_depth(df, 'hot')
         assert depth == pytest.approx(4.04, abs=0.01)
 
-    def test_spring_message_shows_depth_and_concurrent_count(self):
+    def test_isolated_spring_says_the_edge_is_small_and_to_use_little_money(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
         pairs = {'BTC/USDT': _spring_fixture()}
@@ -344,21 +345,22 @@ class TestSignalQualityContext:
         alerter.check_cycle('binance', pairs)
 
         msg = notifier.messages[0]
-        assert 'Barrida bajo el nivel: 4.0%' in msg
-        assert 'Pares con evento en esta misma vela: 1 de 10 (10%)' in msg
-        assert 'poco extendido' in msg
-        assert 'sin confirmar en vivo' in msg
+        assert 'solo 1 de 10 monedas (10%)' in msg
+        assert 'Caso poco extendido' in msg
+        assert 'pequeña' in msg and 'con poco dinero' in msg
 
-    def test_concurrent_pairs_are_counted_across_the_cycle(self):
+    def test_simultaneous_springs_are_counted_and_sent_as_one_message(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
         pairs = {f'P{i}/USDT': _spring_fixture() for i in range(5)}
         pairs.update({f'Q{i}/USDT': _no_event_fixture() for i in range(5)})  # 5 de 10 = 50%
         alerter.check_cycle('binance', pairs)
 
-        assert len(notifier.messages) == 5
-        assert all('Pares con evento en esta misma vela: 5 de 10 (50%)' in m for m in notifier.messages)
-        assert all('capitulacion amplia' in m for m in notifier.messages)
+        assert len(notifier.messages) == 1, 'las señales de una misma vela salen juntas en UN mensaje'
+        msg = notifier.messages[0]
+        assert 'pánico generalizado' in msg and '5 de 10 monedas (50%)' in msg
+        assert all(f'P{i}/USDT' in msg for i in range(5)), 'la lista trae las 5 monedas con precio y stop'
+        assert 'Compra (long) <b>varias monedas de la lista</b>' in msg
 
     def test_context_never_suppresses_an_alert(self):
         notifier = RecordingNotifier()
@@ -400,16 +402,6 @@ class TestSignalQualityContext:
         assert len(notifier.messages) == 1
         assert json.loads(path.read_text().strip())['micro'] is None
 
-    def test_shallow_sweep_gets_the_warning(self):
-        text = WyckoffAlerter._quality_lines('hot', 0.4, 3)
-        assert 'superficial' in text
-        assert 'aislado' not in text
-
-    def test_upthrust_shows_the_data_without_spring_statistics(self):
-        text = WyckoffAlerter._quality_lines('cold', 0.4, 1)
-        assert 'Barrida bajo el nivel: 0.4%' in text
-        assert 'backtest' not in text.split('Hipotesis')[0]
-
     def test_disabled_check_cycle_does_nothing(self):
         notifier = RecordingNotifier()
         WyckoffAlerter(notifier, enabled=False).check_cycle('binance', {'BTC/USDT': _spring_fixture()})
@@ -431,10 +423,10 @@ class TestExecutionGuidanceAndWeekend:
         WyckoffAlerter(notifier, enabled=True).check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
 
         msg = notifier.messages[0]
-        assert 'Ejecucion' in msg
-        assert 'break-even' in msg
-        assert 'primeros ~15 min' in msg
-        assert 'Orden limite' in msg
+        assert 'ahora, a precio de mercado' in msg
+        assert 'Esperar más no mejora el resultado' in msg
+        assert 'No cierres antes por miedo' in msg
+        assert 'no lo muevas ni lo quites' in msg
 
     def test_upthrust_message_does_not_carry_spring_execution_claims(self):
         closes, lows, highs, volumes = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
@@ -446,8 +438,8 @@ class TestExecutionGuidanceAndWeekend:
         WyckoffAlerter(notifier, enabled=True).check_and_alert(
             'binance', 'ETH/USDT', '4h', _to_ohlcv_list(closes, lows, highs, volumes))
 
-        assert 'Ejecucion' not in notifier.messages[0]
-        assert 'break-even' not in notifier.messages[0]
+        assert 'Paso a paso' not in notifier.messages[0]
+        assert 'stop loss' not in notifier.messages[0]
 
     def test_weekend_is_decided_by_the_closing_time_of_the_candle(self):
         # vela 4h que abre viernes 20:00 UTC cierra sabado 00:00 -> cuenta como fin de semana
@@ -459,11 +451,6 @@ class TestExecutionGuidanceAndWeekend:
         assert WyckoffAlerter._is_weekend_close(pd.Timestamp('2026-09-29 12:00', tz='UTC')) is False
         assert WyckoffAlerter._is_weekend_close(None) is False
 
-    def test_weekend_warning_only_for_springs(self):
-        assert 'fin de semana' in WyckoffAlerter._quality_lines('hot', None, None, weekend=True)
-        assert 'fin de semana' not in WyckoffAlerter._quality_lines('cold', None, None, weekend=True)
-        assert WyckoffAlerter._quality_lines('hot', None, None, weekend=False) == ''
-
     def test_weekend_flag_is_recorded(self, tmp_path):
         path = tmp_path / 'record.jsonl'
         WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=str(path)).check_cycle(
@@ -472,15 +459,16 @@ class TestExecutionGuidanceAndWeekend:
 
 
 class TestMessageHonestyAndRadarStale:
-    def test_spring_message_separates_all_signals_from_three_positions(self):
+    def test_spring_message_is_honest_about_risk_and_never_assumes_the_capital(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
         alerter.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
 
         msg = notifier.messages[0]
-        assert 'TODAS las señales' in msg
-        assert '3 posiciones abiertas' in msg
-        assert 'no es prudente' in msg
+        assert 'no es seguro' in msg.lower() or 'No es seguro' in msg
+        assert '4 a 5 de cada 10' in msg
+        assert 'deslistaron' in msg
+        assert 'No es asesoría financiera' in msg
         assert '+92%' not in msg  # cifra de un formato distinto; se presentaba como tasa de la estrategia
         # el capital del operador no es el de la config de prueba de Freqtrade (100 USDT, 3 x 30)
         assert '100 USDT' not in msg and '30 USDT' not in msg
@@ -498,7 +486,7 @@ class TestMessageHonestyAndRadarStale:
                  'catalyst_present': False, 'summary': ''}):
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
 
-        assert 'ALERTA RETARDADA' in alerter.notifier.messages[0]
+        assert 'Aviso tardío' in alerter.notifier.messages[0]
 
 
 class TestWyckoffAlerterGuards:
@@ -600,8 +588,8 @@ class TestVolumeThresholdBoundary:
         messages = self._run(spring=True, upthrust=True, spring_rv=3.0, upthrust_rv=3.0)
         assert len(messages) == 1
         assert messages[0].startswith('🟢')
-        assert 'Spring' in messages[0]
-        assert 'Upthrust' not in messages[0]
+        assert 'OPORTUNIDAD DE COMPRA' in messages[0]
+        assert 'Aviso informativo' not in messages[0]
 
 
 class TestDetectionDegenerateInputs:
@@ -646,8 +634,8 @@ class TestDetectionDegenerateInputs:
         alerter.check_and_alert('binance', 'BTC/USDT', '4h', self._late_fixture(2))
 
         assert len(notifier.messages) == 1
-        assert 'ALERTA RETARDADA' in notifier.messages[0]
-        assert 'Spring' in notifier.messages[0]
+        assert 'Aviso tardío' in notifier.messages[0]
+        assert 'OPORTUNIDAD DE COMPRA' in notifier.messages[0]
 
     def test_late_spring_is_not_repeated_on_later_cycles(self):
         notifier = RecordingNotifier()
@@ -686,8 +674,8 @@ class TestDetectionDegenerateInputs:
 
         alerter.check_cycle('binance', pairs)
 
-        assert len(notifier.messages) == 5
-        assert all('Pares con evento en esta misma vela: 5' in m for m in notifier.messages)
+        assert len(notifier.messages) == 1
+        assert '5 de 5 monedas' in notifier.messages[0]
 
 
 class TestChange24h:
@@ -712,27 +700,34 @@ class TestStaleNoticeBoundaries:
         return datetime(2026, 9, 29, 8, 0, tzinfo=timezone.utc)
 
     def test_exactly_two_hours_after_close_has_no_notice(self):
+        from analysis.alert_text import late_notice
         ts = self._closed_at()
         now = ts + timedelta(seconds=CANDLE_SECONDS + STALE_ALERT_SECONDS)
         with patch.object(WyckoffAlerter, '_now_utc', return_value=now):
-            assert self._alerter()._stale_notice(ts) == ''
+            assert late_notice(self._alerter()._elapsed_hours(ts)) == ''
 
     def test_one_second_over_two_hours_has_notice(self):
+        from analysis.alert_text import late_notice
         ts = self._closed_at()
         now = ts + timedelta(seconds=CANDLE_SECONDS + STALE_ALERT_SECONDS + 1)
         with patch.object(WyckoffAlerter, '_now_utc', return_value=now):
-            assert 'ALERTA RETARDADA' in self._alerter()._stale_notice(ts)
+            assert 'Aviso tardío' in late_notice(self._alerter()._elapsed_hours(ts))
 
     def test_future_timestamp_has_no_notice(self):
+        from analysis.alert_text import late_notice
         ts = self._closed_at()
         with patch.object(WyckoffAlerter, '_now_utc', return_value=ts + timedelta(hours=1)):
-            assert self._alerter()._stale_notice(ts) == ''
+            assert late_notice(self._alerter()._elapsed_hours(ts)) == ''
+
+    def test_missing_timestamp_has_no_notice(self):
+        from analysis.alert_text import late_notice
+        assert late_notice(self._alerter()._elapsed_hours(None)) == ''
 
     def test_naive_timestamp_raises_type_error(self):
         # Caracterizacion: la ruta de produccion siempre entrega index UTC-aware
         # (convert_to_dataframe(..., utc=True)); un timestamp naive rompe la resta.
         with pytest.raises(TypeError):
-            self._alerter()._stale_notice(datetime(2026, 9, 29, 8, 0))
+            self._alerter()._elapsed_hours(datetime(2026, 9, 29, 8, 0))
 
 
 class TestDedupRecordLoading:
@@ -845,7 +840,7 @@ class TestRadarEdges:
                           return_value=self._analyze_result()):
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
         assert len(alerter.notifier.messages) == 1
-        assert '+0.0%' in alerter.notifier.messages[0]
+        assert 'subió 0.0%' in alerter.notifier.messages[0]
 
     def test_record_failure_does_not_prevent_the_alert(self, tmp_path):
         blocker = tmp_path / 'blocker'
@@ -907,32 +902,26 @@ class TestTelegramFailureIsRetried:
 
 
 class TestClockAndCandleLabel:
-    def test_label_shows_utc_and_operator_local_time_with_weekday(self):
-        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, timezone_str='America/Santiago')
-        # vela vie 2026-01-09 16:00-20:00 UTC: cierra 20:00 UTC = 17:00 Santiago (verano, UTC-3)
-        label = alerter._candle_label(pd.Timestamp('2026-01-09T16:00:00Z'))
-        assert label == "🕐 Cierre de la vela: vie 20:00 UTC = vie 17:00 Santiago\n"
+    def test_when_shows_utc_and_operator_local_time(self):
+        from analysis.alert_text import when
+        # vie 2026-01-09 20:00 UTC = 17:00 Santiago (verano, UTC-3)
+        assert when(pd.Timestamp('2026-01-09T20:00:00Z'), 'America/Santiago') == 'vie 20:00 UTC (17:00 Santiago)'
 
-    def test_label_uses_winter_offset_and_can_change_the_local_weekday(self):
-        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, timezone_str='America/Santiago')
-        # vela vie 2026-07-10 20:00-24:00 UTC: cierra sab 00:00 UTC = vie 20:00 Santiago (invierno, UTC-4)
-        label = alerter._candle_label(pd.Timestamp('2026-07-10T20:00:00Z'))
-        assert 'sáb 00:00 UTC = vie 20:00 Santiago' in label
+    def test_when_shows_the_local_weekday_only_when_it_changes(self):
+        from analysis.alert_text import when
+        # sab 00:00 UTC = vie 20:00 Santiago (invierno, UTC-4)
+        assert when(pd.Timestamp('2026-07-11T00:00:00Z'), 'America/Santiago') == 'sáb 00:00 UTC (vie 20:00 Santiago)'
 
-    def test_label_utc_only_when_no_timezone(self):
-        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True)
-        assert alerter._candle_label(pd.Timestamp('2026-01-09T16:00:00Z')) == "🕐 Cierre de la vela: vie 20:00 UTC\n"
-
-    def test_label_handles_missing_or_naive_timestamps(self):
-        alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, timezone_str='America/Santiago')
-        assert alerter._candle_label(None) == ""
-        assert 'vie 20:00 UTC' in alerter._candle_label(pd.Timestamp('2026-01-09T16:00:00'))
+    def test_when_utc_only_without_timezone_and_accepts_naive(self):
+        from analysis.alert_text import when
+        assert when(pd.Timestamp('2026-01-09T20:00:00Z'), 'UTC') == 'vie 20:00 UTC'
+        assert when(pd.Timestamp('2026-01-09T20:00:00'), 'UTC') == 'vie 20:00 UTC'
 
     def test_alert_message_includes_the_closing_time(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True, timezone_str='America/Santiago')
         alerter.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())
-        assert 'Cierre de la vela:' in notifier.messages[0]
+        assert 'La vela de 4 h cerró el' in notifier.messages[0]
         assert 'Santiago' in notifier.messages[0]
 
     def test_clock_offset_from_exchange_is_applied_to_now(self):
@@ -951,6 +940,16 @@ class TestClockAndCandleLabel:
 
 
 class TestLiquidityNotice:
+    def test_low_liquidity_shows_a_warning_and_high_liquidity_does_not(self):
+        from analysis.alert_text import AlertItem, liquidity_note
+        def item(v):
+            return AlertItem(pair='X/USDT', direction='hot', price=1.0, volume_x=3.0, candle_open=pd.Timestamp('2026-01-09T16:00:00Z'), dvol24h=v)
+        assert 'Moneda poco líquida' in liquidity_note([item(5_000_000)])
+        assert '5.0 millones' in liquidity_note([item(5_000_000)])
+        assert liquidity_note([item(20_000_000)]) == ''
+        assert liquidity_note([item(500_000_000)]) == ''
+        assert liquidity_note([item(None)]) == ''
+
     def test_dollar_volume_is_the_sum_of_the_last_six_candles(self):
         df = pd.DataFrame({'volume': [1.0] * 4 + [10.0] * 6, 'close': [1.0] * 4 + [2.0] * 6})
         assert WyckoffAlerter._dollar_volume_24h(df) == pytest.approx(120.0)
@@ -958,39 +957,31 @@ class TestLiquidityNotice:
     def test_dollar_volume_needs_six_candles(self):
         assert WyckoffAlerter._dollar_volume_24h(pd.DataFrame({'volume': [1.0] * 5, 'close': [1.0] * 5})) is None
 
-    def test_low_liquidity_shows_a_warning_and_high_liquidity_does_not(self):
-        assert 'Liquidez baja' in WyckoffAlerter._liquidity_notice(5_000_000)
-        assert '5.0M USD' in WyckoffAlerter._liquidity_notice(5_000_000)
-        assert WyckoffAlerter._liquidity_notice(20_000_000) == ''
-        assert WyckoffAlerter._liquidity_notice(500_000_000) == ''
-        assert WyckoffAlerter._liquidity_notice(None) == ''
-
     def test_alert_message_and_record_carry_the_liquidity(self, tmp_path):
         path = tmp_path / 'record.jsonl'
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path))
         alerter.check_and_alert('binance', 'BTC/USDT', '4h', _spring_fixture())  # volumenes de juguete: liquidez muy baja
-        assert 'Liquidez baja' in notifier.messages[0]
+        assert 'Moneda poco líquida' in notifier.messages[0]
         assert json.loads(path.read_text().strip())['dvol24h_usd'] is not None
 
 
 class TestWideClusterFraction:
     def test_threshold_is_twenty_percent_of_the_watched_pairs(self):
-        wide = WyckoffAlerter._quality_lines('hot', None, 6, watched=30)     # 20%
-        narrow = WyckoffAlerter._quality_lines('hot', None, 5, watched=30)   # 16.7%
-        assert 'capitulacion amplia' in wide and '6 de 30 (20%)' in wide
-        assert 'poco extendido' in narrow and 'capitulacion amplia' not in narrow
+        from analysis.alert_text import strength_block
+        wide = strength_block(6, 30)     # 20%
+        narrow = strength_block(5, 30)   # 16.7%
+        assert 'pánico generalizado' in wide.lower() and '6 de 30 monedas (20%)' in wide
+        assert 'Caso poco extendido' in narrow and 'pánico generalizado' not in narrow.lower()
 
     def test_same_count_means_different_things_for_different_universes(self):
-        assert 'capitulacion amplia' in WyckoffAlerter._quality_lines('hot', None, 6, watched=20)
-        assert 'poco extendido' in WyckoffAlerter._quality_lines('hot', None, 6, watched=49)
+        from analysis.alert_text import strength_block
+        assert 'pánico generalizado' in strength_block(6, 20).lower()
+        assert 'Caso poco extendido' in strength_block(6, 49)
 
-    def test_unknown_universe_falls_back_to_thirty_pairs(self):
-        assert '6 de 30 (20%)' in WyckoffAlerter._quality_lines('hot', None, 6)
-
-    def test_upthrust_shows_the_count_without_spring_statistics(self):
-        text = WyckoffAlerter._quality_lines('cold', None, 6, watched=30)
-        assert '6 de 30' in text and 'backtest' not in text.split('Hipotesis')[0]
+    def test_unknown_universe_or_count_gives_no_strength_block(self):
+        from analysis.alert_text import strength_block
+        assert strength_block(None, 30) == '' and strength_block(6, None) == ''
 
     def test_watched_pairs_are_recorded(self, tmp_path):
         path = tmp_path / 'record.jsonl'
@@ -999,19 +990,81 @@ class TestWideClusterFraction:
         alerter.check_cycle('binance', pairs)
         assert json.loads(path.read_text().strip())['watched_pairs'] == 2
 
-    def test_plan_is_honest_about_survivorship(self):
-        from analysis.wyckoff_alerts import SPRING_PLAN
-        assert 'deslistaron' in SPRING_PLAN and '+0.35%' in SPRING_PLAN
-
 
 class TestHonestWideClusterMessage:
     def test_wide_cluster_states_the_daily_distribution_not_a_sure_return(self):
-        text = WyckoffAlerter._quality_lines('hot', None, 8, watched=30)
-        assert 'capitulacion amplia' in text
-        assert 'mediana +0.6%' in text and '45% de los dias termina en rojo' in text
-        assert '-9.5% a +12%' in text
-        assert 'VARIOS springs' in text
+        from analysis.alert_text import strength_block
+        text = strength_block(8, 30)
+        assert '+0.6%' in text and '4 a 5 de cada 10 días terminaron en pérdida' in text
+        assert '−9.5% a +12%' in text and 'no es seguro' in text
 
-    def test_narrow_cluster_message_unchanged(self):
-        text = WyckoffAlerter._quality_lines('hot', None, 2, watched=30)
-        assert 'poco extendido' in text and 'mediana' not in text
+    def test_narrow_cluster_message_has_no_daily_distribution(self):
+        from analysis.alert_text import strength_block
+        text = strength_block(2, 30)
+        assert 'Caso poco extendido' in text and '+0.6%' not in text
+
+
+class TestGroupedDelivery:
+    """Las señales de una misma vela salen juntas en UN mensaje; el registro y la deduplicación siguen siendo por moneda."""
+
+    def _pairs(self, n=4, quiet=6):
+        pairs = {f'C{i}/USDT': _spring_fixture() for i in range(n)}
+        pairs.update({f'Q{i}/USDT': _no_event_fixture() for i in range(quiet)})
+        return pairs
+
+    def test_one_message_and_one_record_per_coin(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path))
+        alerter.check_cycle('binance', self._pairs())
+
+        assert len(notifier.messages) == 1
+        records = [json.loads(line) for line in path.read_text().strip().splitlines()]
+        assert sorted(r['pair'] for r in records) == ['C0/USDT', 'C1/USDT', 'C2/USDT', 'C3/USDT']
+        assert all(r['concurrent_pairs'] == 4 and r['watched_pairs'] == 10 for r in records)
+
+    def test_group_is_not_repeated_on_the_next_cycle(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        pairs = self._pairs()
+        alerter.check_cycle('binance', pairs)
+        alerter.check_cycle('binance', pairs)
+        assert len(notifier.messages) == 1
+
+    def test_failed_group_is_retried_whole_and_recorded_only_when_delivered(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        notifier = FailingNotifier(fail_times=1)
+        alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path))
+        pairs = self._pairs()
+
+        alerter.check_cycle('binance', pairs)     # falla: nada se marca como enviado
+        assert not path.exists() or path.read_text().strip() == ''
+        alerter.check_cycle('binance', pairs)     # llega el grupo completo
+        alerter.check_cycle('binance', pairs)     # no se repite
+
+        assert notifier.calls == 2 and len(notifier.messages) == 1
+        assert len(path.read_text().strip().splitlines()) == 4
+
+    def test_twitter_is_only_queried_for_single_alerts(self):
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True, twitter_sentiment_enabled=True)
+        with patch.object(alerter.twitter_sentiment, 'analyze', return_value=None) as analyze:
+            alerter.check_cycle('binance', self._pairs(n=3))
+            assert analyze.call_count == 0
+            alerter2 = WyckoffAlerter(RecordingNotifier(), enabled=True, twitter_sentiment_enabled=True)
+        with patch.object(alerter2.twitter_sentiment, 'analyze', return_value=None) as analyze2:
+            alerter2.check_cycle('binance', self._pairs(n=1))
+            assert analyze2.call_count == 1
+
+    def test_a_group_can_mix_directions_as_separate_messages(self):
+        closes, lows, highs, volumes = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
+        closes += [103.0, 100.0]
+        lows += [102.0, 99.0]
+        highs += [105.0, 102.0]
+        volumes += [1000.0, 100.0]
+        upthrust = _to_ohlcv_list(closes, lows, highs, volumes)
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True)
+        alerter.check_cycle('binance', {'A/USDT': _spring_fixture(), 'B/USDT': upthrust})
+        assert len(notifier.messages) == 2
+        assert sorted(m[0] for m in notifier.messages) == ['🔴', '🟢']

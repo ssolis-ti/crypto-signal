@@ -43,6 +43,8 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
 
 - **050** Marco y matemática del edge (debate opencode+agy con arXiv verificado): distribución honesta por día (mediana +0.57%, 45% de días en rojo), Kelly empírico y tope por pérdida (~0.3x del capital en la canasta para perder ~3% en un día malo), gate binario ≥20% + canasta equiponderada; índice continuo, selección por par y ponderación por daño muertos por potencia. La validación hacia adelante ahora mide por episodio.
 
+- **051** Avisos de Telegram reescritos en lenguaje sencillo, con pasos y precios concretos, un solo mensaje por vela en días de pánico, y los avisos de RSI/MACD sin estrellas ni falsa fuerza. Guía para el operador: `docs/GUIA_DE_AVISOS.md`.
+
 ## Pendiente
 
 0. Candidatos que quedan de la sesión de apoyo mutuo (ver specs/044 y 046; la entrada secundaria/retest ya se probó y NO aprueba): desliste anunciado por Binance como catalizador

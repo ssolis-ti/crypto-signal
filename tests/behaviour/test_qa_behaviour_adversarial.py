@@ -52,7 +52,7 @@ class TestBehaviourCoreAdversarial:
         behaviour.data_collector.get_all_historical_data = MagicMock(return_value=historical_data)
         behaviour.strategy_executor.test_strategies = MagicMock(return_value={"binance": {}})
 
-        with patch.object(behaviour.wyckoff_alerter, "check_and_alert") as mock_check:
+        with patch.object(behaviour.wyckoff_alerter, "_collect_pair", return_value=[]) as mock_check:
             behaviour.run({"binance": {"NO_4H/USDT": {}, "HAS_4H/USDT": {}}}, output_mode="cli")
 
             # Solo HAS_4H debe haber llamado a check_and_alert con '4h'
@@ -97,7 +97,7 @@ class TestBehaviourCoreAdversarial:
             if pair == "PAIR1/USDT":
                 raise RuntimeError("Catastrophic error in Wyckoff detection")
 
-        with patch.object(behaviour.wyckoff_alerter, "check_and_alert", side_effect=side_effect) as mock_check:
+        with patch.object(behaviour.wyckoff_alerter, "_collect_pair", side_effect=side_effect) as mock_check:
             # No debe propagar RuntimeError
             behaviour.run({"binance": {"PAIR1/USDT": {}, "PAIR2/USDT": {}}}, output_mode="cli")
 
@@ -119,7 +119,7 @@ class TestBehaviourCoreAdversarial:
         behaviour.data_collector.get_all_historical_data = MagicMock(return_value=historical_data)
 
         call_order = []
-        with patch.object(behaviour.wyckoff_alerter, "check_and_alert", side_effect=lambda *args: call_order.append("wyckoff")), \
+        with patch.object(behaviour.wyckoff_alerter, "_collect_pair", side_effect=lambda *args: call_order.append("wyckoff") or []), \
              patch.object(behaviour.strategy_executor, "test_strategies", side_effect=lambda *args: (call_order.append("strategies"), {"binance": {}})[1]):
             behaviour.run({"binance": {"BTC/USDT": {}}}, output_mode="cli")
 

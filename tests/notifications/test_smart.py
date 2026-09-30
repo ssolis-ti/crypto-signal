@@ -25,8 +25,10 @@ class TestBuildSummaryMessageHeader:
 
         message = manager.build_summary_message()
 
-        assert 'MARKET SCAN' in message
-        assert 'Sin señales operables' in message
+        assert 'Radar RSI/MACD' in message
+        assert 'no predijeron el precio' in message
+        assert 'baja 3.2%' in message and 'mercado a la baja' in message
+        assert '⭐' not in message, 'sin estrellas: el puntaje no predice nada'
 
     def test_actionable_signal_uses_operable_header(self):
         manager = SmartNotificationManager(_zero_delay_config())
@@ -36,13 +38,27 @@ class TestBuildSummaryMessageHeader:
 
         message = manager.build_summary_message()
 
-        assert 'SEÑALES OPERABLES' in message
-        assert 'watchlist' in message
+        assert 'Radar RSI/MACD' in message
+        assert 'SUI/USDT' in message and 'ENA/USDT' in message
+        assert 'OPORTUNIDAD DE COMPRA' in message  # remite a la señal principal
+        assert 'operable' not in message.lower() and 'sólida' not in message and 'fuerte' not in message
 
     def test_empty_signals_returns_empty_string(self):
         manager = SmartNotificationManager(_zero_delay_config())
 
         assert manager.build_summary_message() == ""
+
+
+class TestSummaryPlainLanguage:
+    def test_groups_by_direction_and_describes_rsi_in_words(self):
+        manager = SmartNotificationManager(_zero_delay_config())
+        manager.add_signal({'market': 'SUI/USDT', 'quality': 'A', 'score': 80, 'status': 'hot', 'indicator': 'rsi', 'values': {'rsi': '25.4'}})
+        manager.add_signal({'market': 'DOGE/USDT', 'quality': 'B', 'score': 60, 'status': 'cold', 'indicator': 'rsi', 'values': {'rsi': '72'}})
+
+        message = manager.build_summary_message()
+
+        assert '🟢 <b>Alcistas</b>' in message and 'SUI/USDT — RSI 25 (muy bajo)' in message
+        assert '🔴 <b>Bajistas</b>' in message and 'DOGE/USDT — RSI 72 (muy alto)' in message
 
 
 class TestMaxCSignalsTruncation:
@@ -53,7 +69,7 @@ class TestMaxCSignalsTruncation:
 
         message = manager.build_summary_message()
 
-        assert 'más en watchlist' in message
+        assert 'y 3 más que no se muestran' in message
 
 
 class TestFinalizeCycleGating:
