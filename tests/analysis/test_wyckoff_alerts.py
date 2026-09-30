@@ -1078,3 +1078,40 @@ class TestRecordClock:
         alerter._record({'type': 'radar'})
         row = json.loads(path.read_text().splitlines()[0])
         assert 'exchange_time' in row and 'clock_skew_s' in row and abs(row['clock_skew_s']) < 5
+
+
+class FlakyNotifier:
+    def __init__(self, results):
+        self.results, self.calls = list(results), 0
+
+    def send_direct_text(self, message):
+        self.calls += 1
+        return self.results.pop(0) if self.results else True
+
+
+class TestRadarDelivery:
+    def _alerter(self, tmp_path, notifier):
+        return WyckoffAlerter(notifier, enabled=True, twitter_sentiment_enabled=True, rumor_radar_enabled=True,
+                              record_path=str(tmp_path / 'radar.jsonl'))
+
+    def _run(self, alerter):
+        with patch.object(alerter.twitter_sentiment, 'mention_velocity', return_value=_velocity(3.0)),              patch.object(alerter.twitter_sentiment, 'analyze', return_value={
+                 'current': 9.0, 'baseline': 3.0, 'ratio': 3.0, 'max_views': 0, 'sentiment_extreme': 'euphoria',
+                 'social_spike_confirmed': False, 'catalyst_present': True, 'summary': 'x'}):
+            alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
+
+    def test_failed_telegram_delivery_is_retried_next_cycle_and_not_recorded_as_sent(self, tmp_path):
+        notifier = FlakyNotifier([False, True])
+        alerter = self._alerter(tmp_path, notifier)
+        self._run(alerter)
+        assert notifier.calls == 1 and not (tmp_path / 'radar.jsonl').exists()
+        self._run(alerter)
+        assert notifier.calls == 2
+        assert json.loads((tmp_path / 'radar.jsonl').read_text().strip())['alert_sent'] is True
+        self._run(alerter)
+        assert notifier.calls == 2, 'ya entregado: no se repite'
+
+    def test_radar_error_does_not_break_the_pair(self, tmp_path):
+        alerter = self._alerter(tmp_path, RecordingNotifier())
+        with patch.object(alerter, '_check_rumor_radar', side_effect=RuntimeError('boom')):
+            assert alerter._collect_pair('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture()) == []

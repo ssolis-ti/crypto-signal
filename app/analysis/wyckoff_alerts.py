@@ -239,7 +239,11 @@ class WyckoffAlerter:
 
         last_timestamp = df.index[len(df) - 1]
         if self.rumor_radar_enabled and not any(event[2] == last_timestamp for event, _ in events):
-            self._check_rumor_radar(exchange, market_pair, df, last_timestamp)
+            try:
+                self._check_rumor_radar(exchange, market_pair, df, last_timestamp)
+            except Exception as e:
+                # el radar no validado nunca debe costar un spring (unico edge comprobado) del mismo par
+                self.logger.error(f"[RADAR] Error en {market_pair}: {e}")
 
         pending = []
         for (direction, break_relative_volume, timestamp), sub in events:
@@ -349,7 +353,6 @@ class WyckoffAlerter:
                 self._radar_failures.pop(signature, None)
             return
         self._radar_failures.pop(signature, None)
-        self._remember(signature)
 
         last = df.iloc[-1]
         candle_change = (last['close'] - last['open']) / last['open'] * 100 if last['open'] else 0.0
@@ -357,27 +360,40 @@ class WyckoffAlerter:
         triggered = ratio is not None and ratio >= self.radar_min_ratio
 
         twitter_result = None
+        sent = False
         if triggered:
             twitter_result = self.twitter_sentiment.analyze(ticker, 'radar', velocity=velocity)
-            self._send_radar_alert(exchange, market_pair, rel_vol, candle_change, twitter_result,
-                                   change_24h=self._change_24h(df), timestamp=timestamp)
+            sent = self._send_radar_alert(exchange, market_pair, rel_vol, candle_change, twitter_result,
+                                          change_24h=self._change_24h(df), timestamp=timestamp)
+            if not sent:
+                # Telegram fallo: se reintenta el ciclo siguiente (hasta SEND_MAX_FAILURES) en vez de perder el aviso
+                failures = self._radar_failures.get(signature, 0) + 1
+                self._radar_failures[signature] = failures
+                if failures < SEND_MAX_FAILURES:
+                    return
+                self._radar_failures.pop(signature, None)
+        self._remember(signature)
 
         self._record({
             'type': 'radar', 'exchange': exchange, 'pair': market_pair,
             'candle': timestamp.isoformat(), 'relative_volume': round(float(rel_vol), 2),
             'candle_change_pct': round(float(candle_change), 2),
             'mentions_now': velocity.get('current'), 'mentions_7d_ago': velocity.get('baseline'),
-            'ratio': ratio, 'max_views': velocity.get('max_views'), 'alert_sent': triggered,
+            'ratio': ratio, 'max_views': velocity.get('max_views'), 'alert_sent': sent,
             'sentiment': (twitter_result or {}).get('sentiment_extreme'),
         })
 
     def _send_radar_alert(self, exchange: str, market_pair: str, rel_vol: float,
                           candle_change: float, twitter_result,
-                          change_24h: Optional[float] = None, timestamp=None) -> None:
+                          change_24h: Optional[float] = None, timestamp=None) -> bool:
         text = build_radar(market_pair, rel_vol, candle_change, timestamp, self.timezone_str,
                            self._elapsed_hours(timestamp), TwitterSentimentAnalyzer.format_section(twitter_result))
-        self.notifier.send_direct_text(text)
+        delivered = self.notifier.send_direct_text(text)
+        if delivered is False:
+            self.logger.error(f"[RADAR] Telegram no entrego el aviso de {market_pair}; se reintenta")
+            return False
         self.logger.info(f"[RADAR] Alert sent: {market_pair} (rel_vol={rel_vol:.2f}x)")
+        return True
 
     def _record(self, event: dict) -> None:
         """Registro para validar despues con datos reales hacia adelante. Nunca rompe el ciclo."""
