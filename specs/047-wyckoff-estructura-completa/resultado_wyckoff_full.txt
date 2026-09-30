@@ -1,0 +1,24 @@
+universo: 226 simbolos
+media incondicional (cualquier vela elegible): largo -0.44%, corto +0.07%
+
+evento                           n dias | 2022-24               | 2025-26               |  unido              exceso IC
+E1 clímax de venta (SC)       1353  283 | n= 972  -0.15%  48% | n= 381  +3.72%  54% |  +0.94 [ -1.40, +4.33]
+E2 test secundario (ST)        444  195 | n= 331  -0.35%  47% | n= 113  -0.67%  39% |  -0.43 [ -2.55, +2.84]
+E3 signo de fortaleza (SOS)   4282 1230 | n=3120  -0.21%  40% | n=1162  -0.30%  36% |  -0.24 [ -0.60, +1.04]
+E4 backup / LPS               1237  595 | n= 939  -0.34%  43% | n= 298  -0.78%  39% |  -0.44 [ -0.94, +1.03]
+E5 signo de debilidad (SOW)   3077  552 | n=2010  +0.38%  46% | n=1067  -0.99%  41% |  -0.09 [ -1.74, +1.65]
+E6 LPSY                        890  307 | n= 568  -0.71%  42% | n= 322  +0.29%  48% |  -0.35 [ -2.29, +1.88]
+
+E7 springs: 3460 | con caida previa <= -20% en 60 velas: 860 (25%)
+  IS    con caida previa n= 536  +1.77% ( 56%) | sin n=1835  +1.76% ( 56%) | dif +0.01
+  OOS   con caida previa n= 324  +1.89% ( 55%) | sin n= 765  +1.10% ( 45%) | dif +0.79
+  AMBOS con caida previa n= 860  +1.81% ( 55%) | sin n=2600  +1.57% ( 53%) | dif +0.25  IC99.3% [-4.30, +4.54]
+
+VEREDICTO (criterio pre-registrado):
+  E1 clímax de venta (SC): NO aprueba
+  E2 test secundario (ST): NO aprueba
+  E3 signo de fortaleza (SOS): NO aprueba
+  E4 backup / LPS: NO aprueba
+  E5 signo de debilidad (SOW): NO aprueba
+  E6 LPSY: NO aprueba
+  E7 spring tras caida previa: NO aprueba
