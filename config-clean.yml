@@ -27,20 +27,20 @@ settings:
     # Requiere GETXAPI_API_KEY y GEMINI_API_KEY en .env; si faltan, se degrada sola
     # (la alerta base se envia igual, sin esta seccion).
     twitter_sentiment:
-      enabled: false
+      enabled: true
     # specs/033-rumor-radar/: cruce volumen + rumor. Si una vela de 4h cierra con volumen
     # >= 2.5x el promedio SIN evento Wyckoff, mide la velocidad de menciones en Twitter
     # (ahora vs hace 7 dias); si se acelera >= min_mention_ratio, avisa por Telegram.
     # NO validado: cada caso queda en app/agent_state/rumor_radar.jsonl para validarlo luego.
     # Requiere twitter_sentiment.enabled y GETXAPI_API_KEY.
     rumor_radar:
-      enabled: false
+      enabled: true
       min_mention_ratio: 2.0
 
     # specs/037-microestructura-funding/: foto de funding, open interest, ratio long/short y libro de
     # ordenes de Binance al salir cada alerta. Solo se REGISTRA (no filtra ni cambia el mensaje).
     microstructure:
-      enabled: false
+      enabled: true
 
   # ═══════════════════════════════════════════
   # CONFIGURACIÓN DE PARES DINÁMICOS
@@ -48,7 +48,7 @@ settings:
   dynamic_pairs:
     enabled: true
     source: volume              # Ordenar por: volume
-    top_n: 20                   # Cantidad de pares
+    top_n: 50                  # Cantidad de pares
     quote_currency: USDT        # Moneda de cotización
     min_volume_24h: 3000000     # Volumen mínimo 24h en USDT
     exclude:                    # Excluir stablecoins y pares problemáticos
@@ -182,7 +182,7 @@ notifiers:
 indicators:
   rsi:
     - enabled: true
-      alert_enabled: true
+      alert_enabled: false      # apagado: no predijo el precio (specs/007, 011); poner true para el radar informativo
       alert_frequency: once
       signal: [rsi]
       hot: 30
@@ -196,7 +196,7 @@ indicators:
 
   macd_cross:
     - enabled: true
-      alert_enabled: true
+      alert_enabled: false      # apagado: cruza ~16 veces/dia entre 28 pares y no predijo el precio
       alert_frequency: once
       signal: [macd, signal]
       hot_label: "🟢 MACD cruzó al alza (impulso alcista)"

@@ -1,17 +1,41 @@
 # 🚀 Crypto-Signal
 
-Bot de análisis técnico para criptomonedas, con notificaciones a Telegram. Solo lectura: usa datos
-públicos de mercado vía CCXT, no tiene claves de exchange y no puede operar ni mover fondos.
+Bot de **alertas** para criptomonedas (Binance USD-M, velas de 4 h) con avisos a Telegram en lenguaje
+sencillo. Solo lectura: usa datos públicos de mercado vía CCXT, no tiene claves de exchange y no puede
+operar ni mover fondos. El operador decide y opera a mano.
 
-> **Estado**: en producción (ver [Estado actual](#-estado-actual-y-límites-conocidos)). Desarrollado
-> desde 2026-09-28 con [GitHub Spec Kit](https://github.com/github/spec-kit) sobre una
+> **Estado: cierre v2.0.** En producción en Docker, 398 tests pasando. Desarrollado desde 2026-09-28 con
+> [GitHub Spec Kit](https://github.com/github/spec-kit) sobre una
 > [constitución](.specify/memory/constitution.md) de 7 principios — ver [Desarrollo](#-desarrollo-spec-kit--slices).
+
+### Qué hace (y qué no)
+
+- **Único edge validado:** el **Spring de Wyckoff (long)** en monedas líquidas, sobre todo en días de
+  capitulación amplia (≥ 20 % de los pares con spring en la misma vela). Es **modesto y de alta varianza**:
+  en esos días la mediana fue +0.6 % en 72 h y 4 a 5 de cada 10 días terminaron en pérdida.
+- Vigila los 50 pares de mayor volumen cada 5 minutos; el aviso principal solo sale al cerrar una vela de 4 h.
+- Casi todo lo demás que se probó (RSI/MACD, Twitter, funding, OI, horarios, lado corto, otras temporalidades,
+  radar intradía) **no mostró ventaja** y queda solo como información.
+- Resumen completo: [`docs/CIERRE_PROYECTO.md`](docs/CIERRE_PROYECTO.md).
+
+### Documentación
+
+| Documento | Para qué |
+|---|---|
+| [`QUICKSTART.md`](QUICKSTART.md) | Instalar en 5 comandos |
+| [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md) | Instalar en otro PC, migrar el historial, actualizar, tests, problemas |
+| [`docs/OPERACION.md`](docs/OPERACION.md) | Uso diario, revisiones, riesgos |
+| [`docs/GUIA_DE_AVISOS.md`](docs/GUIA_DE_AVISOS.md) | Qué es cada aviso y qué hacer |
+| [`docs/CIERRE_PROYECTO.md`](docs/CIERRE_PROYECTO.md) | Qué funcionó, qué no, límites, pendientes |
+| [`docs/config.md`](docs/config.md) | Referencia de `config.yml` |
+| [`docs/ESTADO_Y_PENDIENTES.md`](docs/ESTADO_Y_PENDIENTES.md) | Bitácora de estado |
 
 ---
 
-## ✨ Características
+## ✨ Características técnicas (parte heredada incluida)
 
-- 📊 **+15 indicadores técnicos**: RSI, MACD, Bollinger, Ichimoku, Stoch RSI, ADX, y más
+- 📊 **+15 indicadores técnicos**: RSI, MACD, Bollinger, Ichimoku, Stoch RSI, ADX, y más (las alertas de RSI/MACD
+  vienen apagadas en la configuración de cierre: no predijeron el precio)
 - 📈 **Gráficos automáticos**: velas, RSI, MACD e Ichimoku
 - 📱 **Notificaciones inteligentes a Telegram**: resumen consolidado por ciclo + detalle/chart para
   las señales de mayor calidad
@@ -64,7 +88,7 @@ git checkout main
 # 2. Configurar Telegram (token + chat_id van en .env, NUNCA en config.yml)
 cp .env.example .env
 #   Editar .env con tu TELEGRAM_TOKEN y TELEGRAM_CHAT_ID
-#   (o usar el script Configurar_Telegram_CryptoSignal.bat si estás en Windows)
+#   (opcional: GETXAPI_API_KEY y GEMINI_API_KEY para la sección de Twitter y el radar de rumores)
 
 # 3. Copiar y ajustar la configuración
 cp config-clean.yml config.yml
@@ -204,13 +228,14 @@ dependencias pinneadas).
 
 ## 📊 Estado actual y límites conocidos
 
-- ✅ Pipeline de datos sin repintado, UTC consistente en todo punto crítico, 155 tests pasando.
+- ✅ Pipeline de datos sin repintado, UTC consistente en todo punto crítico, reloj del exchange, 398 tests pasando.
 - ✅ Corriendo en producción, ciclo real Binance → Telegram confirmado end-to-end.
-- ✅ **Alerta Wyckoff en vivo** (slice 023): Spring/Upthrust con volumen extremo (≥2.5x) — el único
-  edge de todo el proyecto que sobrevivió validación con holdout — envía un mensaje con encuadre dual
-  (⚡ rápida 1-2h / 📈 sostenida 14d) y los números reales de la validación, completamente
-  independiente del score de `SignalEnhancer`. Gateado por `settings.wyckoff_alerts.enabled` (default
-  `false`, activado en el `config.yml` del operador).
+- ✅ **Aviso OPORTUNIDAD DE COMPRA** (slices 023, 044, 051): Spring de Wyckoff con volumen de ruptura ≥ 2.5x, único
+  edge validado con holdout (mediana +0.6 % en 72 h en días de pánico amplio, 4 a 5 de cada 10 días en pérdida). Un
+  mensaje por vela, en lenguaje sencillo, con 4 pasos y precios concretos. Gateado por
+  `settings.wyckoff_alerts.enabled` (activado en `config-clean.yml`).
+- ℹ️ Avisos informativos sin ventaja comprobada: lado bajista ("sin acción"), "Movimiento raro" (radar + Twitter).
+  Los avisos de RSI/MACD vienen apagados en `config-clean.yml`.
 - ⚠️ **El score de `SignalEnhancer` fue validado históricamente contra los dos indicadores
   habilitados en producción (RSI: 642 señales — slice 007; macd_cross: 1.776 señales — slice 011) y
   no mostró valor predictivo** — en macd_cross a 72h la correlación es incluso significativamente

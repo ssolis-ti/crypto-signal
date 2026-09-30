@@ -1,80 +1,47 @@
-# 🚀 Crypto-Signal: Guía Rápida
+# 🚀 Crypto-Signal: guía rápida
 
-## Estructura de Archivos de Configuración
+Bot de alertas (solo lectura) para Binance USD-M con avisos a Telegram. Guía completa de instalación, migración a otro PC y problemas frecuentes: [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md).
 
-| Archivo | ¿Dónde? | ¿Para qué? |
-|---------|---------|------------|
-| `app/defaults.yml` | Dentro de `app/` | **NO EDITAR** - Plantilla base del sistema |
-| `app/config.yml` | Dentro de `app/` | **TU CONFIGURACIÓN** - Créalo tú |
-| `docker-compose.yml` | Raíz | Para Docker (no lo toques) |
+## Archivos que importan
 
-## Instalación Rápida
+| Archivo | Dónde | Para qué |
+|---|---|---|
+| `.env` | Raíz (ignorado por git) | **Secretos**: `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` y, opcional, `GETXAPI_API_KEY`, `GEMINI_API_KEY`. Se crea copiando `.env.example`. |
+| `config.yml` | Raíz (ignorado por git) | **Tu configuración**. Se crea copiando `config-clean.yml`. Se monta en solo lectura en el contenedor. |
+| `config-clean.yml` | Raíz | Plantilla lista para usar (Wyckoff activo, 50 pares, RSI/MACD sin avisos). |
+| `app/defaults.yml` | `app/` | Valores base del sistema. No editar. |
+| `docker-compose.yml` | Raíz | Contenedor, volúmenes y límites. |
 
-### Opción 1: Docker (Recomendado)
+## Instalación (Docker)
 
 ```bash
 git clone https://github.com/ssolis-ti/crypto-signal.git
 cd crypto-signal
+git checkout main
 
-# Crear tu configuración
-cp app/defaults.yml app/config.yml
+cp .env.example .env            # editar: TELEGRAM_TOKEN y TELEGRAM_CHAT_ID
+cp config-clean.yml config.yml  # revisar timezone y top_n
 
-# Editar app/config.yml con tus credenciales de Telegram
-
-# Ejecutar
-docker-compose up --build
+docker compose up -d --build
+docker logs -f crypto-signal    # debe mostrar "sleeping for N seconds (next cycle aligned to the clock)"
 ```
 
-### Opción 2: Python Local
+Credenciales de Telegram:
+1. **Token:** [@BotFather](https://t.me/BotFather) → `/newbot`.
+2. **Chat ID:** [@userinfobot](https://t.me/userinfobot). Escríbele antes un mensaje a tu bot para que pueda enviarte.
 
-```bash
-git clone https://github.com/ssolis-ti/crypto-signal.git
-cd crypto-signal/app
+## Qué esperar
 
-pip install -r requirements-step-1.txt
-pip install -r requirements-step-2.txt
+- El bot analiza los 50 pares de mayor volumen cada 5 minutos.
+- El aviso que importa, **OPORTUNIDAD DE COMPRA**, solo puede salir justo después de que cierra una vela de 4 h (00, 04, 08, 12, 16, 20 UTC).
+- Días sin avisos son normales: los avisos son raros.
 
-cp defaults.yml config.yml
-# Editar config.yml
+## Documentación
 
-python app.py
-```
-
-## Configuración Mínima (`app/config.yml`)
-
-```yaml
-settings:
-  update_interval: 60
-  market_pairs: [BTC/USDT]
-  enable_charts: true
-
-exchanges:
-  binance:
-    required:
-      enabled: true
-
-notifiers:
-  telegram:
-    required:
-      token: "TU_TOKEN"      # De @BotFather
-      chat_id: "TU_CHAT_ID"  # De @userinfobot
-
-indicators:
-  rsi:
-    - enabled: true
-      alert_enabled: true
-      signal: [rsi]
-      hot: 30
-      cold: 70
-      candle_period: 1h
-      period_count: 14
-```
-
-## Obtener Credenciales de Telegram
-
-1. **Token**: Habla con [@BotFather](https://t.me/BotFather) → `/newbot`
-2. **Chat ID**: Habla con [@userinfobot](https://t.me/userinfobot)
-
----
-
-📖 Documentación completa: [`docs/config.md`](docs/config.md)
+| Documento | Contenido |
+|---|---|
+| [`docs/GUIA_DE_AVISOS.md`](docs/GUIA_DE_AVISOS.md) | Qué es cada aviso y qué hacer |
+| [`docs/OPERACION.md`](docs/OPERACION.md) | Uso diario, revisiones, riesgos |
+| [`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md) | Instalar, migrar, actualizar, tests, problemas |
+| [`docs/CIERRE_PROYECTO.md`](docs/CIERRE_PROYECTO.md) | Qué funcionó, qué no, límites |
+| [`docs/config.md`](docs/config.md) | Referencia completa de `config.yml` |

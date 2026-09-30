@@ -1,14 +1,18 @@
-# Estado de crypto-signal y pendientes (registro al 2026-09-29, actualizado al final del día)
+# Estado de crypto-signal y pendientes (bitácora; cierre v2.0 al 2026-09-30)
+
+> Resumen ejecutivo y vigente: [`CIERRE_PROYECTO.md`](CIERRE_PROYECTO.md). Esta bitácora conserva el detalle cronológico;
+> las cifras de la sección "Estado" están actualizadas al cierre, el resto es histórico.
 
 Trabajo en tres fases: (1) Freqtrade (proyecto aparte, `~/freq`: bots en dry-run y laboratorio de backtests),
-(2) crypto-signal (esta base de código, hecha), (3) fase de análisis (pendiente, la define el operador).
+(2) crypto-signal (esta base de código, hecha), (3) fase de análisis (hecha hasta el spec 052).
 crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a mano. Freqtrade se usó aquí
 únicamente como laboratorio de backtests y no se tocaron sus bots.
 
 ## Estado
 
-- `main` con 360 tests pasando, desplegado en Docker (`docker compose up -d --build`). Specs 001-041. Vigila 30 pares (`top_n: 30` en `config.yml`, gitignored).
-- Vigila 20 pares USDT de Binance por volumen (stablecoins y tokens de oro excluidos). Los 36 slices están en `specs/`.
+- `main` con 398 tests pasando, desplegado en Docker (`docker compose up -d --build`). Specs 001-052. Vigila **50 pares** por volumen (`top_n: 50`; stablecoins y tokens de oro excluidos).
+- **052** Radar intradía (velas 1 h, volumen + retorno propio) probado 2022-26: sin ventaja, ni long ni short. Los registros incluyen `exchange_time` y `clock_skew_s`.
+- QA final con agentes externos: el radar reintenta si Telegram falla y no puede costar un spring del mismo par. Avisos RSI/MACD apagados.
 - **Único edge validado:** Spring de Wyckoff (long) en 4h con volumen de ruptura >= 2.5x, manteniendo ~72 h con stop -10%
   (acierto 56-58%, +1.5% a +1.8% por trade tomando todas las señales; con tope de 3 posiciones ~+1% y 50-56%).
   Upthrust (short): sin edge fiable, solo informativo.
