@@ -36,7 +36,7 @@ Lista de monedas "muy vendidas" o "muy compradas" según RSI/MACD. En las prueba
 - **Stop loss:** orden que cierra tu operación sola si el precio cae 10% desde tu entrada. Limita cuánto puedes perder.
 - **Precio de referencia:** el precio al cierre de la vela; sirve para calcular tu stop. Tu precio de entrada real será parecido.
 - **Canasta:** comprar varias monedas de la lista a la vez, en partes iguales. En días de pánico el resultado viene del conjunto, no de una moneda.
-- **Vela de 4 h:** el bot mira el mercado en bloques de 4 horas; el aviso llega ~7 minutos después de que cierra una vela.
+- **Vela de 4 h:** el bot mira el mercado en bloques de 4 horas; el aviso llega ~1 minuto después de que cierra una vela.
 - **Apalancamiento 1x:** operar solo con tu dinero, sin prestado.
 
 Todo es probabilidad, no garantía. No es asesoría financiera.
