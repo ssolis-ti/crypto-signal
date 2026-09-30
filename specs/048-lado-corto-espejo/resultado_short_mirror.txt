@@ -1,0 +1,28 @@
+universo: 226 simbolos
+media incondicional del SHORT (cualquier vela elegible): +0.07%
+
+senal                                  n dias | 2022-24              | 2025-26              |  unido         exceso IC99%
+S2 subida >= +15% en 24h            3289 1080 | n=2237  -0.45%  47% | n=1052  +1.14%  48% |  +0.06 [ -0.82, +0.86]
+S3 climax de compra (BC)            2833 1150 | n=2048  -0.30%  48% | n= 785  +0.74%  48% |  -0.01 [ -0.69, +0.55]
+S5 amplitud de maximos >= 25%         82   82 | n=  45  -1.35%  36% | n=  37  -0.39%  43% |  -0.92 [ -2.48, +0.51]
+funding agregado: umbral decil superior (2022-24) = 0.0100% por pago
+S4 funding agregado en decil alto     77   77 | n=  40  -1.16%  35% | n=  37  -0.45%  43% |  -0.82 [ -2.43, +0.70]
+
+S1 upthrusts confirmados: 7422 | fraccion de pares con upthrust en la vela: p50 0.04, p90 0.11
+tramo (fraccion de pares)    | 2022-24                                | 2025-26                               
+< 10%                        | n=4838 media= +0.13% acierto= 50% dias=983 | n=1708 media= +0.78% acierto= 50% dias=519
+10-20%                       | n= 337 media= -2.35% acierto= 40% dias= 39 | n= 190 media= +1.29% acierto= 59% dias= 33
+20-35%                       | n= 199 media= -2.72% acierto= 35% dias=  8 | n=  61 media= -2.65% acierto= 39% dias=  6
+>= 35%                       | n=  69 media= -1.60% acierto= 52% dias=  2 | n=  20 media= -0.41% acierto= 55% dias=  1
+< 20%                        | n=5175 media= -0.03% acierto= 49% dias=983 | n=1898 media= +0.83% acierto= 51% dias=525
+>= 20% (amplio)              | n= 268 media= -2.43% acierto= 40% dias= 10 | n=  81 media= -2.10% acierto= 43% dias=  7
+  amplio - no amplio, IS: -2.41 pp
+  amplio - no amplio, OOS: -2.93 pp
+  amplio - no amplio, AMBOS: -2.56 pp  IC99% [-5.95, +0.79]
+
+VEREDICTO (criterio pre-registrado):
+  S2 subida >= +15% en 24h: NO aprueba
+  S3 climax de compra (BC): NO aprueba
+  S5 amplitud de maximos >= 25%: NO aprueba
+  S4 funding agregado en decil alto: NO aprueba
+  S1 clúster de upthrusts: NO aprueba

@@ -37,6 +37,8 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
   sesión de apoyo mutuo con opencode y agy: la amplitud de mínimos no funciona, la de springs confirmados sí es graduada (>= 20% de los pares: +3.8% en 2022-24, +1.5% en 2025-26),
   OI/long-short históricos no aprueban, y en días de capitulación amplia BTC/ETH no aportan (la canasta de alts sí: +2.23%). El aviso ya muestra fracción de pares, liquidez y hora UTC/Santiago.
 
+- **047-048** Estructura completa de Wyckoff (SC, ST, SOS, LPS, SOW, LPSY, spring tras caída) y el espejo corto de todo lo probado en long: **nada aprueba**. Solo el Spring (long) en capitulación amplia tiene ventaja medible.
+
 ## Pendiente
 
 0. Candidatos que quedan de la sesión de apoyo mutuo (ver specs/044 y 046; la entrada secundaria/retest ya se probó y NO aprueba): desliste anunciado por Binance como catalizador
