@@ -1,0 +1,12 @@
+springs en dias amplios: 1478 | dias: 49 | springs por dia: mediana 22 p10 12 p90 61
+media general +2.91% | sd total 9.39
+varianza DENTRO del dia sigma^2 = 32.9 (sd 5.74 pp)
+varianza de las medias diarias = 54.1; componente ENTRE dias tau^2 = 53.0 (sd 7.28 pp)
+ICC (parte de la varianza que es del dia) = 0.62
+sd de la media diaria = 7.36 pp -> SE con 49 dias = 1.05 pp
+media diaria: p10 -9.45  p50 0.57  p90 12.00 | dias con media<0: 45%
+factor de contraccion del efecto-dia (empirical Bayes): mediana 0.97, p10 0.95, p90 0.99
+simbolos distintos: 147 | episodios por simbolo: mediana 6, max 39
+
+CUSUM (unidades % por episodio): k=1.115, sd episodio=7.36, h(ARL0=100 segun agy)=111.7
+  deriva bajo edge muerto (mu=0): +1.115 por episodio -> tiempo minimo a h: 100.2 episodios (sin ruido)
