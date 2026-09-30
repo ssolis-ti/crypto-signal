@@ -1,0 +1,10 @@
+springs: 3476 | con retest (1-8 velas despues): 727 (21%) | espera media 4.9 velas
+
+           |     n orig media  stop | secundaria acierto  stop | dif pareada dias
+IS         |   457      -3.74   40% |      -0.24     42%   48% |       +3.50  206
+OOS        |   270      -3.57   34% |      +0.26     45%   40% |       +3.83  108
+AMBOS      |   727      -3.68   38% |      -0.06     43%   45% |       +3.62  314
+springs SIN retest (se pierden): n=2749, media de su entrada original +3.01% (acierto 61%) | con retest, entrada original -3.68%
+diferencia pareada unida (secundaria - original): +3.62 pp  IC95 por dia [+2.78, +4.38]
+criterios: (1) media secundaria >= +1.5% en IS y OOS: False | (2) dif pareada > 0 en ambos y IC excluye 0: True | (3) stop <= 28%: False | (4) >= 30 dias por periodo: True
+VEREDICTO: NO aprueba

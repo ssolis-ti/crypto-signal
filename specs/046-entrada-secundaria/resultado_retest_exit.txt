@@ -1,0 +1,8 @@
+springs: 3476 | con retest: 727 (21%)
+       |     n mantener 72h acierto | salir en retest acierto |  mejora
+IS     |  2379        +1.78     56% |           +1.82     54% |   +0.04
+OOS    |  1097        +1.26     48% |           +1.21     46% |   -0.05
+AMBOS  |  3476        +1.61     54% |           +1.62     52% |   +0.01
+solo los 727 con retest: mantener -3.68% (acierto 27%) -> salir en el retest -3.62% (acierto 17%)
+mejora general unida: +0.01 pp  IC95 por dia [-0.13, +0.15]
+VEREDICTO (criterio pre-registrado): NO aprueba

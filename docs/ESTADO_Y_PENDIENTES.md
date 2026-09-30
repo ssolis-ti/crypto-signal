@@ -39,8 +39,8 @@ crypto-signal es un bot **solo de alertas** por Telegram; el operador opera a ma
 
 ## Pendiente
 
-0. Candidatos sin probar de la sesión de apoyo mutuo (ver specs/044): entrada secundaria (retest), desliste anunciado como catalizador, Gemini como disyuntor de riesgo,
-   funding agregado como confirmación incremental, resumen matutino en hora de Santiago.
+0. Candidatos que quedan de la sesión de apoyo mutuo (ver specs/044 y 046; la entrada secundaria/retest ya se probó y NO aprueba): desliste anunciado por Binance como catalizador
+   (faltan fechas de anuncio), Gemini como disyuntor de riesgo ante hack/insolvencia, funding agregado como confirmación incremental, resumen matutino en hora de Santiago.
 1. Esperar >= 50 alertas reales maduras (>= 72 h) y correr `specs/040-validacion-hacia-adelante/validate_forward.py`
    (hoy hay 6, todas Upthrust). Decidir ahí si la barrida >= 1% u otro dato pasa de "mostrar" a "filtrar".
 2. **Sesgo de supervivencia (spec 042, hueco principal):** repetir el backtest incluyendo perpetuos deslistados de Binance; hoy los 29 pares
