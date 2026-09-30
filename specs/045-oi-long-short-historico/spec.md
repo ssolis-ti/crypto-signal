@@ -19,3 +19,19 @@ pueden validar hacia adelante": hoy el bot los registra en cada alerta (`micro`,
 - Aprueba SOLO si, en la dirección fijada: signo correcto en 2022-24 y en 2025-26; IC unido excluye 0; |dif unida| >= 0.5 pp;
   >= 30 días distintos por celda y período. Cobertura: se reporta el % de springs con métricas disponibles.
 - Si aprueba: no filtra el bot; se muestra/registra como hipótesis hasta >= 50 alertas reales (el bot ya registra `micro`).
+
+## Resultado (resultado_oi_ls.txt)
+Cobertura: **100% de los 3,476 springs tienen open interest a 24 h y 99% ratio long/short** (las métricas históricas existen para todo el
+universo, incluidos deslistados). Terciles congelados con 2022-24: OI 24h [-9.28%, -0.92%]; long/short [2.19, 3.08].
+
+**Ninguna hipótesis aprueba.**
+- H1 OI 24h en el tercil inferior (limpieza de apalancamiento): 2022-24 **+2.21 pp** (media +3.25%, acierto 63%, 140 días) pero 2025-26
+  **-1.31 pp** (signo invertido); unido +1.29 pp, IC97.5% por día [-1.39, +3.94].
+- H2 long/short en el tercil inferior (cortos): +0.45 pp en 2022-24 y +0.86 pp en 2025-26 (mismo signo, efecto chico); unido +0.40 pp, IC [-1.42, +2.39].
+- Placebo (no cuenta para aprobar) OI 24h en el tercil SUPERIOR: -1.29 pp (2022-24) y -2.09 pp (2025-26); unido -1.57 pp, IC [-3.75, +0.55].
+  Es consistente en los dos períodos y va en el sentido que se esperaría si "OI subiendo fuerte durante el spring = peor" (los
+  que abren posiciones al caer siguen cayendo). **Observación exploratoria, no pre-registrada: no se actúa**; el bot ya registra
+  `micro.oi_change_24h_pct` y se revisa con >= 50 alertas reales.
+
+Conclusión: el mismo patrón que funding y horarios: un efecto grande en 2022-24 que no sobrevive fuera de muestra. El OI/long-short queda
+como dato informativo registrado; ahora también se sabe que se pueden backtestear (archivos diarios de data.binance.vision).
