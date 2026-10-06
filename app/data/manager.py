@@ -112,6 +112,15 @@ class DataCache:
             del self._store[key]
 
 
+def _quoted_market(symbol: str, quote: str) -> bool:
+    """Spot BTC/USDT o perpetuo lineal BTC/USDT:USDT. Deja fuera fechas, USDC y coin-m."""
+    if not isinstance(symbol, str) or not quote:
+        return False
+    if symbol.endswith(f'/{quote}') and ':' not in symbol:
+        return True
+    return symbol.endswith(f'/{quote}:{quote}')
+
+
 class DataManager:
     """
     Gestor centralizado de datos de mercado.
@@ -202,10 +211,11 @@ class DataManager:
         tickers = self.get_tickers(exchange)
         self.logger.debug(f"get_tickers returned {len(tickers)} tickers for {exchange}")
 
-        # Filtrar y ordenar
+        # Filtrar y ordenar. Spot es BTC/USDT. El perpetuo lineal USD-M es BTC/USDT:USDT.
+        # Un futuro con fecha (BTC/USDT:USDT-261225) o uno en USDC no entra.
         pairs_with_volume = []
         for symbol, ticker in tickers.items():
-            if not symbol.endswith(f'/{quote}'):
+            if not _quoted_market(symbol, quote):
                 continue
 
             volume = ticker.get('quoteVolume', 0) or 0

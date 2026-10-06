@@ -93,8 +93,10 @@ def main():
             )
             market_data.update(exchange_markets)
         else:
-            logger.info("No configured markets, using all available on exchange.")
-            market_data.update(exchange_interface.get_exchange_markets())
+            logger.error(
+                "No configured markets for %s. Not loading every market on the exchange.",
+                exchange_name,
+            )
 
     thread_list = []
 

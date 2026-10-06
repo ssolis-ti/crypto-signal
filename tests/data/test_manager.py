@@ -191,3 +191,17 @@ class TestGetTopPairs:
         manager = self._manager_with_tickers({'ETH/BTC': {'quoteVolume': 999}})
 
         assert manager.get_top_pairs('binance', quote='USDT') == []
+
+    def test_linear_usdt_perpetuals_are_kept_and_other_contracts_are_not(self):
+        manager = self._manager_with_tickers({
+            'BTC/USDT:USDT': {'quoteVolume': 500},
+            'ETH/USDT:USDT': {'quoteVolume': 400},
+            'BTC/USDT:USDT-261225': {'quoteVolume': 900},
+            'ETH/USDC:USDC': {'quoteVolume': 800},
+            'BTC/USD:BTC': {'quoteVolume': 700},
+            'SOL/USDT': {'quoteVolume': 50},
+        })
+
+        result = manager.get_top_pairs('binance', quote='USDT', top_n=10)
+
+        assert result == ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT']

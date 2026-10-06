@@ -52,6 +52,21 @@ class TestPairResolverDynamicMode:
         # requested more than top_n to compensate for the exclusion
         assert dm.calls[0]['top_n'] == 2 + 1
 
+    def test_spot_exclusion_also_drops_the_perpetual_symbol(self):
+        dm = FakeDataManager(['BTC/USDT:USDT', 'ETH/USDT:USDT', 'BNB/USDT:USDT'])
+        settings = {
+            'market_pairs': None,
+            'dynamic_pairs': {
+                'enabled': True, 'source': 'volume', 'top_n': 5,
+                'quote_currency': 'USDT', 'exclude': ['ETH/USDT'],
+            },
+        }
+        resolver = PairResolver(settings, dm)
+
+        result = resolver.resolve('binance')
+
+        assert result == ['BTC/USDT:USDT', 'BNB/USDT:USDT']
+
     def test_data_manager_none_returns_empty_list(self):
         settings = {
             'market_pairs': None,

@@ -121,8 +121,9 @@ class PairResolver:
             self.logger.error(f"Error obteniendo top pairs para {exchange}: {e}")
             return []
         
-        # Aplicar exclusiones
-        filtered = [p for p in pairs if p not in exclude][:top_n]
+        # Aplicar exclusiones. La lista del config está en forma spot (USDC/USDT);
+        # en perpetuos el mismo mercado se llama USDC/USDT:USDT.
+        filtered = [p for p in pairs if p not in exclude and p.split(':')[0] not in exclude][:top_n]
         
         self.logger.info(f"Pares resueltos: {len(filtered)} activos")
         return filtered

@@ -121,6 +121,8 @@ exchanges:
   binance:
     required:
       enabled: true
+    # Perpetuos USD-M, el mercado del estudio. El selector se queda con BTC/USDT:USDT.
+    future: true
 
 # ═══════════════════════════════════════════
 # NOTIFICADORES
