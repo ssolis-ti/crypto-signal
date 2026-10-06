@@ -1,14 +1,15 @@
 """
 Alertas Wyckoff en vivo (specs/023-wyckoff-live-alerts/).
 
-Envia una alerta de Telegram cuando la ultima vela de 4h cerrada confirma un
-Spring/Upthrust con volumen extremo en la ruptura (>=2.5x el promedio) -- el UNICO
-filtro que sobrevivio validacion in-sample/out-of-sample en este proyecto
-(specs/017-wyckoff-edge-refinement/). El plan del mensaje sale del backtest en Freqtrade
-(specs/032-freqtrade-lab-wyckoff/), que refuto el encuadre "rapido" de 1-2h y el de 14d:
+La unica alerta de Telegram es el Spring de la ultima vela de 4h cerrada, con
+volumen extremo en la ruptura (>=2.5x el promedio) -- el UNICO filtro que sobrevivio
+validacion in-sample/out-of-sample en este proyecto (specs/017-wyckoff-edge-refinement/).
+El plan del mensaje sale del backtest en Freqtrade (specs/032-freqtrade-lab-wyckoff/),
+que refuto el encuadre "rapido" de 1-2h y el de 14d:
 
   - Spring: long, mantener ~72h, stop -10% (consistente en 2022-2024 y 2025-2026).
-  - Upthrust: solo informativo, perdio en promedio en 2022-2024.
+    Es la alerta principal: entra al chat y el HTML queda en telegram_sent.jsonl.
+  - Upthrust y radar de rumores: se detectan y se registran, no se envian.
 
 Deliberadamente independiente de SignalEnhancer/SmartNotificationManager (ese
 scoring ya se probo, dos veces, que no predice nada -- specs/007, specs/011): esta
@@ -25,11 +26,12 @@ import structlog
 
 from analyzers.utils import IndicatorUtils
 from analyzers.indicators.wyckoff import WyckoffPrimitives
-from analysis.alert_text import (AlertItem, build_group_buy, build_info_bearish, build_radar, build_single_buy)
+from analysis.alert_text import LOW_LIQUIDITY_USD, WIDE_FRACTION, AlertItem, build_group_buy, build_single_buy
 from analysis.market_microstructure import MarketMicrostructure
 from analysis.twitter_sentiment import TwitterSentimentAnalyzer
 
 DEFAULT_RECORD_PATH = 'agent_state/rumor_radar.jsonl'
+SENT_ARCHIVE_NAME = 'telegram_sent.jsonl'
 DEFAULT_RADAR_MIN_RATIO = 2.0
 RADAR_MAX_FAILURES = 3
 SEND_MAX_FAILURES = 12  # ciclos de 5 min: ~1h reintentando si Telegram no responde
@@ -70,7 +72,9 @@ class WyckoffAlerter:
         self._radar_failures: Dict[str, int] = {}
         self._send_failures: Dict[str, int] = {}
         self._concurrent: Dict[tuple, int] = {}
-        self._watched: Optional[int] = None  # pares revisados en el ciclo (para expresar la amplitud como fraccion)
+        self._watched: Optional[int] = None  # pares liquidos del ciclo: denominador del 20%
+        self._liquid_watched: Optional[int] = None
+        self._apply_breadth_gate = False  # check_cycle lo enciende; check_and_alert no tiene universo
         self.twitter_sentiment = TwitterSentimentAnalyzer(enabled=twitter_sentiment_enabled)
         # El radar necesita Twitter: sin el no hay nada que cruzar con el volumen.
         self.rumor_radar_enabled = rumor_radar_enabled and twitter_sentiment_enabled
@@ -112,6 +116,7 @@ class WyckoffAlerter:
         de deteccion se loguea y se ignora -- nunca debe interrumpir el ciclo de analisis
         (Principio: degradar seguro, nunca romper el pipeline).
         """
+        self._apply_breadth_gate = False
         self._deliver(self._collect_pair(exchange, market_pair, candle_period, historical_data))
 
     def _collect_pair(self, exchange: str, market_pair: str, candle_period: str, historical_data) -> list:
@@ -129,15 +134,15 @@ class WyckoffAlerter:
 
     def check_cycle(self, exchange: str, pairs_data: Dict[str, list]) -> None:
         """
-        Revisa todos los pares de un exchange en un ciclo. Primero cuenta cuantos pares tienen
-        evento en la MISMA vela: el edge viene de capitulaciones de todo el mercado (springs aislados
-        casi sin ventaja; >= 20% de los pares a la vez, mucho mejor), y ese dato solo se conoce mirando
-        todos los pares antes de avisar. Los avisos de una misma vela salen juntos en UN mensaje.
+        Revisa todos los pares de un exchange en un ciclo. Primero cuenta cuantos pares LIQUIDOS
+        (>= 20 millones USD en 24 h) tienen evento en la MISMA vela. Telegram recibe la compra
+        solo si esos springs son >= 20% de los pares liquidos. El resto se registra y no se envia.
         """
         if not self.enabled:
             return
-        self._concurrent = self._count_concurrent(exchange, pairs_data)
-        self._watched = len(pairs_data)
+        self._apply_breadth_gate = True
+        self._concurrent, self._liquid_watched = self._count_concurrent(exchange, pairs_data)
+        self._watched = self._liquid_watched
         pending = []
         for market_pair, historical_data in pairs_data.items():
             try:
@@ -146,13 +151,18 @@ class WyckoffAlerter:
                 self.logger.error(f"[WYCKOFF] Exception checking pair {market_pair} on {exchange}: {e}")
         self._deliver(pending)
 
-    def _count_concurrent(self, exchange: str, pairs_data: Dict[str, list]) -> Dict[tuple, int]:
+    def _count_concurrent(self, exchange: str, pairs_data: Dict[str, list]):
+        """Cuenta solo pares con volumen 24h >= 20 millones USD. Devuelve (conteos, universo liquido)."""
         counts: Dict[tuple, int] = {}
+        liquid = 0
         for market_pair, historical_data in pairs_data.items():
             if not historical_data or len(historical_data) < self._min_history():
                 continue
             try:
                 df = IndicatorUtils().convert_to_dataframe(historical_data)
+                if not self._is_liquid_df(df):
+                    continue
+                liquid += 1
                 events = [event for event, _ in self._recent_events(df)]
             except Exception as e:
                 self.logger.error(f"[WYCKOFF] No se pudo contar eventos de {market_pair}: {e}")
@@ -160,7 +170,17 @@ class WyckoffAlerter:
             for event in events:
                 key = (exchange, event[0], event[2].isoformat())
                 counts[key] = counts.get(key, 0) + 1
-        return counts
+        return counts, liquid
+
+    @staticmethod
+    def _is_liquid_df(df) -> bool:
+        dvol = WyckoffAlerter._dollar_volume_24h(df)
+        return dvol is not None and dvol >= LOW_LIQUIDITY_USD
+
+    @staticmethod
+    def _is_liquid_event(event: dict) -> bool:
+        dvol = event.get('dvol24h')
+        return dvol is not None and dvol >= LOW_LIQUIDITY_USD
 
     @staticmethod
     def _min_history() -> int:
@@ -275,22 +295,45 @@ class WyckoffAlerter:
             except Exception as e:
                 self.logger.error(f"[WYCKOFF] No se pudo enviar el aviso de {[g['pair'] for g in group]}: {e}")
 
+    def _silent(self, g: dict, direction: str, timestamp, watched, reason: str) -> None:
+        self._remember(g['signature'])
+        concurrent = g.get('concurrent')
+        self.logger.info(f"[WYCKOFF] Registrado (sin Telegram): {g['pair']} {reason} "
+                         f"(vela={timestamp}, vol={g['break_rv']:.2f}x, {concurrent}/{watched})")
+        self._record_wyckoff(g, direction, timestamp, twitter_result=None)
+
     def _deliver_group(self, direction: str, timestamp, group: list) -> None:
-        watched = self._watched or DEFAULT_WATCHED
+        watched = DEFAULT_WATCHED if self._watched is None else self._watched
+        if direction != 'hot':
+            # Upthrust: se registra para validarlo, no entra al chat. La unica alerta es el spring.
+            for g in group:
+                self._silent(g, direction, timestamp, watched, 'upthrust')
+            return
+        if self._apply_breadth_gate:
+            liquid = [g for g in group if self._is_liquid_event(g)]
+            for g in group:
+                if g not in liquid:
+                    self._silent(g, direction, timestamp, watched, 'spring poco liquido')
+            concurrent = group[0].get('concurrent') or 0
+            wide = watched > 0 and concurrent / watched >= WIDE_FRACTION
+            if not wide or not liquid:
+                for g in liquid:
+                    self._silent(g, direction, timestamp, watched, 'spring bajo el 20%')
+                return
+            group = liquid
+
         items = [AlertItem(pair=g['pair'], direction=direction, price=g['price'], volume_x=g['break_rv'],
                            candle_open=timestamp, concurrent=g['concurrent'], watched=watched,
                            dvol24h=g['dvol24h'], change_24h=g['change_24h']) for g in group]
         elapsed = self._elapsed_hours(timestamp)
         twitter_result = None
-        if direction == 'hot' and len(group) == 1:
+        if len(group) == 1:
             ticker = group[0]['pair'].split('/')[0]
             twitter_result = self.twitter_sentiment.analyze(ticker, direction)
             items[0].twitter_section = TwitterSentimentAnalyzer.format_section(twitter_result)
-        if direction == 'hot':
-            text = (build_single_buy(items[0], self.timezone_str, elapsed) if len(items) == 1
-                    else build_group_buy(items, self.timezone_str, elapsed))
-        else:
-            text = build_info_bearish(items, self.timezone_str, elapsed)
+
+        text = (build_single_buy(items[0], self.timezone_str, elapsed) if len(items) == 1
+                else build_group_buy(items, self.timezone_str, elapsed))
 
         if self.notifier.send_direct_text(text) is False:
             # Telegram no respondio: NO se da por enviado, se reintenta en el ciclo siguiente.
@@ -305,33 +348,65 @@ class WyckoffAlerter:
                     self._send_failures.pop(g['signature'], None)
             return
 
+        self._archive_sent([g['pair'] for g in group], timestamp, text)
         for g in group:
             self._send_failures.pop(g['signature'], None)
             self._remember(g['signature'])
-            self.logger.info(f"[WYCKOFF] Alert sent: {g['pair']} {direction} (break_relative_volume={g['break_rv']:.2f}x, "
-                             f"grupo de {len(group)})")
-            self._record({
-                'type': 'wyckoff', 'direction': direction, 'exchange': g['exchange'], 'pair': g['pair'],
+            self.logger.info(f"[WYCKOFF] Alert sent: {g['pair']} hot (break_relative_volume={g['break_rv']:.2f}x, "
+                             f"grupo de {len(group)}, {g['concurrent']}/{watched})")
+            self._record_wyckoff(g, direction, timestamp, twitter_result)
+
+    def _record_wyckoff(self, g: dict, direction: str, timestamp, twitter_result) -> None:
+        self._record({
+            'type': 'wyckoff', 'direction': direction, 'exchange': g['exchange'], 'pair': g['pair'],
+            'candle': timestamp.isoformat() if timestamp is not None else None,
+            'relative_volume': round(g['break_rv'], 2),
+            'sweep_depth_pct': None if g['sweep_depth'] is None else round(float(g['sweep_depth']), 3),
+            'concurrent_pairs': g['concurrent'],
+            'watched_pairs': self._watched,
+            'weekend_close': self._is_weekend_close(timestamp),
+            'dvol24h_usd': None if g['dvol24h'] is None else round(g['dvol24h'], 0),
+            'change_24h_pct': None if g['change_24h'] is None else round(float(g['change_24h']), 2),
+            'mentions_now': (twitter_result or {}).get('current'),
+            'mentions_7d_ago': (twitter_result or {}).get('baseline'),
+            'ratio': (twitter_result or {}).get('ratio'),
+            'sentiment': (twitter_result or {}).get('sentiment_extreme'),
+            'micro': self._safe_microstructure(g['exchange'], g['pair']),
+            'eligible': self._is_liquid_event(g),
+        })
+
+    def _sent_archive_path(self) -> Optional[str]:
+        if not self.record_path:
+            return None
+        directory = os.path.dirname(self.record_path)
+        return os.path.join(directory, SENT_ARCHIVE_NAME) if directory else SENT_ARCHIVE_NAME
+
+    def _archive_sent(self, pairs: list, timestamp, text: str) -> None:
+        """El HTML que salio a Telegram, para leerlo sin abrir el chat. No reintenta el envio."""
+        path = self._sent_archive_path()
+        if not path:
+            return
+        try:
+            row = {
+                'recorded_at': datetime.now(timezone.utc).isoformat(),
+                'kind': 'wyckoff_hot',
+                'pairs': pairs,
                 'candle': timestamp.isoformat() if timestamp is not None else None,
-                'relative_volume': round(g['break_rv'], 2),
-                'sweep_depth_pct': None if g['sweep_depth'] is None else round(float(g['sweep_depth']), 3),
-                'concurrent_pairs': g['concurrent'],
-                'watched_pairs': self._watched,
-                'weekend_close': self._is_weekend_close(timestamp),
-                'dvol24h_usd': None if g['dvol24h'] is None else round(g['dvol24h'], 0),
-                'change_24h_pct': None if g['change_24h'] is None else round(float(g['change_24h']), 2),
-                'mentions_now': (twitter_result or {}).get('current'),
-                'mentions_7d_ago': (twitter_result or {}).get('baseline'),
-                'ratio': (twitter_result or {}).get('ratio'),
-                'sentiment': (twitter_result or {}).get('sentiment_extreme'),
-                'micro': self._safe_microstructure(g['exchange'], g['pair']),
-            })
+                'text': text,
+            }
+            directory = os.path.dirname(path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            with open(path, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(row, ensure_ascii=False) + '\n')
+        except Exception as e:
+            self.logger.error(f"[RECORD] No se pudo guardar el texto enviado: {e}")
 
     def _check_rumor_radar(self, exchange: str, market_pair: str, df, timestamp) -> None:
         """
         Radar volumen + rumor (specs/033-rumor-radar/): vela de 4h cerrada con volumen
         extremo SIN evento Wyckoff -> se mira si las menciones en Twitter se aceleran.
-        No validado: aviso para mirar el grafico, no una entrada.
+        No validado y no es la alerta principal: se registra, no se manda a Telegram.
         """
         rel_vol = WyckoffPrimitives.relative_volume(df).iloc[-1]
         if pd.isna(rel_vol) or rel_vol < EXTREME_VOLUME_THRESHOLD:
@@ -360,18 +435,11 @@ class WyckoffAlerter:
         triggered = ratio is not None and ratio >= self.radar_min_ratio
 
         twitter_result = None
-        sent = False
         if triggered:
             twitter_result = self.twitter_sentiment.analyze(ticker, 'radar', velocity=velocity)
-            sent = self._send_radar_alert(exchange, market_pair, rel_vol, candle_change, twitter_result,
-                                          change_24h=self._change_24h(df), timestamp=timestamp)
-            if not sent:
-                # Telegram fallo: se reintenta el ciclo siguiente (hasta SEND_MAX_FAILURES) en vez de perder el aviso
-                failures = self._radar_failures.get(signature, 0) + 1
-                self._radar_failures[signature] = failures
-                if failures < SEND_MAX_FAILURES:
-                    return
-                self._radar_failures.pop(signature, None)
+            ratio_txt = "n/a" if ratio is None else f"{ratio:.2f}"
+            self.logger.info(f"[RADAR] Registrado (sin Telegram): {market_pair} (vela={timestamp}, "
+                             f"rel_vol={rel_vol:.2f}x, menciones_ratio={ratio_txt})")
         self._remember(signature)
 
         self._record({
@@ -379,21 +447,9 @@ class WyckoffAlerter:
             'candle': timestamp.isoformat(), 'relative_volume': round(float(rel_vol), 2),
             'candle_change_pct': round(float(candle_change), 2),
             'mentions_now': velocity.get('current'), 'mentions_7d_ago': velocity.get('baseline'),
-            'ratio': ratio, 'max_views': velocity.get('max_views'), 'alert_sent': sent,
+            'ratio': ratio, 'max_views': velocity.get('max_views'), 'alert_sent': False,
             'sentiment': (twitter_result or {}).get('sentiment_extreme'),
         })
-
-    def _send_radar_alert(self, exchange: str, market_pair: str, rel_vol: float,
-                          candle_change: float, twitter_result,
-                          change_24h: Optional[float] = None, timestamp=None) -> bool:
-        text = build_radar(market_pair, rel_vol, candle_change, timestamp, self.timezone_str,
-                           self._elapsed_hours(timestamp), TwitterSentimentAnalyzer.format_section(twitter_result))
-        delivered = self.notifier.send_direct_text(text)
-        if delivered is False:
-            self.logger.error(f"[RADAR] Telegram no entrego el aviso de {market_pair}; se reintenta")
-            return False
-        self.logger.info(f"[RADAR] Alert sent: {market_pair} (rel_vol={rel_vol:.2f}x)")
-        return True
 
     def _record(self, event: dict) -> None:
         """Registro para validar despues con datos reales hacia adelante. Nunca rompe el ciclo."""
@@ -411,7 +467,7 @@ class WyckoffAlerter:
             with open(self.record_path, 'a', encoding='utf-8') as f:
                 f.write(json.dumps(event, default=str) + '\n')
         except Exception as e:
-            self.logger.error(f"[RADAR] No se pudo registrar el evento: {e}")
+            self.logger.error(f"[RECORD] No se pudo registrar el evento {event.get('type', 'evento')}: {e}")
 
     @staticmethod
     def _change_24h(df) -> Optional[float]:

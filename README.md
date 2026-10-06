@@ -4,7 +4,7 @@ Bot de **alertas** para criptomonedas (Binance USD-M, velas de 4 h) con avisos a
 sencillo. Solo lectura: usa datos públicos de mercado vía CCXT, no tiene claves de exchange y no puede
 operar ni mover fondos. El operador decide y opera a mano.
 
-> **Estado: cierre v2.0.** En producción en Docker, 398 tests pasando. Desarrollado desde 2026-09-28 con
+> **Estado: v3.0.0.** En producción en Docker, 403 tests pasando. Desarrollado desde 2026-09-28 con
 > [GitHub Spec Kit](https://github.com/github/spec-kit) sobre una
 > [constitución](.specify/memory/constitution.md) de 7 principios — ver [Desarrollo](#-desarrollo-spec-kit--slices).
 
@@ -223,20 +223,20 @@ dependencias pinneadas).
 | [052](specs/052-radar-intradia/) | **Radar intradia (1h)**: caso AVAX; disparador volumen+retorno propio probado 2022-26 en IS/OOS, sin ventaja (long ni short); solo util como aviso de 'mira el grafico'. Registros con hora del exchange y desfase del reloj |
 | [053](specs/053-correlaciones/) | **Correlaciones entre pares como variable de estado**: correlación media 7d, dispersión y retorno del mercado no aportan (efecto ~0 y signo invertido entre IS y OOS); opencode y agy coinciden en ventaja esperada casi nula. Ideas baratas sin probar en la spec |
 | [035](specs/035-auditoria-resultados/) | **Auditoría de resultados y de estrategia** (opencode/DeepSeek + agy/Gemini, verificadas por mí): el mensaje de alerta mezclaba tres formatos (corregido); el edge viene de capitulaciones de todo el mercado (springs aislados sin ventaja, 5+ pares a la vez +2.5%); filtros propuestos (barrida, caída 24h, régimen BTC) no superan un bootstrap por día -> se muestran y registran, no filtran |
-| [033](specs/033-rumor-radar/) | **En producción, NO validado**: radar volumen + rumor — vela 4h con volumen ≥2.5x sin evento Wyckoff + velocidad de menciones en Twitter ≥2x vs hace 7 días → aviso. Cada caso se registra en `agent_state/rumor_radar.jsonl` para validarlo después |
+| [033](specs/033-rumor-radar/) | **En producción, NO validado y fuera del chat**: radar volumen + rumor — vela 4h con volumen ≥2.5x sin evento Wyckoff + velocidad de menciones en Twitter ≥2x vs hace 7 días. Cada caso se registra en `agent_state/rumor_radar.jsonl`. Telegram solo recibe el spring |
 
 ---
 
 ## 📊 Estado actual y límites conocidos
 
-- ✅ Pipeline de datos sin repintado, UTC consistente en todo punto crítico, reloj del exchange, 398 tests pasando.
+- ✅ Pipeline de datos sin repintado, UTC consistente en todo punto crítico, reloj del exchange, 403 tests pasando.
 - ✅ Corriendo en producción, ciclo real Binance → Telegram confirmado end-to-end.
-- ✅ **Aviso OPORTUNIDAD DE COMPRA** (slices 023, 044, 051): Spring de Wyckoff con volumen de ruptura ≥ 2.5x, único
-  edge validado con holdout (mediana +0.6 % en 72 h en días de pánico amplio, 4 a 5 de cada 10 días en pérdida). Un
-  mensaje por vela, en lenguaje sencillo, con 4 pasos y precios concretos. Gateado por
-  `settings.wyckoff_alerts.enabled` (activado en `config-clean.yml`).
-- ℹ️ Avisos informativos sin ventaja comprobada: lado bajista ("sin acción"), "Movimiento raro" (radar + Twitter).
-  Los avisos de RSI/MACD vienen apagados en `config-clean.yml`.
+- ✅ **Aviso OPORTUNIDAD DE COMPRA** (slices 023, 044, 050, 051): Spring de Wyckoff con volumen de ruptura ≥ 2.5x, único
+  edge validado con holdout (mediana +0.6 % en 72 h en días de pánico amplio, 4 a 5 de cada 10 días en pérdida). Telegram
+  lo envía solo si los springs líquidos (≥ 20 millones USD en 24 h) son al menos el 20 % de ese universo en la misma vela.
+  Un mensaje por vela, en lenguaje sencillo, con 4 pasos y precios concretos.
+- ℹ️ El spring suelto, el upthrust y el radar se registran en `app/agent_state/rumor_radar.jsonl` y no entran al chat.
+  Twitter es una nota en la compra de una sola moneda. Los avisos de RSI/MACD vienen apagados en `config-clean.yml`.
 - ⚠️ **El score de `SignalEnhancer` fue validado históricamente contra los dos indicadores
   habilitados en producción (RSI: 642 señales — slice 007; macd_cross: 1.776 señales — slice 011) y
   no mostró valor predictivo** — en macd_cross a 72h la correlación es incluso significativamente

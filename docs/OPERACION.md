@@ -42,7 +42,7 @@ docker logs crypto-signal | grep -i "Alert sent\|RADAR\|WYCKOFF"       # avisos 
 curl http://127.0.0.1:8090/status                                      # estado por HTTP
 ```
 
-Registro de alertas: `app/agent_state/rumor_radar.jsonl` (una línea JSON por evento; incluye `recorded_at`, `exchange_time` y `clock_skew_s` para auditar retrasos).
+Registro de eventos: `app/agent_state/rumor_radar.jsonl` (una línea JSON por evento; incluye `recorded_at`, `exchange_time` y `clock_skew_s`). Telegram solo recibe la compra spring. El HTML enviado queda en `app/agent_state/telegram_sent.jsonl`. El radar y el upthrust se registran y no entran al chat.
 
 ## Validación hacia adelante (cuando haya datos)
 

@@ -6,8 +6,9 @@ Dos mediciones sobre los tweets recientes de un ticker (GetXAPI, docs.getxapi.co
 
 1. Velocidad de menciones: la busqueda devuelve una pagina fija de ~20 tweets, asi que
    en vez de contar se mide cuanto tiempo abarcan (20 tweets en 10 min = ticker
-   hirviendo; en 12 h = quieto). Se compara contra la misma medicion de hace 7 dias
-   usando `until_time:` (corte exacto en el pasado, verificado en vivo).
+   hirviendo; en 12 h = quieto). Antes de medir se descartan tuits con 0 likes o de
+   cuentas con menos de 100 seguidores (spam de cashtag). Se compara contra la misma
+   medicion de hace 7 dias usando `until_time:` (corte exacto en el pasado).
 2. Clasificacion del contenido con Gemini (esquema de specs/030): capitulacion /
    euforia / mixto / nada, pico social confirmado por terceros, catalizador presente.
 
@@ -34,6 +35,9 @@ MAX_TWEET_TEXT_CHARS = 240
 BASELINE_DAYS = 7
 ACCELERATING_RATIO = 2.0
 VIRAL_VIEWS = 50_000
+# Pantalla de spam sobre la pagina que ya llego. No es un edge: no decide el envio.
+MIN_LIKE_COUNT = 1
+MIN_AUTHOR_FOLLOWERS = 100
 TWITTER_DATE_FORMAT = "%a %b %d %H:%M:%S %z %Y"
 
 CLASSIFICATION_PROMPT_TEMPLATE = """Sos un analista de sentimiento de mercados cripto. A continuacion hay hasta {n} tweets recientes sobre {ticker}, recolectados porque el precio tuvo un pico de volumen inusual.
@@ -132,7 +136,39 @@ class TwitterSentimentAnalyzer:
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
-        return response.json().get('tweets') or []
+        raw = response.json().get('tweets') or []
+        return self._screen_spam(raw)
+
+    @staticmethod
+    def _is_number(value):
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+    @classmethod
+    def _screen_spam(cls, tweets):
+        """Quita tuits sin likes o de cuentas chicas. Si el campo no viene, el tuit se queda."""
+        if not isinstance(tweets, list):
+            return []
+        kept = [t for t in tweets if cls._keep_tweet(t)]
+        dropped = len(tweets) - len(kept)
+        if dropped:
+            structlog.get_logger().debug(
+                f"[TWITTER] {dropped} tuits fuera (0 likes o < {MIN_AUTHOR_FOLLOWERS} seguidores); quedan {len(kept)}"
+            )
+        return kept
+
+    @classmethod
+    def _keep_tweet(cls, tweet) -> bool:
+        if not isinstance(tweet, dict):
+            return False
+        likes = tweet.get('likeCount')
+        if cls._is_number(likes) and likes < MIN_LIKE_COUNT:
+            return False
+        author = tweet.get('author')
+        if isinstance(author, dict):
+            followers = author.get('followers')
+            if cls._is_number(followers) and followers < MIN_AUTHOR_FOLLOWERS:
+                return False
+        return True
 
     @staticmethod
     def _mentions_per_hour(tweets):
@@ -198,17 +234,15 @@ class TwitterSentimentAnalyzer:
         current, baseline, ratio = result.get('current'), result.get('baseline'), result.get('ratio')
         # Los numeros pueden faltar o llegar con un tipo inesperado (salida de un LLM):
         # formatearlos a la fuerza tumbaba la alerta entera. Se muestra solo lo que es numerico.
-        def _is_number(value):
-            return isinstance(value, (int, float)) and not isinstance(value, bool)
-
-        if _is_number(ratio) and _is_number(current) and _is_number(baseline):
+        is_number = TwitterSentimentAnalyzer._is_number
+        if is_number(ratio) and is_number(current) and is_number(baseline):
             trend = " 🔥 acelerando" if ratio >= ACCELERATING_RATIO else ""
             lines.append(f"Menciones: {current:.1f}/h ahora vs {baseline:.1f}/h hace "
                          f"{BASELINE_DAYS} días ({ratio:.1f}x){trend}")
-        elif _is_number(current):
+        elif is_number(current):
             lines.append(f"Menciones: {current:.1f}/h ahora")
         max_views = result.get('max_views')
-        if _is_number(max_views) and max_views >= VIRAL_VIEWS:
+        if is_number(max_views) and max_views >= VIRAL_VIEWS:
             lines.append(f"📣 Tweet viral: {max_views:,} vistas")
 
         sentiment_extreme = result.get('sentiment_extreme')

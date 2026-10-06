@@ -14,8 +14,9 @@ settings:
   # ALERTAS WYCKOFF EN VIVO (specs/023-wyckoff-live-alerts/)
   # ═══════════════════════════════════════════
   # Unico edge validado con holdout in-sample/out-of-sample de este proyecto
-  # (specs/017-wyckoff-edge-refinement/): Spring/Upthrust con volumen extremo (>=2.5x)
-  # en la vela de ruptura, solo en 4h. Independiente del score de SignalEnhancer
+  # (specs/017 y 050): spring con volumen extremo (>=2.5x) en 4h, y solo se manda a
+  # Telegram si los springs liquidos (>= 20 millones USD/24h) son >= 20% de ese universo.
+  # El spring suelto y el upthrust se registran y no entran al chat. Independiente del score de SignalEnhancer
   # (ya invalidado dos veces -- specs/007, specs/011). Envia un mensaje con ambos
   # encuadres (rapida 1-2h / sostenida 14d) y los numeros reales de la validacion.
   wyckoff_alerts:
@@ -30,8 +31,8 @@ settings:
       enabled: true
     # specs/033-rumor-radar/: cruce volumen + rumor. Si una vela de 4h cierra con volumen
     # >= 2.5x el promedio SIN evento Wyckoff, mide la velocidad de menciones en Twitter
-    # (ahora vs hace 7 dias); si se acelera >= min_mention_ratio, avisa por Telegram.
-    # NO validado: cada caso queda en app/agent_state/rumor_radar.jsonl para validarlo luego.
+    # (ahora vs hace 7 dias). NO es la alerta de Telegram: se registra en
+    # app/agent_state/rumor_radar.jsonl. El chat solo recibe el spring (compra).
     # Requiere twitter_sentiment.enabled y GETXAPI_API_KEY.
     rumor_radar:
       enabled: true

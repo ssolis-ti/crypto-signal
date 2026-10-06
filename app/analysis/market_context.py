@@ -142,7 +142,7 @@ class MarketContext:
                 top_losers=losers[-5:][::-1]  # Últimos 5 invertidos
             )
             
-            self.logger.info(
+            self.logger.debug(
                 f"Contexto: BTC {context.btc_trend} ({context.btc_change_24h}%), "
                 f"Sentiment {context.market_sentiment}, "
                 f"Gainers/Losers: {context.total_gainers}/{context.total_losers}"

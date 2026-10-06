@@ -63,6 +63,16 @@ def _no_event_fixture():
     return _to_ohlcv_list(closes, lows, highs, volumes)
 
 
+def _liquid(ohlcv, factor=500):
+    """Escala el volumen sin cambiar el volumen relativo. 500 deja las velas de juguete sobre 20 millones USD."""
+    out = []
+    for row in ohlcv:
+        row = list(row)
+        row[5] = row[5] * factor
+        out.append(row)
+    return out
+
+
 class TestWyckoffAlerterSpring:
     def test_confirmed_spring_sends_a_plain_language_buy_plan(self):
         notifier = RecordingNotifier()
@@ -98,7 +108,7 @@ class TestWyckoffAlerterSpring:
 
 
 class TestWyckoffAlerterUpthrust:
-    def test_confirmed_upthrust_is_informative_and_says_to_do_nothing(self):
+    def test_confirmed_upthrust_is_recorded_and_not_sent(self, tmp_path):
         closes, lows, highs, volumes = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
         closes += [103.0, 100.0]
         lows += [102.0, 99.0]
@@ -106,16 +116,17 @@ class TestWyckoffAlerterUpthrust:
         volumes += [1000.0, 100.0]
         ohlcv = _to_ohlcv_list(closes, lows, highs, volumes)
 
+        path = tmp_path / 'record.jsonl'
         notifier = RecordingNotifier()
-        alerter = WyckoffAlerter(notifier, enabled=True)
+        alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path))
 
         alerter.check_and_alert('binance', 'ETH/USDT', '4h', ohlcv)
+        alerter.check_and_alert('binance', 'ETH/USDT', '4h', ohlcv)
 
-        assert len(notifier.messages) == 1
-        msg = notifier.messages[0]
-        assert msg.startswith('🔴 <b>Aviso informativo (sin acción): ETH/USDT</b>')
-        assert 'Nada.' in msg and 'no dieron ventaja' in msg
-        assert 'Paso a paso' not in msg
+        assert notifier.messages == []
+        records = [json.loads(line) for line in path.read_text().strip().splitlines()]
+        assert len(records) == 1
+        assert records[0]['direction'] == 'cold' and records[0]['pair'] == 'ETH/USDT'
 
 
 class TestWyckoffAlerterDedup:
@@ -207,7 +218,7 @@ class TestRumorRadar:
         alerter = self._alerter(tmp_path, radar=True, twitter=False)
         assert alerter.rumor_radar_enabled is False
 
-    def test_accelerating_mentions_send_radar_alert_and_record(self, tmp_path):
+    def test_accelerating_mentions_are_recorded_and_not_sent(self, tmp_path):
         alerter = self._alerter(tmp_path)
         with patch.object(alerter.twitter_sentiment, 'mention_velocity', return_value=_velocity(3.0)), \
              patch.object(alerter.twitter_sentiment, 'analyze', return_value={
@@ -216,13 +227,10 @@ class TestRumorRadar:
                  'catalyst_present': True, 'summary': 'Rumor de listing.'}):
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
 
-        assert len(alerter.notifier.messages) == 1
-        msg = alerter.notifier.messages[0]
-        assert 'Movimiento raro: SOL/USDT' in msg
-        assert 'No hay ventaja comprobada' in msg
-        assert 'Rumor de listing.' in msg
+        assert alerter.notifier.messages == []
         record = json.loads((tmp_path / 'radar.jsonl').read_text().strip())
-        assert record['type'] == 'radar' and record['alert_sent'] is True
+        assert record['type'] == 'radar' and record['alert_sent'] is False
+        assert record['sentiment'] == 'euphoria' and record['pair'] == 'SOL/USDT'
 
     def test_quiet_mentions_record_without_alert(self, tmp_path):
         alerter = self._alerter(tmp_path)
@@ -337,23 +345,42 @@ class TestSignalQualityContext:
         depth = WyckoffAlerter._sweep_depth(df, 'hot')
         assert depth == pytest.approx(4.04, abs=0.01)
 
-    def test_isolated_spring_says_the_edge_is_small_and_to_use_little_money(self):
+    def test_isolated_liquid_spring_is_recorded_and_not_sent(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
         notifier = RecordingNotifier()
-        alerter = WyckoffAlerter(notifier, enabled=True)
-        pairs = {'BTC/USDT': _spring_fixture()}
-        pairs.update({f'Q{i}/USDT': _no_event_fixture() for i in range(9)})  # 1 de 10 pares vigilados
+        alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path))
+        pairs = {'BTC/USDT': _liquid(_spring_fixture())}
+        pairs.update({f'Q{i}/USDT': _liquid(_no_event_fixture()) for i in range(9)})  # 1 de 10 = 10%
+        alerter.check_cycle('binance', pairs)
         alerter.check_cycle('binance', pairs)
 
-        msg = notifier.messages[0]
-        assert 'solo 1 de 10 monedas (10%)' in msg
-        assert 'Caso poco extendido' in msg
-        assert 'pequeña' in msg and 'con poco dinero' in msg
+        assert notifier.messages == []
+        assert not (tmp_path / 'telegram_sent.jsonl').exists()
+        records = [json.loads(line) for line in path.read_text().strip().splitlines()]
+        assert len(records) == 1
+        assert records[0]['pair'] == 'BTC/USDT' and records[0]['eligible'] is True
+        assert records[0]['concurrent_pairs'] == 1 and records[0]['watched_pairs'] == 10
+
+    def test_illiquid_spring_stays_out_of_a_wide_order(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
+        notifier = RecordingNotifier()
+        alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path))
+        pairs = {f'P{i}/USDT': _liquid(_spring_fixture()) for i in range(3)}
+        pairs.update({f'Q{i}/USDT': _liquid(_no_event_fixture()) for i in range(7)})
+        pairs['DUST/USDT'] = _spring_fixture()
+        alerter.check_cycle('binance', pairs)
+
+        assert len(notifier.messages) == 1
+        assert 'DUST' not in notifier.messages[0]
+        assert all(f'P{i}/USDT' in notifier.messages[0] for i in range(3))
+        dust = [json.loads(line) for line in path.read_text().splitlines() if '"DUST/USDT"' in line]
+        assert len(dust) == 1 and dust[0]['eligible'] is False
 
     def test_simultaneous_springs_are_counted_and_sent_as_one_message(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
-        pairs = {f'P{i}/USDT': _spring_fixture() for i in range(5)}
-        pairs.update({f'Q{i}/USDT': _no_event_fixture() for i in range(5)})  # 5 de 10 = 50%
+        pairs = {f'P{i}/USDT': _liquid(_spring_fixture()) for i in range(5)}
+        pairs.update({f'Q{i}/USDT': _liquid(_no_event_fixture()) for i in range(5)})  # 5 de 10 = 50%
         alerter.check_cycle('binance', pairs)
 
         assert len(notifier.messages) == 1, 'las señales de una misma vela salen juntas en UN mensaje'
@@ -362,29 +389,36 @@ class TestSignalQualityContext:
         assert all(f'P{i}/USDT' in msg for i in range(5)), 'la lista trae las 5 monedas con precio y stop'
         assert 'Compra (long) <b>varias monedas de la lista</b>' in msg
 
-    def test_context_never_suppresses_an_alert(self):
+    def test_a_single_liquid_pair_is_wide_and_is_sent(self, tmp_path):
+        path = tmp_path / 'record.jsonl'
         notifier = RecordingNotifier()
-        alerter = WyckoffAlerter(notifier, enabled=True)
-        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})  # aislado
+        alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path))
+        alerter.check_cycle('binance', {'BTC/USDT': _liquid(_spring_fixture())})  # 1 de 1 = 100%
+
         assert len(notifier.messages) == 1
+        sent = json.loads((tmp_path / 'telegram_sent.jsonl').read_text().strip())
+        assert sent['kind'] == 'wyckoff_hot' and sent['pairs'] == ['BTC/USDT']
+        assert 'Entrada:' in sent['text'] and 'Stop:' in sent['text'] and 'Salida:' in sent['text']
 
     def test_context_is_recorded_for_forward_validation(self, tmp_path):
         path = tmp_path / 'record.jsonl'
         alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=str(path))
-        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})
+        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})  # volumen de juguete: no es elegible
 
         record = json.loads(path.read_text().strip())
         assert record['type'] == 'wyckoff'
-        assert record['concurrent_pairs'] == 1
+        assert record['eligible'] is False
+        assert record['concurrent_pairs'] is None
         assert record['sweep_depth_pct'] == pytest.approx(4.04, abs=0.01)
         assert 'change_24h_pct' in record
+        assert not (tmp_path / 'telegram_sent.jsonl').exists()
 
     def test_microstructure_snapshot_is_recorded_not_shown(self, tmp_path):
         path = tmp_path / 'record.jsonl'
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path), microstructure_enabled=True)
         alerter.microstructure.snapshot = lambda exchange, pair: {'funding_rate_pct': 0.01}
-        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})
+        alerter.check_cycle('binance', {'BTC/USDT': _liquid(_spring_fixture())})
 
         assert json.loads(path.read_text().strip())['micro'] == {'funding_rate_pct': 0.01}
         assert '0.01' not in notifier.messages[0] and 'micro' not in notifier.messages[0].lower()
@@ -397,7 +431,7 @@ class TestSignalQualityContext:
         def boom(exchange, pair):
             raise RuntimeError('binance caido')
         alerter.microstructure.snapshot = boom
-        alerter.check_cycle('binance', {'BTC/USDT': _spring_fixture()})
+        alerter.check_cycle('binance', {'BTC/USDT': _liquid(_spring_fixture())})
 
         assert len(notifier.messages) == 1
         assert json.loads(path.read_text().strip())['micro'] is None
@@ -410,7 +444,7 @@ class TestSignalQualityContext:
     def test_one_pair_failing_does_not_stop_the_cycle(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
-        pairs = {'BAD/USDT': [[1, 'x']] * 40, 'BTC/USDT': _spring_fixture()}
+        pairs = {'BAD/USDT': [[1, 'x']] * 40, 'BTC/USDT': _liquid(_spring_fixture())}
         alerter.check_cycle('binance', pairs)
         assert len(notifier.messages) == 1
 
@@ -428,7 +462,7 @@ class TestExecutionGuidanceAndWeekend:
         assert 'No cierres antes por miedo' in msg
         assert 'no lo muevas ni lo quites' in msg
 
-    def test_upthrust_message_does_not_carry_spring_execution_claims(self):
+    def test_upthrust_does_not_send_a_trade_message(self):
         closes, lows, highs, volumes = _flat_range_df(n_flat=FIXTURE_FLAT_CANDLES)
         closes += [103.0, 100.0]
         lows += [102.0, 99.0]
@@ -438,8 +472,7 @@ class TestExecutionGuidanceAndWeekend:
         WyckoffAlerter(notifier, enabled=True).check_and_alert(
             'binance', 'ETH/USDT', '4h', _to_ohlcv_list(closes, lows, highs, volumes))
 
-        assert 'Paso a paso' not in notifier.messages[0]
-        assert 'stop loss' not in notifier.messages[0]
+        assert notifier.messages == []
 
     def test_weekend_is_decided_by_the_closing_time_of_the_candle(self):
         # vela 4h que abre viernes 20:00 UTC cierra sabado 00:00 -> cuenta como fin de semana
@@ -473,7 +506,7 @@ class TestMessageHonestyAndRadarStale:
         # el capital del operador no es el de la config de prueba de Freqtrade (100 USDT, 3 x 30)
         assert '100 USDT' not in msg and '30 USDT' not in msg
 
-    def test_radar_alert_after_downtime_is_marked_stale(self, tmp_path):
+    def test_radar_after_downtime_is_recorded_and_not_sent(self, tmp_path):
         alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, twitter_sentiment_enabled=True,
                                  rumor_radar_enabled=True, record_path=str(tmp_path / 'radar.jsonl'))
         ohlcv = _volume_spike_no_event_fixture()
@@ -486,7 +519,8 @@ class TestMessageHonestyAndRadarStale:
                  'catalyst_present': False, 'summary': ''}):
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
 
-        assert 'Aviso tardío' in alerter.notifier.messages[0]
+        assert alerter.notifier.messages == []
+        assert json.loads((tmp_path / 'radar.jsonl').read_text().strip())['alert_sent'] is False
 
 
 class TestWyckoffAlerterGuards:
@@ -670,7 +704,7 @@ class TestDetectionDegenerateInputs:
     def test_late_events_count_as_concurrent_pairs(self):
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
-        pairs = {f'P{i}/USDT': self._late_fixture(1) for i in range(5)}
+        pairs = {f'P{i}/USDT': _liquid(self._late_fixture(1)) for i in range(5)}
 
         alerter.check_cycle('binance', pairs)
 
@@ -787,14 +821,16 @@ class TestRadarEdges:
                 'sentiment_extreme': 'none', 'social_spike_confirmed': False,
                 'catalyst_present': False, 'summary': ''}
 
-    def test_ratio_exactly_at_threshold_alerts(self, tmp_path):
+    def test_ratio_exactly_at_threshold_is_recorded_not_sent(self, tmp_path):
         alerter = self._alerter(tmp_path)
         with patch.object(alerter.twitter_sentiment, 'mention_velocity',
                           return_value=_velocity(2.0)), \
              patch.object(alerter.twitter_sentiment, 'analyze',
                           return_value=self._analyze_result()):
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
-        assert len(alerter.notifier.messages) == 1
+        assert alerter.notifier.messages == []
+        record = json.loads((tmp_path / 'radar.jsonl').read_text().strip())
+        assert record['alert_sent'] is False and record['ratio'] == 2.0
 
     def test_ratio_just_below_threshold_records_without_alert(self, tmp_path):
         alerter = self._alerter(tmp_path)
@@ -839,10 +875,10 @@ class TestRadarEdges:
              patch.object(alerter.twitter_sentiment, 'analyze',
                           return_value=self._analyze_result()):
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', ohlcv)
-        assert len(alerter.notifier.messages) == 1
-        assert 'subió 0.0%' in alerter.notifier.messages[0]
+        assert alerter.notifier.messages == []
+        assert json.loads((tmp_path / 'radar.jsonl').read_text().strip())['candle_change_pct'] == 0.0
 
-    def test_record_failure_does_not_prevent_the_alert(self, tmp_path):
+    def test_record_failure_does_not_raise(self, tmp_path):
         blocker = tmp_path / 'blocker'
         blocker.write_text('x')  # archivo, no directorio: makedirs va a fallar
         alerter = WyckoffAlerter(RecordingNotifier(), enabled=True,
@@ -853,7 +889,7 @@ class TestRadarEdges:
              patch.object(alerter.twitter_sentiment, 'analyze',
                           return_value=self._analyze_result()):
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
-        assert len(alerter.notifier.messages) == 1
+        assert alerter.notifier.messages == []
 
 
 class FailingNotifier:
@@ -876,7 +912,7 @@ class TestTelegramFailureIsRetried:
         path = tmp_path / 'record.jsonl'
         notifier = FailingNotifier(fail_times=2)
         alerter = WyckoffAlerter(notifier, enabled=True, record_path=str(path))
-        data = {'BTC/USDT': _spring_fixture()}
+        data = {'BTC/USDT': _liquid(_spring_fixture())}
 
         alerter.check_cycle('binance', data)   # falla
         assert not path.exists() or path.read_text().strip() == ''
@@ -892,7 +928,7 @@ class TestTelegramFailureIsRetried:
         from analysis.wyckoff_alerts import SEND_MAX_FAILURES
         notifier = FailingNotifier(fail_times=10_000)
         alerter = WyckoffAlerter(notifier, enabled=True)
-        data = {'BTC/USDT': _spring_fixture()}
+        data = {'BTC/USDT': _liquid(_spring_fixture())}
 
         for _ in range(SEND_MAX_FAILURES + 5):
             alerter.check_cycle('binance', data)
@@ -986,7 +1022,7 @@ class TestWideClusterFraction:
     def test_watched_pairs_are_recorded(self, tmp_path):
         path = tmp_path / 'record.jsonl'
         alerter = WyckoffAlerter(RecordingNotifier(), enabled=True, record_path=str(path))
-        pairs = {'BTC/USDT': _spring_fixture(), 'Q/USDT': _no_event_fixture()}
+        pairs = {'BTC/USDT': _liquid(_spring_fixture()), 'Q/USDT': _liquid(_no_event_fixture())}
         alerter.check_cycle('binance', pairs)
         assert json.loads(path.read_text().strip())['watched_pairs'] == 2
 
@@ -1008,8 +1044,8 @@ class TestGroupedDelivery:
     """Las señales de una misma vela salen juntas en UN mensaje; el registro y la deduplicación siguen siendo por moneda."""
 
     def _pairs(self, n=4, quiet=6):
-        pairs = {f'C{i}/USDT': _spring_fixture() for i in range(n)}
-        pairs.update({f'Q{i}/USDT': _no_event_fixture() for i in range(quiet)})
+        pairs = {f'C{i}/USDT': _liquid(_spring_fixture()) for i in range(n)}
+        pairs.update({f'Q{i}/USDT': _liquid(_no_event_fixture()) for i in range(quiet)})
         return pairs
 
     def test_one_message_and_one_record_per_coin(self, tmp_path):
@@ -1053,7 +1089,7 @@ class TestGroupedDelivery:
             assert analyze.call_count == 0
             alerter2 = WyckoffAlerter(RecordingNotifier(), enabled=True, twitter_sentiment_enabled=True)
         with patch.object(alerter2.twitter_sentiment, 'analyze', return_value=None) as analyze2:
-            alerter2.check_cycle('binance', self._pairs(n=1))
+            alerter2.check_cycle('binance', self._pairs(n=1, quiet=0))
             assert analyze2.call_count == 1
 
     def test_a_group_can_mix_directions_as_separate_messages(self):
@@ -1065,9 +1101,9 @@ class TestGroupedDelivery:
         upthrust = _to_ohlcv_list(closes, lows, highs, volumes)
         notifier = RecordingNotifier()
         alerter = WyckoffAlerter(notifier, enabled=True)
-        alerter.check_cycle('binance', {'A/USDT': _spring_fixture(), 'B/USDT': upthrust})
-        assert len(notifier.messages) == 2
-        assert sorted(m[0] for m in notifier.messages) == ['🔴', '🟢']
+        alerter.check_cycle('binance', {'A/USDT': _liquid(_spring_fixture()), 'B/USDT': _liquid(upthrust)})
+        assert len(notifier.messages) == 1
+        assert notifier.messages[0].startswith('🟢')
 
 
 class TestRecordClock:
@@ -1100,16 +1136,15 @@ class TestRadarDelivery:
                  'social_spike_confirmed': False, 'catalyst_present': True, 'summary': 'x'}):
             alerter.check_and_alert('binance', 'SOL/USDT', '4h', _volume_spike_no_event_fixture())
 
-    def test_failed_telegram_delivery_is_retried_next_cycle_and_not_recorded_as_sent(self, tmp_path):
+    def test_radar_never_calls_telegram_and_is_recorded_once(self, tmp_path):
         notifier = FlakyNotifier([False, True])
         alerter = self._alerter(tmp_path, notifier)
         self._run(alerter)
-        assert notifier.calls == 1 and not (tmp_path / 'radar.jsonl').exists()
         self._run(alerter)
-        assert notifier.calls == 2
-        assert json.loads((tmp_path / 'radar.jsonl').read_text().strip())['alert_sent'] is True
-        self._run(alerter)
-        assert notifier.calls == 2, 'ya entregado: no se repite'
+        assert notifier.calls == 0
+        lines = (tmp_path / 'radar.jsonl').read_text().strip().splitlines()
+        assert len(lines) == 1
+        assert json.loads(lines[0])['alert_sent'] is False
 
     def test_radar_error_does_not_break_the_pair(self, tmp_path):
         alerter = self._alerter(tmp_path, RecordingNotifier())

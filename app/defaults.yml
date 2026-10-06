@@ -26,7 +26,7 @@ settings:
     twitter_sentiment:
       enabled: false
     # specs/033-rumor-radar/: vela de 4h con volumen >= 2.5x SIN evento Wyckoff + menciones
-    # en Twitter acelerando (ahora vs hace 7 dias) -> aviso. NO validado. Requiere twitter_sentiment.
+    # en Twitter acelerando (ahora vs hace 7 dias). Se registra, no se manda a Telegram.
     rumor_radar:
       enabled: false
       min_mention_ratio: 2.0

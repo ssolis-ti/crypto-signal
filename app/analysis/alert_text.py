@@ -155,6 +155,24 @@ def sizing_line(concurrent: Optional[int], watched: Optional[int], several: bool
             "Sin apalancamiento alto: usa 1x.\n\n")
 
 
+def _ticket(item: AlertItem, tz_name: str, several: bool) -> str:
+    """Las tres cifras de la orden, arriba del relato, para leerlas en la primera pantalla."""
+    exit_at = when(exit_time(item), tz_name)
+    clock = (f"<b>Salida:</b> {exit_at}. Son 72 h después del cierre de la vela, no de este mensaje. "
+             f"No cierres antes por miedo a una bajada chica.\n\n")
+    if several:
+        return (f"<b>Entrada:</b> ahora, a precio de mercado, varias monedas de la lista, en partes iguales. "
+                f"El precio de referencia de cada fila es el cierre de la vela de 4 h, no tu precio de llenado.\n"
+                f"<b>Stop:</b> stop loss de −{STOP_PCT}% sobre ese cierre (el precio está en cada fila). "
+                f"No lo muevas ni lo quites.\n" + clock)
+    price = fmt_price(item.price)
+    stop = fmt_price(stop_price(item.price))
+    return (f"<b>Entrada:</b> ahora, a precio de mercado. precio de referencia: <b>{price}</b> "
+            f"(cierre de la vela de 4 h, no tu precio de llenado).\n"
+            f"<b>Stop:</b> stop loss en <b>{stop}</b> (−{STOP_PCT}%). Es el −{STOP_PCT}% de ese cierre. "
+            f"No lo muevas ni lo quites.\n" + clock)
+
+
 def build_single_buy(item: AlertItem, tz_name: str, elapsed_hours: Optional[float]) -> str:
     coin_name = coin(item.pair)
     price = fmt_price(item.price)
@@ -164,11 +182,13 @@ def build_single_buy(item: AlertItem, tz_name: str, elapsed_hours: Optional[floa
              f"1️⃣ Compra (long) {coin_name} <b>ahora, a precio de mercado</b> (precio de referencia: <b>{price}</b>). "
              f"Esperar más no mejora el resultado.\n"
              f"2️⃣ Pon un <b>stop loss en {stop}</b> (−{STOP_PCT}%). Es obligatorio; no lo muevas ni lo quites.\n"
-             f"3️⃣ Si no salta el stop, <b>cierra el {when(exit_time(item), tz_name)}</b> (72 h después de entrar). "
+             f"3️⃣ Si no salta el stop, <b>cierra el {when(exit_time(item), tz_name)}</b> "
+             f"(72 h después del cierre de la vela, no de este mensaje). "
              f"No cierres antes por miedo a una bajada chica: cerrar antes empeoró los resultados.\n"
              f"4️⃣ No compres más si baja (no promedies a la baja).\n\n")
     parts = [
         f"🟢 <b>OPORTUNIDAD DE COMPRA: {item.pair}</b>\n",
+        _ticket(item, tz_name, several=False),
         f"🕐 La vela de 4 h cerró el {when(close_time(item), tz_name)}\n\n",
         late_notice(elapsed_hours),
         liquidity_note([item]),
@@ -211,11 +231,13 @@ def build_group_buy(items: List[AlertItem], tz_name: str, elapsed_hours: Optiona
              f"1️⃣ Compra (long) <b>varias monedas de la lista</b> (idealmente 3 o más, en partes iguales), <b>ahora, a precio de mercado</b>. "
              f"Mejor la canasta que una sola moneda: el resultado viene del conjunto.\n"
              f"2️⃣ En cada una pon un <b>stop loss de −{STOP_PCT}%</b> (el precio está en la lista). Obligatorio; no lo muevas.\n"
-             f"3️⃣ Si no salta el stop, <b>cierra todo el {when(exit_time(ref), tz_name)}</b> (72 h después de entrar). "
+             f"3️⃣ Si no salta el stop, <b>cierra todo el {when(exit_time(ref), tz_name)}</b> "
+             f"(72 h después del cierre de la vela, no de este mensaje). "
              f"No cierres antes por miedo a una bajada chica.\n"
              f"4️⃣ No compres más si baja (no promedies a la baja).\n\n")
     parts = [
         f"{title}\n",
+        _ticket(ref, tz_name, several=True),
         f"🕐 La vela de 4 h cerró el {when(close_time(ref), tz_name)}\n\n",
         late_notice(elapsed_hours),
         f"<b>¿Qué pasó?</b>\n{what}\n\n",
@@ -243,14 +265,16 @@ def build_info_bearish(items: List[AlertItem], tz_name: str, elapsed_hours: Opti
         head = f"🔴 <b>Aviso informativo (sin acción): {len(items)} monedas</b>"
         what = (f"Estas monedas subieron por encima de su máximo de los últimos 3 días con mucho volumen y enseguida volvieron a caer: "
                 f"{names}{more}.")
+    price = fmt_price(ref.price)
+    vol = f"{ref.volume_x:.1f}×" if ref.volume_x else "alto"
     return (f"{head}\n"
-            f"🕐 La vela de 4 h cerró el {when(close_time(ref), tz_name)}\n\n"
+            f"<b>Entrada:</b> ninguna. <b>Stop:</b> ninguno. <b>Salida:</b> ninguna.\n"
+            f"<b>Qué hacer: Nada.</b> No abras una venta. No cierres una compra por este aviso.\n"
+            f"{what} Podría venir una bajada, y aun así no se opera: en nuestras pruebas estos avisos "
+            f"<b>no dieron ventaja para abrir ventas</b>. Úsalo solo como información.\n"
+            f"🕐 La vela de 4 h cerró el {when(close_time(ref), tz_name)}. "
+            f"Cierre {price}: solo para ubicar la vela, no es una orden. Volumen de la ruptura: {vol}.\n"
             f"{late_notice(elapsed_hours)}"
-            f"<b>¿Qué pasó?</b>\n{what} Podría venir una bajada.\n\n"
-            f"<b>¿Qué hacer?</b>\n"
-            f"👉 <b>Nada.</b> En nuestras pruebas estos avisos <b>no dieron ventaja para abrir ventas (cortos)</b>: en varios "
-            f"períodos perdieron dinero, sobre todo cuando el mercado ya venía subiendo. Úsalo solo como información. "
-            f"Si tienes una compra abierta de estas monedas, vigila tu stop.\n\n"
             f"<i>{DISCLAIMER}</i>")
 
 
@@ -259,14 +283,14 @@ def build_radar(pair: str, rel_vol: float, candle_change: float, candle_open: pd
     color = "subió" if candle_change >= 0 else "bajó"
     close = pd.Timestamp(candle_open) + pd.Timedelta(hours=CANDLE_HOURS)
     text = (f"🛰️ <b>Movimiento raro: {pair}</b> (solo para mirar)\n"
-            f"🕐 La vela de 4 h cerró el {when(close, tz_name)}\n\n"
+            f"<b>Entrada:</b> ninguna. <b>Stop:</b> ninguno. <b>Salida:</b> ninguna.\n"
+            f"<b>Qué hacer:</b> nada. <b>No hay ventaja comprobada</b>. No entres solo por este aviso.\n"
+            f"🕐 La vela de 4 h cerró el {when(close, tz_name)}\n"
             f"{late_notice(elapsed_hours)}"
             f"<b>¿Qué pasó?</b>\n"
             f"{coin(pair)} {color} {abs(candle_change):.1f}% en esta vela con muchísimo volumen ({rel_vol:.1f} veces lo normal), "
-            f"pero <b>sin el patrón de rebote</b> de las oportunidades de compra.\n\n")
+            f"pero <b>sin el patrón de rebote</b> de las oportunidades de compra. Este aviso no trae precio de orden.\n")
     if twitter_section:
-        text += f"{twitter_section}\n\n"
-    text += ("<b>¿Qué hacer?</b>\n"
-             "👉 Mira el gráfico si te interesa. <b>No hay ventaja comprobada</b>: no entres solo por este aviso.\n\n"
-             f"<i>{DISCLAIMER}</i>")
+        text += f"\n{twitter_section}\n"
+    text += f"\n<i>{DISCLAIMER}</i>"
     return text

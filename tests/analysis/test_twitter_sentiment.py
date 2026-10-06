@@ -9,7 +9,12 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from analysis.twitter_sentiment import TwitterSentimentAnalyzer, TWITTER_DATE_FORMAT
+from analysis.twitter_sentiment import (
+    MIN_AUTHOR_FOLLOWERS,
+    MIN_LIKE_COUNT,
+    TwitterSentimentAnalyzer,
+    TWITTER_DATE_FORMAT,
+)
 
 
 def _mock_response(json_data, status_ok=True):
@@ -154,6 +159,73 @@ def _tweets_spanning(n, minutes_apart, views=0):
          'createdAt': (base - timedelta(minutes=i * minutes_apart)).strftime(TWITTER_DATE_FORMAT)}
         for i in range(n)
     ]}
+
+
+def _dated_tweet(text, minutes_ago, likes=5, followers=1_000, views=10):
+    created = (datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc) - timedelta(minutes=minutes_ago))
+    return {
+        'text': text,
+        'likeCount': likes,
+        'viewCount': views,
+        'createdAt': created.strftime(TWITTER_DATE_FORMAT),
+        'author': {'userName': 'alguien', 'followers': followers},
+    }
+
+
+class TestSpamScreen:
+    def test_zero_likes_and_small_accounts_are_left_out_of_velocity_and_gemini(self, monkeypatch):
+        monkeypatch.setenv('GETXAPI_API_KEY', 'k1')
+        monkeypatch.setenv('GEMINI_API_KEY', 'k2')
+        analyzer = TwitterSentimentAnalyzer(enabled=True)
+        # Dos tuits reales separados 60 min = 1 mencion/h. El spam junto inflaria la velocidad.
+        real = [
+            _dated_tweet('panic selling', minutes_ago=0, likes=4, followers=2_000),
+            _dated_tweet('this is over', minutes_ago=60, likes=3, followers=500),
+        ]
+        spam = [
+            _dated_tweet('airdrop claim now', minutes_ago=1, likes=0, followers=50_000, views=90_000),
+            _dated_tweet('join my telegram', minutes_ago=2, likes=20, followers=MIN_AUTHOR_FOLLOWERS - 1),
+        ]
+        gemini_payload = {
+            'sentiment_extreme': 'capitulation', 'social_spike_confirmed': False,
+            'catalyst_present': False, 'summary': 'Capitulan.',
+        }
+        with patch('analysis.twitter_sentiment.requests.get',
+                   return_value=_mock_response({'tweets': real + spam})) as mock_get, \
+             patch('analysis.twitter_sentiment.requests.post',
+                   return_value=_mock_response(_gemini_response(gemini_payload))) as mock_post:
+            result = analyzer.analyze('SOL', 'hot')
+
+        assert result['current'] == pytest.approx(1.0)
+        assert result['max_views'] == 10
+        assert 'airdrop' not in mock_post.call_args.kwargs['json']['contents'][0]['parts'][0]['text']
+        assert 'join my telegram' not in mock_post.call_args.kwargs['json']['contents'][0]['parts'][0]['text']
+        assert 'panic selling' in mock_post.call_args.kwargs['json']['contents'][0]['parts'][0]['text']
+        assert mock_get.call_count == 2
+
+    def test_a_page_of_only_spam_skips_gemini(self, monkeypatch):
+        monkeypatch.setenv('GETXAPI_API_KEY', 'k1')
+        monkeypatch.setenv('GEMINI_API_KEY', 'k2')
+        analyzer = TwitterSentimentAnalyzer(enabled=True)
+        spam = [_dated_tweet('airdrop', minutes_ago=i, likes=0, followers=10) for i in range(5)]
+        with patch('analysis.twitter_sentiment.requests.get', return_value=_mock_response({'tweets': spam})), \
+             patch('analysis.twitter_sentiment.requests.post') as mock_post:
+            assert analyzer.analyze('SOL', 'hot') is None
+        mock_post.assert_not_called()
+
+    def test_missing_like_and_follower_fields_are_kept(self):
+        kept = TwitterSentimentAnalyzer._screen_spam([
+            {'text': 'sin campos', 'createdAt': 'Tue Sep 29 12:00:00 +0000 2026'},
+            {'text': 'likes en texto', 'likeCount': '0', 'author': {'followers': '3'}},
+            {'text': 'cero likes', 'likeCount': 0, 'author': {'followers': 5_000}},
+            {'text': 'cuenta chica', 'likeCount': 8, 'author': {'followers': 12}},
+            'no es un tuit',
+        ])
+        assert [t['text'] for t in kept] == ['sin campos', 'likes en texto']
+
+    def test_one_like_and_exact_follower_floor_stay(self):
+        tweet = _dated_tweet('ok', minutes_ago=0, likes=MIN_LIKE_COUNT, followers=MIN_AUTHOR_FOLLOWERS)
+        assert TwitterSentimentAnalyzer._keep_tweet(tweet) is True
 
 
 class TestMentionVelocity:
