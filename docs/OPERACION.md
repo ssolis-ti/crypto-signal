@@ -48,9 +48,9 @@ Registro de eventos: `app/agent_state/rumor_radar.jsonl` (una línea JSON por ev
 
 Con ≥ 50 alertas maduras (≥ 72 h) reales:
 ```bash
-python specs/040-validacion-hacia-adelante/validate_forward.py
+docker run --rm -v "$PWD:/src" -w /src crypto-signal-crypto-signal python specs/040-validacion-hacia-adelante/validate_forward.py app/agent_state/rumor_radar.jsonl
 ```
-(Necesita pandas: se corre en un entorno con pandas o en la imagen de laboratorio). Se niega a concluir con menos de 50. La confirmación del efecto de los días de pánico amplio (≥ 20 % de los pares) necesita ~25 episodios, cerca de 2 años; el monitoreo de degradación (CUSUM) se estima en ~10 años. Detalle en `specs/040` y `specs/050`.
+Mide Binance USD-M, con el stop en el cierre de la vela de señal. Se niega a concluir con menos de 50. La confirmación del efecto de los días de pánico amplio (≥ 20 % de los pares líquidos) necesita ~25 episodios, cerca de 2 años; el monitoreo de degradación (CUSUM) se estima en ~10 años. Detalle en `specs/040` y `specs/050`.
 
 ## Riesgos que hay que tener presentes
 
